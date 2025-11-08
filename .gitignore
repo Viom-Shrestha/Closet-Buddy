@@ -8,3 +8,34 @@ wheels/
 
 # Virtual environments
 .venv
+
+# --- Python & Django ---
+*.py[cod]
+*.sqlite3
+db.sqlite3
+*.log
+.env
+.env.*
+.venv/
+media/
+staticfiles/
+*.pid
+
+# --- uv ---
+uv.lock
+
+# --- Node / React ---
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+
+# --- VS Code & OS ---
+.vscode/
+.DS_Store
+Thumbs.db
+
+# --- Cache ---
+*.cache
+*.bak
+*.tmp
