@@ -8,6 +8,12 @@ dependencies = [
     "django>=5.2.8",
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.16.1",
+    "huggingface-hub>=0.36.0",
+    "onnxruntime-gpu>=1.23.2",
     "pillow>=12.0.0",
     "rembg>=2.0.67",
+    "tailwind>=3.1.5b0",
+    "torch>=2.9.1",
+    "torchvision>=0.24.1",
+    "transformers>=4.57.1",
 ]

@@ -1,0 +1,25 @@
+closet_buddy/
+│
+├── backend/                      ← Django API backend
+│   ├── manage.py
+│   ├── closet_buddy_backend/
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   └── wsgi.py
+│   ├── api/                      ← Django app for your APIs
+│   │   ├── models.py
+│   │   ├── views.py
+│   │   ├── urls.py
+│   │   └── segmentation_utils.py
+│   └── media/                    ← segmented and uploaded images
+│
+├── frontend/                     ← React frontend (Vite or CRA)
+│   ├── package.json
+│   ├── src/
+│   └── public/
+│
+├── ai_models/                    ← Local AI scripts
+│   ├── classification/
+│   └── recommendation/
+│
+└── pyproject.toml                ← uv project file
