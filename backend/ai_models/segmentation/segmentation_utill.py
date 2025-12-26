@@ -10,8 +10,8 @@ def segment_image(uploaded_image):
     output_image = remove(input_image)
 
     filename = f"{uuid.uuid4()}.png"
-    output_path = Path(settings.MEDIA_ROOT) / "segmented" / filename
+    output_path = Path(settings.MEDIA_ROOT) / "clothing" / filename
 
     output_image.save(output_path)
 
-    return f"{settings.MEDIA_URL}segmented/{filename}"
+    return f"{settings.MEDIA_URL}clothing/{filename}"
