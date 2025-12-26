@@ -1,13 +1,14 @@
 import 'dart:io';
 import 'dart:convert';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
+  // ---------------- BASE URLS ----------------
   static const String host = 'http://127.0.0.1:8000';
-  static const String baseUrl = 'http://127.0.0.1:8000/api/auth';
+  static const String baseUrl = '$host/api/auth';
 
+  // ---------------- AUTH ----------------
   Future<bool> register(
     String username,
     String email,
@@ -63,6 +64,7 @@ class ApiService {
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('access_token');
+    await prefs.remove('refresh_token');
   }
 
   Future<bool> refreshToken() async {
@@ -86,6 +88,7 @@ class ApiService {
 
   Future<Map<String, dynamic>?> fetchProfile() async {
     String? token = await getAccessToken();
+    if (token == null) return null;
 
     var response = await http.get(
       Uri.parse('$baseUrl/profile/'),
@@ -124,60 +127,103 @@ class ApiService {
     return null;
   }
 
-  // In ApiService.dart
+  // 1. Create a helper for Authenticated GETs
+  Future<http.Response> _getWithRefresh(String url) async {
+    String? token = await getAccessToken();
+    var response = await http.get(
+      Uri.parse(url),
+      headers: {'Authorization': 'Bearer $token'},
+    );
 
+    if (response.statusCode == 401) {
+      if (await refreshToken()) {
+        token = await getAccessToken();
+        return await http.get(
+          Uri.parse(url),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+      }
+    }
+    return response;
+  }
+
+  // 2. Create a helper for Authenticated POSTs
+  Future<http.Response> _postWithRefresh(
+    String url,
+    Map<String, dynamic> body,
+  ) async {
+    String? token = await getAccessToken();
+    var response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 401) {
+      if (await refreshToken()) {
+        token = await getAccessToken();
+        return await http.post(
+          Uri.parse(url),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(body),
+        );
+      }
+    }
+    return response;
+  }
+
+  // ---------------- STORAGE ----------------
+  Future<List<Map<String, dynamic>>> getStorages() async {
+    final response = await _getWithRefresh('$baseUrl/storage/');
+
+    if (response.statusCode == 200) {
+      List data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      print("Failed to load storages: ${response.statusCode} ${response.body}");
+      return [];
+    }
+  }
+
+  // ---------------- SEGMENTATION ----------------
   Future<String?> segmentImage(File image) async {
-    // 1. Get token and check for null
     String? accessToken = await getAccessToken();
     if (accessToken == null) return null;
 
-    // Helper function to send the multipart request
     Future<http.StreamedResponse> _sendRequest(String token) async {
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('$baseUrl/segment/'),
       );
-
-      // Set Authorization header
       request.headers['Authorization'] = 'Bearer $token';
-
-      // Add the file
       request.files.add(await http.MultipartFile.fromPath('image', image.path));
-
       return request.send();
     }
 
-    // --- Attempt 1: Send request with current token ---
     http.StreamedResponse response = await _sendRequest(accessToken);
 
-    // --- Token Refresh Logic (Handling 401) ---
     if (response.statusCode == 401) {
       final refreshed = await refreshToken();
       if (!refreshed) {
         await logout();
         return null;
       }
-
-      // Get the newly refreshed token and resend
       accessToken = await getAccessToken();
       if (accessToken == null) return null;
-
       response = await _sendRequest(accessToken);
     }
 
-    // --- Process Final Response ---
     final body = await response.stream.bytesToString();
-
     if (response.statusCode == 200) {
       final data = jsonDecode(body);
-      final String relativeUrl =
-          data['segmented_image']; // e.g., /media/segmented/image.png
-
-      // 2. FIX: Prepend the full host to the relative URL
-      final String fullUrl =
-          '$host$relativeUrl'; // e.g., http://127.0.0.1:8000/media/segmented/image.png
-
-      return fullUrl; // <-- Return the absolute URL
+      final String relativeUrl = data['segmented_image'];
+      return '$host$relativeUrl';
     } else {
       print(
         'Segmentation API failed. Status: ${response.statusCode}, Body: $body',
@@ -205,5 +251,78 @@ class ApiService {
       print('Error deleting segmented image: $e');
       return false;
     }
+  }
+
+  // ---------------- CLIP AUTH ----------------
+  Future<bool> checkIfClothing(File image) async {
+    final token = await getAccessToken();
+    if (token == null) return false;
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/ai/authenticate-clothing/'),
+    );
+    request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(await http.MultipartFile.fromPath('image', image.path));
+
+    final response = await request.send();
+    final body = await response.stream.bytesToString();
+
+    if (response.statusCode == 200) {
+      return jsonDecode(body)['is_clothing'] == true;
+    }
+
+    return false;
+  }
+
+  // ---------------- METADATA EXTRACTION ----------------
+  Future<Map<String, dynamic>> extractMetadata(String segmentedUrl) async {
+    // Use the helper you wrote to handle 401 errors automatically
+    final response = await _postWithRefresh('$baseUrl/ai/extract-metadata/', {
+      'segmented_image': segmentedUrl,
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      print(
+        'Failed to extract metadata: ${response.statusCode} ${response.body}',
+      );
+      return {};
+    }
+  }
+
+  // ---------------- SAVE CLOTHING ----------------
+  Future<bool> saveClothing(Map<String, dynamic> data) async {
+    final token = await getAccessToken();
+    if (token == null) return false;
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/clothing/'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(data),
+    );
+
+    return response.statusCode == 201;
+  }
+
+  // ---------------- SAVE NON-CLOTHING ----------------
+  Future<bool> saveNonClothing(Map<String, dynamic> data) async {
+    final token = await getAccessToken();
+    if (token == null) return false;
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/non-clothing/'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(data),
+    );
+
+    return response.statusCode == 201;
   }
 }

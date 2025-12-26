@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'profile_screen.dart';
 import 'admin_screen.dart';
-import 'segmentation_screen.dart';
+import 'add_item.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -55,16 +55,16 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 20),
 
             // --- NEW BUTTON: Navigate to Segmentation Screen ---
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SegmentationScreen()),
-              );
-            },
-            child: const Text('Go to Segmentation'),
-          ),
-          const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddItemScreen()),
+                );
+              },
+              child: const Text('Go to Segmentation'),
+            ),
+            const SizedBox(height: 20),
 
             // Show admin button only for admins
             if (role == "admin")
