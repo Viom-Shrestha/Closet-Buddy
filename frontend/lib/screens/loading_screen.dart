@@ -1,398 +1,237 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
-import 'home_screen.dart';
-import 'login_screen.dart';
 import 'dart:math' as math;
 
-class LoadingScreen extends StatefulWidget {
-  const LoadingScreen({super.key});
+class LoadingPage extends StatefulWidget {
+  const LoadingPage({Key? key}) : super(key: key);
 
   @override
-  State<LoadingScreen> createState() => _LoadingScreenState();
+  State<LoadingPage> createState() => _ClosetBuddyLoadingPageState();
 }
 
-class _LoadingScreenState extends State<LoadingScreen>
+class _ClosetBuddyLoadingPageState extends State<LoadingPage>
     with TickerProviderStateMixin {
-  final ApiService api = ApiService();
-  late AnimationController _rotationController;
   late AnimationController _fadeController;
-  late AnimationController _scaleController;
+  late AnimationController _pulseController;
+  late AnimationController _progressController;
   late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+  late Animation<double> _pulseAnimation;
+
+  int _currentStep = 0;
+  final List<String> _loadingSteps = [
+    'Initializing AI assistant',
+    'Loading your wardrobe',
+    'Preparing recommendations',
+  ];
 
   @override
   void initState() {
     super.initState();
 
-    void goTo(Widget page) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => page),
-      );
-    }
-
-    Future<void> checkAuth() async {
-      await Future.delayed(const Duration(seconds: 4));
-
-      final token = await api.getAccessToken();
-
-      if (token != null) {
-        // Try fetching profile to confirm token validity
-        final profile = await api.fetchProfile();
-
-        if (profile != null) {
-          goTo(const HomeScreen());
-          return;
-        }
-      }
-
-      goTo(const LoginScreen());
-    }
-    
-    checkAuth();
-
-    _rotationController = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..repeat();
-
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
 
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+
+    _progressController = AnimationController(
+      duration: const Duration(seconds: 6),
       vsync: this,
     );
 
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeIn));
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
     _fadeController.forward();
-    _scaleController.forward();
+    _pulseController.repeat(reverse: true);
+    _progressController.forward();
+
+    // Simulate loading steps
+    _animateSteps();
+  }
+
+  void _animateSteps() async {
+    for (int i = 0; i < _loadingSteps.length; i++) {
+      await Future.delayed(Duration(seconds: 2));
+      if (mounted) {
+        setState(() {
+          _currentStep = i;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
-    _rotationController.dispose();
     _fadeController.dispose();
-    _scaleController.dispose();
+    _pulseController.dispose();
+    _progressController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF6B4CE6), Color(0xFFB24CE6), Color(0xFFE64C9C)],
-          ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              // Floating particles
-              ...List.generate(20, (index) => FloatingParticle(index: index)),
+      backgroundColor: Color(0xFFF8F9FA),
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              children: [
+                Spacer(flex: 2),
 
-              // Main content
-              Center(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Animated hanger icon
-                        AnimatedBuilder(
-                          animation: _rotationController,
-                          builder: (context, child) {
-                            return Transform.rotate(
-                              angle:
-                                  math.sin(
-                                    _rotationController.value * 2 * math.pi,
-                                  ) *
-                                  0.1,
-                              child: Container(
-                                width: 120,
-                                height: 120,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.white.withOpacity(0.3),
-                                      blurRadius: 30,
-                                      spreadRadius: 10,
-                                    ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  Icons.checkroom_rounded,
-                                  size: 60,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            );
-                          },
+                // Logo
+                ScaleTransition(
+                  scale: _pulseAnimation,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0xFF1A1A1A).withOpacity(0.2),
+                          blurRadius: 32,
+                          offset: Offset(0, 12),
                         ),
-
-                        SizedBox(height: 40),
-
-                        // App name
-                        Text(
-                          'Closet Buddy',
-                          style: TextStyle(
-                            fontSize: 42,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 1.5,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black26,
-                                offset: Offset(0, 4),
-                                blurRadius: 10,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        SizedBox(height: 12),
-
-                        // Tagline
-                        Text(
-                          'Your AI-Powered Style Assistant',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.9),
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-
-                        SizedBox(height: 60),
-
-                        // Loading indicator
-                        SpinningLoader(),
-
-                        SizedBox(height: 24),
-
-                        // Loading text
-                        AnimatedLoadingText(),
                       ],
+                    ),
+                    child: Icon(
+                      Icons.checkroom_rounded,
+                      size: 48,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
-class FloatingParticle extends StatefulWidget {
-  final int index;
+                SizedBox(height: 40),
 
-  const FloatingParticle({Key? key, required this.index}) : super(key: key);
+                // App name
+                Text(
+                  'Closet Buddy',
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A1A),
+                    letterSpacing: -0.5,
+                  ),
+                ),
 
-  @override
-  State<FloatingParticle> createState() => _FloatingParticleState();
-}
+                SizedBox(height: 12),
 
-class _FloatingParticleState extends State<FloatingParticle>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late double startX;
-  late double startY;
-  late double endY;
+                // Tagline
+                Text(
+                  'Your AI-Powered Personal Stylist',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF6B7280),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
 
-  @override
-  void initState() {
-    super.initState();
-    final random = math.Random(widget.index);
-    startX = random.nextDouble();
-    startY = random.nextDouble();
-    endY = random.nextDouble();
+                Spacer(flex: 1),
 
-    _controller = AnimationController(
-      duration: Duration(seconds: 3 + random.nextInt(4)),
-      vsync: this,
-    )..repeat();
-  }
+                // Loading progress
+                Column(
+                  children: [
+                    // Progress bar
+                    Container(
+                      width: double.infinity,
+                      constraints: BoxConstraints(maxWidth: 320),
+                      child: Column(
+                        children: [
+                          AnimatedBuilder(
+                            animation: _progressController,
+                            builder: (context, child) {
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: LinearProgressIndicator(
+                                  value: _progressController.value,
+                                  backgroundColor: Color(0xFFE5E7EB),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF1A1A1A),
+                                  ),
+                                  minHeight: 6,
+                                ),
+                              );
+                            },
+                          ),
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+                          SizedBox(height: 24),
 
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Positioned(
-          left: MediaQuery.of(context).size.width * startX,
-          top:
-              MediaQuery.of(context).size.height *
-              (startY + (endY - startY) * _controller.value),
-          child: Opacity(
-            opacity: 0.3 * (1 - _controller.value),
-            child: Container(
-              width: 4 + (widget.index % 3) * 2,
-              height: 4 + (widget.index % 3) * 2,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
+                          // Loading text
+                          AnimatedSwitcher(
+                            duration: Duration(milliseconds: 400),
+                            child: Text(
+                              _loadingSteps[_currentStep],
+                              key: ValueKey<int>(_currentStep),
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                Spacer(flex: 2),
+
+                // Bottom info
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 32),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'All systems operational',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Version 1.0.0',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
-    );
-  }
-}
-
-class SpinningLoader extends StatefulWidget {
-  const SpinningLoader({Key? key}) : super(key: key);
-
-  @override
-  State<SpinningLoader> createState() => _SpinningLoaderState();
-}
-
-class _SpinningLoaderState extends State<SpinningLoader>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Transform.rotate(
-          angle: _controller.value * 2 * math.pi,
-          child: Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withOpacity(0.3),
-                width: 4,
-              ),
-            ),
-            child: CustomPaint(painter: LoaderPainter(_controller.value)),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class LoaderPainter extends CustomPainter {
-  final double progress;
-
-  LoaderPainter(this.progress);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      -math.pi / 2,
-      math.pi * 1.5,
-      false,
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(LoaderPainter oldDelegate) => true;
-}
-
-class AnimatedLoadingText extends StatefulWidget {
-  const AnimatedLoadingText({Key? key}) : super(key: key);
-
-  @override
-  State<AnimatedLoadingText> createState() => _AnimatedLoadingTextState();
-}
-
-class _AnimatedLoadingTextState extends State<AnimatedLoadingText>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  final List<String> _texts = [
-    'Organizing your wardrobe',
-    'Analyzing your style',
-    'Preparing outfits',
-  ];
-  int _currentIndex = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller =
-        AnimationController(
-          duration: const Duration(milliseconds: 2000),
-          vsync: this,
-        )..addListener(() {
-          if (_controller.value == 1.0) {
-            setState(() {
-              _currentIndex = (_currentIndex + 1) % _texts.length;
-            });
-            _controller.reset();
-            _controller.forward();
-          }
-        });
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: Tween<double>(begin: 0.4, end: 1.0).animate(_controller),
-      child: Text(
-        _texts[_currentIndex] + '...',
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.white.withOpacity(0.8),
-          letterSpacing: 0.5,
         ),
       ),
     );

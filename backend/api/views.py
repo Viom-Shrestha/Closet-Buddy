@@ -7,7 +7,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import ClothingItem, StorageUnit, NonClothingItem
@@ -22,21 +21,48 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
 
-
-@api_view(['GET'])
+@api_view(['GET', 'PUT']) # Added PUT here
 @permission_classes([IsAuthenticated])
 def profile(request):
-    """Return user's profile info"""
     user = request.user
-    role = "admin" if user.is_staff else "user"
-    return Response({
-        "username": user.username,
-        "email": user.email,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "role": role,
-    })
+    
+    if request.method == 'GET':
+        role = "admin" if user.is_staff else "user"
+        return Response({
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": role,
+        })
 
+    elif request.method == 'PUT':
+        # Get data from the Flutter request body
+        first_name = request.data.get('first_name')
+        last_name = request.data.get('last_name')
+
+        if not first_name or not last_name:
+            return Response(
+                {"error": "First name and last name cannot be empty"}, 
+            )
+        
+        # Check for name length (optional but good)
+        if len(first_name) > 30 or len(last_name) > 30:
+            return Response(
+                {"error": "Name is too long"}, 
+            )
+            
+        # Update fields if they were provided
+        user.first_name = first_name
+        user.last_name = last_name
+        
+        user.save()
+
+        return Response({
+            "message": "Profile updated successfully",
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+        }, status=200)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -90,17 +116,13 @@ def delete_segmented_image(request):
         return Response({"detail": "URL not provided."}, status=400)
 
     try:
-        # 1. Handle Full URLs (if Flutter sends http://127.0.0.1:8000/media/...)
-        # This gets the part after /media/ accurately
-        media_url = settings.MEDIA_URL # usually '/media/'
+        media_url = settings.MEDIA_URL 
         if media_url in segmented_url:
             relative_path = segmented_url.split(media_url)[-1]
         else:
             relative_path = segmented_url
 
-        # 2. Construct the absolute file path
         file_path = os.path.join(settings.MEDIA_ROOT, relative_path)
-        
         print(f"DEBUG: Attempting to delete file at: {file_path}")
 
         if os.path.exists(file_path):
@@ -121,12 +143,10 @@ def save_clothing_item(request):
     segmented_url = data.get('image_url')
 
     if segmented_url:
-        # Convert URL to relative local path
         media_url = settings.MEDIA_URL
         relative_path = segmented_url.split(media_url)[-1]
         full_path = os.path.join(settings.MEDIA_ROOT, relative_path)
 
-        # Open the file and attach it to the request data
         if os.path.exists(full_path):
             f = open(full_path, 'rb')
             # 'image' matches your model field name
@@ -147,7 +167,6 @@ def list_storage_units(request):
     storages = StorageUnit.objects.filter(user=request.user).select_related('parent_storage')
     serializer = StorageUnitSerializer(storages, many=True)
     return Response(serializer.data)
-
 
 def save_non_clothing_item(request):
     """
@@ -198,9 +217,7 @@ def authenticate_clothing(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def extract_metadata(request):
-    # Flexible key checking to avoid 400 errors
     print(f"DEBUG: Incoming request data: {request.data}")
-    
     segmented_url = request.data.get("segmented_image") or request.data.get("url")
     
     if not segmented_url:
@@ -213,8 +230,7 @@ def extract_metadata(request):
 
         if not image_path.exists():
             return Response({"error": f"Image not found at {image_path}"}, status=404)
-
-        # Your color extraction logic
+        # color extraction logic
         colors = extract_colors_with_names(str(image_path))
 
         return Response({
@@ -224,7 +240,6 @@ def extract_metadata(request):
             "subcategory": "Shirt",
             "occasion": "Casual",
         }, status=200)
-
     except Exception as e:
         print(f"DEBUG: Extraction Error: {e}")
         return Response({"error": str(e)}, status=500)

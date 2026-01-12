@@ -17,6 +17,7 @@ urlpatterns = [
 
     # Profile
     path('profile/', profile, name='profile'),
+    path('profile/update/', profile, name='profile-update'),
 
     # Admin
     path('admin-dashboard/', admin_dashboard, name='admin_dashboard'),
