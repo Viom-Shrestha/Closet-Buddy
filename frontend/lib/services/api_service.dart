@@ -4,11 +4,11 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // ---------------- BASE URLS ----------------
+  // BASE URLS
   static const String host = 'http://127.0.0.1:8000';
   static const String baseUrl = '$host/api/auth';
 
-  // ---------------- AUTH ----------------
+  // AUTH
   Future<bool> register(
     String username,
     String email,
@@ -105,7 +105,6 @@ class ApiService {
         headers: {'Authorization': 'Bearer $token'},
       );
     }
-
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
@@ -125,6 +124,43 @@ class ApiService {
       return jsonDecode(response.body);
     }
     return null;
+  }
+
+  // Inside class ApiService
+  Future<bool> updateProfile(Map<String, String> data) async {
+    String? token = await getAccessToken();
+    if (token == null) return false;
+
+    final url = Uri.parse(
+      '$baseUrl/profile/update/',
+    ); // Adjust URL to match your backend
+
+    var response = await http.put(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(data),
+    );
+
+    // If token expired, try to refresh and retry once
+    if (response.statusCode == 401) {
+      final refreshed = await refreshToken();
+      if (!refreshed) return false;
+
+      token = await getAccessToken();
+      response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(data),
+      );
+    }
+
+    return response.statusCode == 200;
   }
 
   // 1. Create a helper for Authenticated GETs
@@ -191,7 +227,7 @@ class ApiService {
     }
   }
 
-  // ---------------- SEGMENTATION ----------------
+  //  SEGMENTATION
   Future<String?> segmentImage(File image) async {
     String? accessToken = await getAccessToken();
     if (accessToken == null) return null;
@@ -207,7 +243,6 @@ class ApiService {
     }
 
     http.StreamedResponse response = await _sendRequest(accessToken);
-
     if (response.statusCode == 401) {
       final refreshed = await refreshToken();
       if (!refreshed) {
@@ -218,7 +253,6 @@ class ApiService {
       if (accessToken == null) return null;
       response = await _sendRequest(accessToken);
     }
-
     final body = await response.stream.bytesToString();
     if (response.statusCode == 200) {
       final data = jsonDecode(body);

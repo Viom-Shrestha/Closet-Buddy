@@ -1,0 +1,60 @@
+Exclusions: Features such as monetary transactions (payments), advanced premium tiers, and virtual try-ons are considered out of scope for the current MVP (Minimum Viable Product) and are not represented in the system architecture.
+
+Since you are using the default Django User table and have decided to keep premium features like AI ratings and Virtual Try-On out of the current scope, you can handle the "Free vs. Premium" distinction using Django Groups.
+
+This is the most "Django-friendly" way to manage tiers without modifying the database schema or writing complex custom logic.
+
+1. The Strategy: Using Django Groups
+Instead of adding a new field to the database, you create two Groups in the Django Admin:
+
+"Free_Tier"
+
+"Premium_Tier"
+
+When a user registers, you programmatically assign them to the "Free_Tier" group. If you ever want to simulate a "Premium" user for testing, you simply move them to the "Premium_Tier" group in the Admin panel.
+
+2. Implementation in your Code
+In your views.py (Logic)
+You can easily check a user's tier before allowing them to access certain "future" features or increased limits (like more storage spaces).
+
+Python
+
+def generate_outfit(request):
+    # Check if user is in the Premium group
+    is_premium = request.user.groups.filter(name='Premium_Tier').exists()
+    
+    if is_premium:
+        # Allow advanced features
+        pass
+    else:
+        # Limit to basic features
+        pass
+In your Templates (UI)
+You can hide or "lock" premium buttons (like the AI rating button) using a simple check.
+
+HTML
+
+{% if request.user.groups.all.0.name == "Premium_Tier" %}
+    <button>Get AI Rating</button>
+{% else %}
+    <button class="locked">Upgrade to Premium for AI Rating</button>
+{% endif %}
+3. Impact on your Diagrams
+Since you are using the Default Auth User, you should update your documentation as follows:
+
+ERD: Your User entity doesn't need a is_premium field. Instead, show a Many-to-Many relationship between User and Group (this is how Django handles it internally).
+
+Use Case Diagram: * Keep the User as the base actor.
+
+If you want to keep "Premium" in the diagram for future-proofing, keep the Premium User actor but only connect it to the features you plan to add later (like Virtual Try-On).
+
+Label those specific use cases as [Future Scope].
+
+4. Why this is good for your Project
+Zero Database Bloat: You don't have to run complex migrations on the auth_user table.
+
+Scalability: If you decide to add a "Gold" or "Pro" tier later, you just add another Group.
+
+Simplicity: It keeps your current project scope tight while proving to your evaluators that you have a plan for monetization/tiering.
+
+Would you like me to help you draft the "Database Schema" description for the User section to explain this Group-based approach?

@@ -2,18 +2,12 @@ from rest_framework import serializers
 from .models import ClothingItem,NonClothingItem,StorageUnit
 from django.contrib.auth.models import User
 
-# class ClothingItemSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = ClothingItem
-#         fields = "__all__"
-
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
 
     class Meta:
         model = User
         fields = ('username', 'email', 'password', 'first_name', 'last_name')
-
     def create(self, validated_data):
         user = User.objects.create_user(
             username=validated_data['username'],
@@ -23,14 +17,19 @@ class RegisterSerializer(serializers.ModelSerializer):
             last_name=validated_data.get('last_name', '')
         )
         return user
-
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name']
+        # Username and Email are usually read-only during a profile update
+        read_only_fields = ['username', 'email']
+        
 class ClothingItemCreateSerializer(serializers.ModelSerializer):
     storage_id = serializers.PrimaryKeyRelatedField(
         queryset=StorageUnit.objects.all(),
         source="storage_unit",
         write_only=True
     )
-
     class Meta:
         model = ClothingItem
         fields = [
@@ -77,3 +76,4 @@ class NonClothingItemSerializer(serializers.ModelSerializer):
             "name": obj.storage_unit.name,
             "type": obj.storage_unit.type
         }
+        

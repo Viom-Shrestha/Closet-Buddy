@@ -6,27 +6,23 @@ from ai_models.segmentation.segmentation_utill import test_segmentation
 from ai_models.classification.subcategory import test_subcategory
 
 
-class TestModels(APIView):
-    parser_classes = [MultiPartParser]
+import os
+# Import your function - change 'your_file_name' to the actual name of your script
+from ai_models.utils.color_extraction_util import extract_colors_with_names
 
-    def post(self, request):
-        img = request.FILES['image']
+def run_test(test_image_folder):
+    for filename in os.listdir(test_image_folder):
+        if filename.endswith((".jpg", ".png", ".jpeg")):
+            path = os.path.join(test_image_folder, filename)
+            result = extract_colors_with_names(path)
+            print(f"File: {filename}")
+            print(f"  -> Result: {result}\n")
 
-        # 1. Test Segmentation
-        seg_output, seg_time = test_segmentation(img)
-
-        # Convert segmented output to PIL for classification
-        seg_output_pil = seg_output
-
-        if seg_output_pil.mode != "RGB":
-            image = seg_output_pil.convert("RGB")
-
-        # 2. Test Classification
-        label, cls_time = test_subcategory(image)
-
-        # Respond
-        return Response({
-            "segmentation_time": seg_time,
-            "classification_time": cls_time,
-            "predicted_subcategory": label
-        })
+if __name__ == "__main__":
+    # Create a folder named 'test_images' and put 3-4 sample clothes there
+    folder_path = "./test_images" 
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        print(f"Please put some images in {folder_path} and run again.")
+    else:
+        run_test(folder_path)

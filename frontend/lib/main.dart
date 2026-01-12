@@ -6,7 +6,6 @@ import 'screens/home_screen.dart';
 import 'services/api_service.dart';
 import 'screens/loading_screen.dart';
 
-
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const ClosetBuddyApp());
@@ -79,13 +78,13 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   void _goTo(Widget page) {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => page),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => page));
   }
 
   @override
   Widget build(BuildContext context) {
-    return const LoadingScreen();
+    return const LoadingPage();
   }
 }
