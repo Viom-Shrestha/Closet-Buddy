@@ -3,12 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/clothing_service.dart';
 
-late TextEditingController categoryController;
-late TextEditingController subcategoryController;
-late TextEditingController dominantColorController;
-late TextEditingController secondaryColorController;
-late TextEditingController occasionController;
-
 enum UploadStep { selectImage, reviewing, editing }
 
 class UploadClothingScreen extends StatefulWidget {
@@ -78,12 +72,6 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   }
 
   Future<void> _processImage() async {
-    categoryController.text = category;
-    subcategoryController.text = subcategory;
-    dominantColorController.text = dominantColor;
-    secondaryColorController.text = secondaryColor;
-    occasionController.text = occasion;
-
     if (!mounted) return;
 
     try {
@@ -93,11 +81,19 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
 
       setState(() {
         segmentedUrl = result['segmented_image'];
+
         category = result['category'];
         subcategory = result['subcategory'];
         dominantColor = result['dominant_color'];
         secondaryColor = result['secondary_color'];
         occasion = result['occasion'];
+
+        // ✅ update controllers AFTER values exist
+        categoryController.text = category;
+        subcategoryController.text = subcategory;
+        dominantColorController.text = dominantColor;
+        secondaryColorController.text = secondaryColor;
+        occasionController.text = occasion;
 
         isLoading = false;
         currentStep = UploadStep.reviewing;
@@ -121,7 +117,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
 
     final payload = {
       "storage_unit": widget.storageId,
-      "image_url": segmentedUrl,
+      "segmented_image": segmentedUrl,
       "category": category,
       "subcategory": subcategory,
       "dominant_color": dominantColor,
@@ -155,6 +151,12 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       dominantColor = '';
       secondaryColor = '';
       occasion = '';
+
+      categoryController.clear();
+      subcategoryController.clear();
+      dominantColorController.clear();
+      secondaryColorController.clear();
+      occasionController.clear();
 
       currentStep = UploadStep.selectImage;
     });
