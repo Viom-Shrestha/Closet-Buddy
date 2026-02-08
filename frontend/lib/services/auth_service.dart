@@ -1,0 +1,48 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'api_client.dart';
+
+class AuthService {
+  final ApiClient client = ApiClient();
+
+  Future<bool> register(
+    String username,
+    String email,
+    String password,
+    String firstName,
+    String lastName,
+  ) async {
+    final res = await http.post(
+      Uri.parse('${ApiClient.baseUrl}/register/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'username': username,
+        'email': email,
+        'password': password,
+        'first_name': firstName,
+        'last_name': lastName,
+      }),
+    );
+
+    return res.statusCode == 201;
+  }
+
+  Future<bool> login(String username, String password) async {
+    final res = await http.post(
+      Uri.parse('${ApiClient.baseUrl}/login/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'username': username, 'password': password}),
+    );
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      await client.saveTokens(data['access'], data['refresh']);
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> logout() async {
+    await client.post('/logout/', {});
+  }
+}

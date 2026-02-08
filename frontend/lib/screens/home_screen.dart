@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../services/api_service.dart';
+import '../services/profile_service.dart';
 import 'profile_screen.dart';
 import 'admin_screen.dart';
 import 'add_item_screen.dart';
@@ -21,7 +21,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final api = ApiService();
+  final ProfileService profileService = ProfileService();
 
   String role = "user";
   int _selectedIndex = 0;
@@ -45,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // ---------------- BACKEND ----------------
 
   void fetchUserRole() async {
-    final profileData = await api.fetchProfile();
+    final profileData = await profileService.fetchProfile();
     if (profileData != null) {
       setState(() {
         role = profileData['role']; // user / admin

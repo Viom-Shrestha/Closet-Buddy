@@ -1,16 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../services/api_service.dart';
+import '../services/clothing_service.dart';
 
-enum UploadStep {
-  selectImage,
-  authenticating,
-  segmenting,
-  reviewing,
-  extracting,
-  editing,
-}
+late TextEditingController categoryController;
+late TextEditingController subcategoryController;
+late TextEditingController dominantColorController;
+late TextEditingController secondaryColorController;
+late TextEditingController occasionController;
+
+enum UploadStep { selectImage, reviewing, editing }
 
 class UploadClothingScreen extends StatefulWidget {
   final int storageId;
@@ -23,7 +22,7 @@ class UploadClothingScreen extends StatefulWidget {
 }
 
 class _UploadClothingScreenState extends State<UploadClothingScreen> {
-  final ApiService api = ApiService();
+  final ClothingService clothingService = ClothingService();
   final ImagePicker picker = ImagePicker();
 
   UploadStep currentStep = UploadStep.selectImage;
@@ -38,69 +37,68 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   String secondaryColor = '';
   String occasion = '';
 
-  Future<void> pickImageFromGallery() async {
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        selectedImage = File(picked.path);
-        currentStep = UploadStep.authenticating;
-      });
-      _authenticateImage();
-    }
+  late TextEditingController categoryController;
+  late TextEditingController subcategoryController;
+  late TextEditingController dominantColorController;
+  late TextEditingController secondaryColorController;
+  late TextEditingController occasionController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    categoryController = TextEditingController();
+    subcategoryController = TextEditingController();
+    dominantColorController = TextEditingController();
+    secondaryColorController = TextEditingController();
+    occasionController = TextEditingController();
   }
 
-  Future<void> pickImageFromCamera() async {
-    final picked = await picker.pickImage(source: ImageSource.camera);
-    if (picked != null) {
-      setState(() {
-        selectedImage = File(picked.path);
-        currentStep = UploadStep.authenticating;
-      });
-      _authenticateImage();
-    }
+  @override
+  void dispose() {
+    categoryController.dispose();
+    subcategoryController.dispose();
+    dominantColorController.dispose();
+    secondaryColorController.dispose();
+    occasionController.dispose();
+    super.dispose();
   }
 
-  Future<void> _authenticateImage() async {
-    setState(() => isLoading = true);
+  Future<void> _pickImage(ImageSource source) async {
+    final picked = await picker.pickImage(source: source);
+
+    if (picked == null) return;
+
+    setState(() {
+      selectedImage = File(picked.path);
+      isLoading = true;
+    });
+
+    await _processImage();
+  }
+
+  Future<void> _processImage() async {
+    categoryController.text = category;
+    subcategoryController.text = subcategory;
+    dominantColorController.text = dominantColor;
+    secondaryColorController.text = secondaryColor;
+    occasionController.text = occasion;
+
+    if (!mounted) return;
 
     try {
-      final isValid = await api.checkIfClothing(selectedImage!);
+      final result = await clothingService.process(selectedImage!);
 
-      if (!isValid) {
-        setState(() {
-          isLoading = false;
-          currentStep = UploadStep.selectImage;
-          selectedImage = null;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('This doesn\'t appear to be a clothing item'),
-            backgroundColor: Color(0xFFEF4444),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      } else {
-        setState(() {
-          currentStep = UploadStep.segmenting;
-        });
-        _segmentImage();
-      }
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-        currentStep = UploadStep.selectImage;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Authentication failed: $e')));
-    }
-  }
+      if (result == null) throw "Processing failed";
 
-  Future<void> _segmentImage() async {
-    try {
-      final url = await api.segmentImage(selectedImage!);
       setState(() {
-        segmentedUrl = url;
+        segmentedUrl = result['segmented_image'];
+        category = result['category'];
+        subcategory = result['subcategory'];
+        dominantColor = result['dominant_color'];
+        secondaryColor = result['secondary_color'];
+        occasion = result['occasion'];
+
         isLoading = false;
         currentStep = UploadStep.reviewing;
       });
@@ -108,85 +106,56 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       setState(() {
         isLoading = false;
         currentStep = UploadStep.selectImage;
+        selectedImage = null;
       });
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Segmentation failed: $e')));
-    }
-  }
-
-  Future<void> _extractMetadata() async {
-    setState(() {
-      isLoading = true;
-      currentStep = UploadStep.extracting;
-    });
-
-    try {
-      final result = await api.extractMetadata(segmentedUrl!);
-
-      setState(() {
-        category = result['category'] ?? 'Topwear';
-        subcategory = result['subcategory'] ?? 'Shirt';
-        dominantColor = result['dominant_color'] ?? 'Unknown';
-        secondaryColor = result['secondary_color'] ?? 'Unknown';
-        occasion = result['occassion'] ?? 'Casual';
-        isLoading = false;
-        currentStep = UploadStep.editing;
-      });
-    } catch (e) {
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Extraction failed: $e')));
+      ).showSnackBar(SnackBar(content: Text("Processing failed: $e")));
     }
   }
 
   Future<void> _saveClothing() async {
+    if (segmentedUrl == null) return;
     setState(() => isLoading = true);
 
-    final itemData = {
-      'storage_id': widget.storageId,
-      'image_url': segmentedUrl,
-      'category': category,
-      'subcategory': subcategory,
-      'dominant_color': dominantColor,
-      'secondary_color': secondaryColor,
-      'occasion': occasion,
+    final payload = {
+      "storage_unit": widget.storageId,
+      "image_url": segmentedUrl,
+      "category": category,
+      "subcategory": subcategory,
+      "dominant_color": dominantColor,
+      "secondary_color": secondaryColor,
+      "occasion": occasion,
     };
 
-    try {
-      final success = await api.saveClothing(itemData);
+    final success = await clothingService.save(payload);
 
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Item added successfully!'),
-            backgroundColor: Color(0xFF10B981),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      } else {
-        setState(() => isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to save item')));
-      }
-    } catch (e) {
-      setState(() => isLoading = false);
+    setState(() => isLoading = false);
+
+    if (success) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ).showSnackBar(const SnackBar(content: Text("Failed to save clothing")));
     }
   }
 
   Future<void> _retakePhoto() async {
     if (segmentedUrl != null) {
-      await api.deleteSegmentedImage(segmentedUrl!);
+      await clothingService.deleteSegmented(segmentedUrl!);
     }
     setState(() {
       selectedImage = null;
       segmentedUrl = null;
+
+      category = '';
+      subcategory = '';
+      dominantColor = '';
+      secondaryColor = '';
+      occasion = '';
+
       currentStep = UploadStep.selectImage;
     });
   }
@@ -254,8 +223,6 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         return _buildReviewSegmentation();
       case UploadStep.editing:
         return _buildEditMetadata();
-      default:
-        return SizedBox();
     }
   }
 
@@ -284,14 +251,14 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
             icon: Icons.photo_library_outlined,
             title: 'Choose from Gallery',
             description: 'Select an existing photo',
-            onTap: pickImageFromGallery,
+            onTap: () => _pickImage(ImageSource.gallery),
           ),
           SizedBox(height: 16),
           _buildUploadButton(
             icon: Icons.camera_alt_outlined,
             title: 'Take Photo',
             description: 'Use your camera to capture',
-            onTap: pickImageFromCamera,
+            onTap: () => _pickImage(ImageSource.camera),
           ),
           Spacer(),
           Container(
@@ -450,7 +417,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: _extractMetadata,
+                    onPressed: () {
+                      setState(() => currentStep = UploadStep.editing);
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color(0xFF1A1A1A),
                       foregroundColor: Colors.white,
@@ -499,14 +468,6 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   }
 
   Widget _buildEditMetadata() {
-    final categoryController = TextEditingController(text: category);
-    final subcategoryController = TextEditingController(text: subcategory);
-    final dominantColorController = TextEditingController(text: dominantColor);
-    final secondaryColorController = TextEditingController(
-      text: secondaryColor,
-    );
-    final occasionController = TextEditingController(text: occasion);
-
     return Column(
       children: [
         Expanded(
@@ -592,7 +553,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: _saveClothing,
+                onPressed: isLoading ? null : _saveClothing,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Color(0xFF10B981),
                   foregroundColor: Colors.white,
@@ -657,15 +618,6 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   }
 
   String _getLoadingMessage() {
-    switch (currentStep) {
-      case UploadStep.authenticating:
-        return 'Verifying clothing item...';
-      case UploadStep.segmenting:
-        return 'Removing background...';
-      case UploadStep.extracting:
-        return 'Analyzing details...';
-      default:
-        return 'Processing...';
-    }
+    return 'Processing clothing...';
   }
 }

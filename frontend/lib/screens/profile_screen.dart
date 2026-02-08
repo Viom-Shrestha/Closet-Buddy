@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../services/api_service.dart';
+import '../services/profile_service.dart';
+import '../services/auth_service.dart';
 import 'login_screen.dart';
 import '../widgets/primary_buttons.dart';
 
@@ -12,6 +13,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final ProfileService profileService = ProfileService();
+  final AuthService authService = AuthService();
   bool _isEditing = false;
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
@@ -31,8 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout(BuildContext context) async {
-    final api = ApiService();
-    await api.logout();
+    await authService.logout();
 
     if (!context.mounted) return;
 
@@ -53,10 +55,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       return; // Stop the function here
     }
-
-    // If valid, continue with API call...
-    final api = ApiService();
-
     // Prepare the data map
     final Map<String, String> updatedData = {
       'first_name': _firstNameController.text.trim(),
@@ -70,7 +68,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
-    final success = await api.updateProfile(updatedData);
+    final success = await profileService.updateProfile(updatedData);
 
     if (!context.mounted) return;
     Navigator.pop(context); // Remove loading indicator
@@ -212,8 +210,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final api = ApiService();
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -240,7 +236,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>?>(
-        future: api.fetchProfile(),
+        future: profileService.fetchProfile(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(

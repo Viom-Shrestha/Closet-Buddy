@@ -3,7 +3,8 @@ import 'theme/app_theme.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
-import 'services/api_service.dart';
+import 'services/api_client.dart';
+import 'services/profile_service.dart';
 import 'screens/loading_screen.dart';
 
 void main() {
@@ -35,7 +36,8 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  final ApiService api = ApiService();
+  final ApiClient apiClient = ApiClient();
+  final ProfileService profileService = ProfileService();
 
   @override
   void initState() {
@@ -44,19 +46,21 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _handleAuthFlow() async {
-    // Optional splash delay for branding
+    // Optional splash delay
     await Future.delayed(const Duration(seconds: 4));
 
-    final accessToken = await api.getAccessToken();
+    // Check access token
+    final token = await apiClient.token();
 
     if (!mounted) return;
 
-    if (accessToken == null) {
+    if (token == null) {
       _goTo(const LoginScreen());
       return;
     }
 
-    final profile = await api.fetchProfile();
+    // Validate token by fetching profile
+    final profile = await profileService.fetchProfile();
 
     if (!mounted) return;
 
@@ -65,8 +69,8 @@ class _AuthGateState extends State<AuthGate> {
       return;
     }
 
-    // Try refresh token
-    final refreshed = await api.refreshToken();
+    // Try refresh
+    final refreshed = await apiClient.refresh();
 
     if (!mounted) return;
 

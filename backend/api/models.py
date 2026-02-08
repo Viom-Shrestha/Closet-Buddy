@@ -51,6 +51,7 @@ class ClothingItem(models.Model):
     dominant_color = models.CharField(max_length=30)
     secondary_color = models.CharField(max_length=30, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_favourite = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.category} ({self.user.username})"
@@ -92,5 +93,6 @@ class Outfit(models.Model):
     occasion = models.CharField(max_length=50, null=True, blank=True)
     rating = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
     created_at = models.DateTimeField(auto_now_add=True)
+    is_favourite = models.BooleanField(default=False)
     def __str__(self):
         return f"{self.name} ({self.user.username})"

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
-import 'dart:math' as math;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _formKey = GlobalKey<FormState>();
   final _username = TextEditingController();
   final _password = TextEditingController();
-  final api = ApiService();
+  final AuthService authService = AuthService();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -60,13 +59,13 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isLoading = true);
 
     // Attempt login and get the token (or false on failure)
-    final token = await api.login(_username.text, _password.text);
+    final success = await authService.login(_username.text, _password.text);
 
     if (!mounted) return;
 
     setState(() => _isLoading = false); // Stop loading regardless of outcome
 
-    if (token != false) {
+    if (success) {
       // if (_rememberMe) {
       // await api.saveTokens(token);
       // }
