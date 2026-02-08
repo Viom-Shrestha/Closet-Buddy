@@ -20,7 +20,20 @@ class ClothingService {
     final res = await req.send();
     final body = await res.stream.bytesToString();
 
-    return res.statusCode == 200 ? jsonDecode(body) : null;
+    final decoded = jsonDecode(body);
+
+    // ✅ Success
+    if (res.statusCode == 200) {
+      return decoded;
+    }
+
+    // ❌ Not clothing
+    if (res.statusCode == 400 && decoded['error'] == "Not a clothing item") {
+      throw "Not a clothing item";
+    }
+
+    // ❌ Other backend errors
+    throw decoded['error'] ?? "Processing failed";
   }
 
   Future<bool> save(Map<String, dynamic> data) async {

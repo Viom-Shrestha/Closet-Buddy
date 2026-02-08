@@ -28,12 +28,20 @@ def clothing_process(request):
         return Response({"error": "Image required"}, status=400)
 
     # -------- CLIP --------
-    if not is_clothing(image.file):
-        return Response({"error": "Not clothing"}, status=400)
+    auth_result = is_clothing(image.file)
+
+    if not auth_result["is_clothing"]:
+        return Response({
+            "error": "Not a clothing item",
+            "confidence": auth_result["confidence"]
+        }, status=400)
+
 
     # -------- SEGMENT --------
     try:
-        segmented_url = segment_image(image)
+        segmented_path = segment_image(image)
+        segmented_url = request.build_absolute_uri(segmented_path)
+
     except Exception:
         return Response({"error": "Segmentation failed"}, status=500)
 
@@ -96,7 +104,11 @@ def clothing_save(request):
             subcategory=data["subcategory"],
             occasion=data["occasion"]
         )
-
+    try:
+        os.remove(image_path)
+    except Exception as e:
+        print("Cleanup failed:", e)
+    
     return Response({"id": clothing.id}, status=201)
 
 @api_view(['POST'])

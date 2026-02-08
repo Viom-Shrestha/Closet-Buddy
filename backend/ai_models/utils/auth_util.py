@@ -44,7 +44,13 @@ def is_clothing(image_path):
         clothing_score = (image_features @ clothing_features.T).mean()
         non_clothing_score = (image_features @ non_clothing_features.T).mean()
 
+    is_valid = (
+        clothing_score > non_clothing_score
+    )
+
     return {
-    "is_clothing": clothing_score > non_clothing_score,
-    "confidence": float(clothing_score)
-    }
+    "is_clothing": bool(is_valid),
+    "confidence": float(clothing_score),
+    "non_clothing_score": float(non_clothing_score)
+}
+
