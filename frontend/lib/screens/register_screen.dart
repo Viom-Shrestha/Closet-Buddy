@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -10,7 +10,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
-  final api = ApiService();
+  final authService = AuthService();
   final _formKey = GlobalKey<FormState>();
   final _username = TextEditingController();
   final _email = TextEditingController();
@@ -71,7 +71,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
       setState(() => _isLoading = true);
 
-      final success = await api.register(
+      final success = await authService.register(
         _username.text,
         _email.text,
         _password.text,

@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../services/profile_service.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final api = ApiService();
+    final profileService = ProfileService();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Admin Dashboard')),
       body: FutureBuilder(
-        future: api.fetchAdminData(),
+        future: profileService.fetchAdminDashboard(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
           final data = snapshot.data as Map<String, dynamic>;
 
           return Padding(

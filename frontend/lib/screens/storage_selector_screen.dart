@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../services/storage_service.dart';
 import 'upload_clothing_screen.dart';
 import 'add_non_clothing_screen.dart';
 
@@ -14,7 +14,7 @@ class StorageSelectorScreen extends StatefulWidget {
 }
 
 class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
-  final ApiService api = ApiService();
+  final StorageService storageService = StorageService();
   List<Map<String, dynamic>> storageList = [];
   int? selectedStorageId;
   bool isLoading = true;
@@ -27,7 +27,7 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
 
   Future<void> loadStorages() async {
     try {
-      final result = await api.getStorages();
+      final result = await storageService.getAll();
       result.sort((a, b) {
         int aParent = a['parent_storage']?['id'] ?? 0;
         int bParent = b['parent_storage']?['id'] ?? 0;

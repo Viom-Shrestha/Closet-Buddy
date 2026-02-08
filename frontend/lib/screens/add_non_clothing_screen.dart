@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../services/misc_service.dart';
 
 class AddNonClothingScreen extends StatefulWidget {
   final int storageId;
@@ -12,7 +12,7 @@ class AddNonClothingScreen extends StatefulWidget {
 }
 
 class _AddNonClothingScreenState extends State<AddNonClothingScreen> {
-  final ApiService api = ApiService();
+  final MiscService miscService = MiscService();
   final _formKey = GlobalKey<FormState>();
   final _itemNameController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -36,7 +36,7 @@ class _AddNonClothingScreenState extends State<AddNonClothingScreen> {
       };
 
       try {
-        final success = await api.saveNonClothing(itemData);
+        final success = await miscService.saveNonClothing(itemData);
 
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
