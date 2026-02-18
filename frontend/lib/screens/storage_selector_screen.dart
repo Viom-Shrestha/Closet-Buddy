@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/widgets/hover_clickable.dart';
 import '../services/storage_service.dart';
 import 'upload_clothing_screen.dart';
 import 'add_non_clothing_screen.dart';
@@ -155,7 +156,7 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
     final storageId = storage['id'] as int;
     final isSelected = selectedStorageId == storageId;
     final storageName = storage['name'] as String;
-    final storageType = storage['storage_type'] as String? ?? 'Storage';
+    final storageType = storage['type'] as String? ?? 'Storage';
     final itemCount = storage['item_count'] as int? ?? 0;
     final parentStorage = storage['parent_storage'];
 
@@ -164,7 +165,7 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
       displayName = '${parentStorage['name']} › $storageName';
     }
 
-    return GestureDetector(
+    return HoverClickable(
       onTap: () {
         setState(() {
           selectedStorageId = storageId;

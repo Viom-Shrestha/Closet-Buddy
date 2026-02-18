@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/hover_clickable.dart';
 import 'storage_selector_screen.dart';
 
 class AddItemSelectionPage extends StatefulWidget {
@@ -136,7 +137,7 @@ class _AddItemSelectionPageState extends State<AddItemSelectionPage> {
     required Color iconColor,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return HoverClickable(
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.all(20),

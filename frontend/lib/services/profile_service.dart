@@ -10,7 +10,7 @@ class ProfileService {
   }
 
   Future<bool> updateProfile(Map<String, String> data) async {
-    final res = await client.post('/profile/update/', data);
+    final res = await client.put('/profile/update/', data);
     return res.statusCode == 200;
   }
 

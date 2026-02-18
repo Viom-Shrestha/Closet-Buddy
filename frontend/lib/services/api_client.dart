@@ -81,5 +81,51 @@ class ApiClient {
     return res;
   }
 
+  Future<http.Response> put(String path, Map body) async {
+    var token = await _accessToken();
+
+    var res = await http.put(
+      Uri.parse('$baseUrl$path'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (res.statusCode == 401 && await refresh()) {
+      token = await _accessToken();
+      return http.put(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+    }
+
+    return res;
+  }
+
+  Future<http.Response> delete(String path) async {
+    var token = await _accessToken();
+
+    var res = await http.delete(
+      Uri.parse('$baseUrl$path'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (res.statusCode == 401 && await refresh()) {
+      token = await _accessToken();
+      return http.delete(
+        Uri.parse('$baseUrl$path'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+    }
+
+    return res;
+  }
+
   Future<String?> token() => _accessToken();
 }

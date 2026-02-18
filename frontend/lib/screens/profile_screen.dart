@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
+import '../services/storage_service.dart';
+import '../services/outfit_service.dart';
 import 'login_screen.dart';
 import '../widgets/primary_buttons.dart';
 
@@ -15,15 +17,19 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ProfileService profileService = ProfileService();
   final AuthService authService = AuthService();
+  final StorageService storageService = StorageService();
+  final OutfitService outfitService = OutfitService();
   bool _isEditing = false;
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
+  late Future<Map<String, dynamic>?> _profileBundleFuture;
 
   @override
   void initState() {
     super.initState();
     _firstNameController = TextEditingController();
     _lastNameController = TextEditingController();
+    _profileBundleFuture = _loadProfileBundle();
   }
 
   @override
@@ -76,6 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (success) {
       setState(() {
         _isEditing = false;
+        _profileBundleFuture = _loadProfileBundle();
       });
 
       // Refresh the screen data
@@ -93,6 +100,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     }
+  }
+
+  int _asInt(dynamic v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v?.toString() ?? '') ?? 0;
+  }
+
+  Future<Map<String, dynamic>?> _loadProfileBundle() async {
+    final profile = await profileService.fetchProfile();
+    if (profile == null) return null;
+
+    final storages = await storageService.getAll();
+    final outfits = await outfitService.getAll();
+
+    final topLevelStorages = storages.where((s) => s['parent_storage'] == null);
+
+    final Map<int, Map<String, dynamic>> clothesById = {};
+
+    for (final storage in topLevelStorages) {
+      final id = _asInt(storage['id']);
+      if (id <= 0) continue;
+
+      try {
+        final detail = await storageService.getDetail(id);
+        final clothes = List<Map<String, dynamic>>.from(
+          detail['clothes'] ?? [],
+        );
+
+        for (final c in clothes) {
+          final clothingId = _asInt(c['id']);
+          if (clothingId > 0) clothesById[clothingId] = c;
+        }
+      } catch (_) {
+        // skip failing storage detail requests and continue building profile data
+      }
+    }
+
+    final categoryCounts = <String, int>{};
+    for (final c in clothesById.values) {
+      final raw = (c['category'] ?? '').toString().trim();
+      final category = raw.isEmpty ? 'Unknown' : raw;
+      categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
+    }
+
+    final sortedCategories = categoryCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return {
+      'profile': profile,
+      'total_clothes': clothesById.length,
+      'total_outfits': outfits.length,
+      'total_storages': topLevelStorages.length,
+      'category_counts': sortedCategories,
+    };
   }
 
   Widget _buildStatCard(String label, String value, IconData icon) {
@@ -224,6 +286,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Color(0xFF1A1A1A)),
+            onPressed: () {
+              setState(() {
+                _profileBundleFuture = _loadProfileBundle();
+              });
+            },
+          ),
           if (!_isEditing)
             IconButton(
               icon: const Icon(Icons.edit_outlined, color: Color(0xFF1A1A1A)),
@@ -236,7 +306,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>?>(
-        future: profileService.fetchProfile(),
+        future: _profileBundleFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -253,16 +323,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
             );
           }
 
-          final profile = snapshot.data!;
+          final bundle = snapshot.data!;
+          final profile = Map<String, dynamic>.from(bundle['profile'] ?? {});
+          final totalClothes = _asInt(bundle['total_clothes']);
+          final totalOutfits = _asInt(bundle['total_outfits']);
+          final totalStorages = _asInt(bundle['total_storages']);
+          final categoryCounts = List<MapEntry<String, int>>.from(
+            bundle['category_counts'] ?? const <MapEntry<String, int>>[],
+          );
+          final topCategories = categoryCounts.take(4).toList();
+
+          const chartColors = <Color>[
+            Color(0xFF1A1A1A),
+            Color(0xFF4B5563),
+            Color(0xFF6B7280),
+            Color(0xFF9CA3AF),
+          ];
+
           if (!_isEditing) {
             _firstNameController.text = profile['first_name'] ?? '';
             _lastNameController.text = profile['last_name'] ?? '';
           }
-
-          // Mock data for demonstration
-          final totalClothes = 127;
-          final totalOutfits = 34;
-          final totalStorages = 3;
 
           return SingleChildScrollView(
             child: ConstrainedBox(
@@ -431,69 +512,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          SizedBox(
-                            height: 200,
-                            child: PieChart(
-                              PieChartData(
-                                sectionsSpace: 2,
-                                centerSpaceRadius: 50,
-                                sections: [
-                                  PieChartSectionData(
-                                    value: 45,
-                                    title: '45',
-                                    color: const Color(0xFF1A1A1A),
-                                    radius: 60,
-                                    titleStyle: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  PieChartSectionData(
-                                    value: 38,
-                                    title: '38',
-                                    color: const Color(0xFF6B7280),
-                                    radius: 60,
-                                    titleStyle: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  PieChartSectionData(
-                                    value: 44,
-                                    title: '44',
-                                    color: const Color(0xFF9CA3AF),
-                                    radius: 60,
-                                    titleStyle: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
+                          if (topCategories.isEmpty)
+                            const SizedBox(
+                              height: 160,
+                              child: Center(
+                                child: Text(
+                                  'No clothing data yet',
+                                  style: TextStyle(color: Color(0xFF9CA3AF)),
+                                ),
+                              ),
+                            )
+                          else
+                            SizedBox(
+                              height: 200,
+                              child: PieChart(
+                                PieChartData(
+                                  sectionsSpace: 2,
+                                  centerSpaceRadius: 50,
+                                  sections: [
+                                    for (
+                                      int i = 0;
+                                      i < topCategories.length;
+                                      i++
+                                    )
+                                      PieChartSectionData(
+                                        value: topCategories[i].value
+                                            .toDouble(),
+                                        title: '${topCategories[i].value}',
+                                        color:
+                                            chartColors[i % chartColors.length],
+                                        radius: 60,
+                                        titleStyle: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
                           const SizedBox(height: 24),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 12,
                             children: [
-                              _buildLegendItem(
-                                'T-Shirts',
-                                45,
-                                const Color(0xFF1A1A1A),
-                              ),
-                              _buildLegendItem(
-                                'Pants',
-                                38,
-                                const Color(0xFF6B7280),
-                              ),
-                              _buildLegendItem(
-                                'Dresses',
-                                44,
-                                const Color(0xFF9CA3AF),
-                              ),
+                              for (int i = 0; i < topCategories.length; i++)
+                                _buildLegendItem(
+                                  topCategories[i].key,
+                                  topCategories[i].value,
+                                  chartColors[i % chartColors.length],
+                                ),
                             ],
                           ),
                         ],
