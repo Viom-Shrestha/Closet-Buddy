@@ -22,17 +22,17 @@ class ClothingService {
 
     final decoded = jsonDecode(body);
 
-    // ✅ Success
+    // Success
     if (res.statusCode == 200) {
       return decoded;
     }
 
-    // ❌ Not clothing
+    // Not clothing
     if (res.statusCode == 400 && decoded['error'] == "Not a clothing item") {
-      throw "Not a clothing item";
+      throw {"type": "not_clothing", "confidence": decoded["confidence"]};
     }
 
-    // ❌ Other backend errors
+    // Other backend errors
     throw decoded['error'] ?? "Processing failed";
   }
 
@@ -44,5 +44,45 @@ class ClothingService {
   Future<bool> deleteSegmented(String url) async {
     final res = await client.post('/delete-segmented/', {'url': url});
     return res.statusCode == 200;
+  }
+
+  Future<List<Map<String, dynamic>>> getRecentClothes() async {
+    final res = await client.get('/clothing/recent/');
+    return res.statusCode == 200
+        ? List<Map<String, dynamic>>.from(jsonDecode(res.body))
+        : [];
+  }
+
+  Future<bool> toggleFavourite(int id) async {
+    final res = await client.post('/clothing/$id/toggle-favourite/', {});
+
+    return res.statusCode == 200;
+  }
+
+  Future<bool> deleteClothing(int id) async {
+    final res = await client.delete('/clothing/$id/delete/');
+    return res.statusCode == 204;
+  }
+
+  Future<bool> updateClothing(int id, Map data) async {
+    final res = await client.put('/clothing/$id/update/', data);
+    return res.statusCode == 200;
+  }
+
+  Future<bool> moveToStorage(int id, int storageId) async {
+    final res = await client.put('/clothing/$id/update/', {
+      'storage_unit': storageId,
+    });
+    return res.statusCode == 200;
+  }
+
+  Future<Map<String, dynamic>?> getById(int id) async {
+    final res = await client.get('/clothing/$id/');
+
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+
+    return null;
   }
 }

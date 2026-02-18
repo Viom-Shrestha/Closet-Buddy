@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../widgets/hover_clickable.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/clothing_service.dart';
@@ -105,14 +106,30 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         selectedImage = null;
       });
 
+      if (e is Map && e["type"] == "not_clothing") {
+        final confidence = (e["confidence"] * 100).toStringAsFixed(1);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "This doesn’t look like clothing.\nAI confidence: $confidence%",
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Processing failed: $e")));
+      ).showSnackBar(SnackBar(content: Text("Processing failed")));
     }
   }
 
   Future<void> _saveClothing() async {
     if (segmentedUrl == null) return;
+
     setState(() => isLoading = true);
 
     final payload = {
@@ -130,7 +147,17 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     setState(() => isLoading = false);
 
     if (success) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Clothing saved successfully"),
+          backgroundColor: Color(0xFF10B981),
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      Navigator.pop(context, true); // IMPORTANT
     } else {
       ScaffoldMessenger.of(
         context,
@@ -260,7 +287,17 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
             icon: Icons.camera_alt_outlined,
             title: 'Take Photo',
             description: 'Use your camera to capture',
-            onTap: () => _pickImage(ImageSource.camera),
+            onTap: () {
+              if (Platform.isWindows) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Camera only works on mobile devices"),
+                  ),
+                );
+                return;
+              }
+              _pickImage(ImageSource.camera);
+            },
           ),
           Spacer(),
           Container(
@@ -298,7 +335,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     required String description,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return HoverClickable(
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.all(20),

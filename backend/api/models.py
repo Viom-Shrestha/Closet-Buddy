@@ -13,6 +13,16 @@ class StorageUnit(models.Model):
         ("shelf", "Shelf"),
         ("other", "Other"),
     ]
+    ALLOWED_CHILDREN = {
+    "closet": ["shelf", "drawer", "box"],
+    "wardrobe": ["shelf", "drawer", "box"],
+    "cupboard": ["shelf", "box", "drawer"],
+    "shelf": ["box"],
+    "drawer": [],
+    "box": [],
+    "other": []
+    }
+
     user = models.ForeignKey(User, on_delete=models.CASCADE,related_name="storage_units")
     name = models.CharField(max_length=100)
     description = models.TextField(null=True, blank=True)
@@ -32,6 +42,26 @@ class StorageUnit(models.Model):
 
     def __str__(self):
         return f"{self.name} [{self.type}] - {self.user.username}"
+    
+    def clean(self):
+        if self.parent_storage:
+            if self.parent_storage.user != self.user:
+                raise ValidationError("Parent storage must belong to same user.")
+
+            parent_type = self.parent_storage.type
+
+            allowed = self.ALLOWED_CHILDREN.get(parent_type, [])
+
+            if self.type not in allowed:
+                raise ValidationError(
+                    f"{parent_type} cannot contain {self.type}"
+                )
+                
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    
     
 class ClothingItem(models.Model):
     user = models.ForeignKey(

@@ -1,4 +1,3 @@
-
 import os
 from pathlib import Path
 from urllib.parse import urlparse
@@ -11,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..models import ClothingItem, StorageUnit
-from ..serializer import ClothingItemCreateSerializer
+from ..serializer import ClothingItemSerializer, ClothingItemUpdateSerializer
 
 from ai_models.segmentation.segmentation_utill import segment_image
 from ai_models.utils.auth_util import is_clothing
@@ -137,4 +136,96 @@ def delete_segmented_image(request):
         return Response({"detail": f"Error: {str(e)}"}, status=500)
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def recent_clothes(request):
+    items = ClothingItem.objects.filter(user=request.user)\
+                                .order_by("-created_at")[:6]
+
+    return Response([
+        {
+            "id": i.id,
+            "image": request.build_absolute_uri(i.image.url),
+            "is_favourite": i.is_favourite
+        }
+        for i in items
+    ])
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def toggle_favourite(request, pk):
+    try:
+        item = ClothingItem.objects.get(id=pk, user=request.user)
+    except ClothingItem.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    item.is_favourite = not item.is_favourite
+    item.save()
+
+    return Response({
+        "id": item.id,
+        "is_favourite": item.is_favourite
+    }, status=200)
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_clothing(request, pk):
+
+    try:
+        item = ClothingItem.objects.get(id=pk, user=request.user)
+    except ClothingItem.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    item.image.delete(save=False)
+    item.delete()
+
+    return Response({"detail": "Deleted"}, status=204)
+
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+def update_clothing(request, pk):
+
+    try:
+        item = ClothingItem.objects.get(id=pk, user=request.user)
+    except ClothingItem.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    payload = dict(request.data)
+    storage_id = payload.pop("storage_unit", None)
+
+    if storage_id is not None:
+        try:
+            if isinstance(storage_id, list):
+                storage_id = storage_id[0]
+            storage = StorageUnit.objects.get(id=storage_id, user=request.user)
+        except StorageUnit.DoesNotExist:
+            return Response({"error": "Invalid storage unit"}, status=400)
+
+        item.storage_unit = storage
+        item.save(update_fields=["storage_unit"])
+
+    if not payload:
+        serializer = ClothingItemSerializer(item, context={"request": request})
+        return Response(serializer.data, status=200)
+
+    serializer = ClothingItemUpdateSerializer(item, data=payload, partial=True)
+
+    if serializer.is_valid():
+        serializer.save()
+        refreshed = ClothingItemSerializer(item, context={"request": request})
+        return Response(refreshed.data, status=200)
+
+    return Response(serializer.errors, status=400)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def clothing_detail(request, pk):
+    try:
+        item = ClothingItem.objects.get(id=pk, user=request.user)
+    except ClothingItem.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    serializer = ClothingItemSerializer(item, context={"request": request})
+    return Response(serializer.data)
 
