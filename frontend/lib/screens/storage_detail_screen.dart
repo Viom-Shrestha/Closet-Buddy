@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/storage_service.dart';
 import '../services/clothing_service.dart';
+import '../services/misc_service.dart';
 import '../services/api_client.dart';
 import 'clothing_detail_screen.dart';
 import 'upload_clothing_screen.dart';
@@ -17,6 +18,7 @@ class StorageDetailScreen extends StatefulWidget {
 class _StorageDetailScreenState extends State<StorageDetailScreen> {
   final StorageService storageService = StorageService();
   final ClothingService clothingService = ClothingService();
+  final MiscService miscService = MiscService();
 
   Map<String, dynamic>? data;
   bool loading = true;
@@ -25,6 +27,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
   String _searchQuery = '';
   bool _selectionMode = false;
   final Set<int> _selectedClothingIds = <int>{};
+  List<Map<String, dynamic>> _breadcrumbChain = const [];
 
   @override
   void initState() {
@@ -35,9 +38,16 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
   Future<void> _load() async {
     try {
       final res = await storageService.getDetail(widget.storageId);
+      final allStorages = await storageService.getAll();
+      final chain = _buildBreadcrumbChain(
+        res['storage'] as Map<String, dynamic>,
+        allStorages,
+      );
+
       if (!mounted) return;
       setState(() {
         data = res;
+        _breadcrumbChain = chain;
         loading = false;
       });
     } catch (_) {
@@ -59,6 +69,37 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  List<Map<String, dynamic>> _buildBreadcrumbChain(
+    Map<String, dynamic> currentStorage,
+    List<Map<String, dynamic>> allStorages,
+  ) {
+    final byId = <int, Map<String, dynamic>>{};
+    for (final s in allStorages) {
+      final id = _asInt(s['id']);
+      if (id > 0) byId[id] = s;
+    }
+
+    final chain = <Map<String, dynamic>>[];
+    final visited = <int>{};
+
+    Map<String, dynamic>? cursor = currentStorage;
+    while (cursor != null) {
+      final id = _asInt(cursor['id']);
+      if (id <= 0 || visited.contains(id)) break;
+      visited.add(id);
+      chain.add(cursor);
+
+      final parent = cursor['parent_storage'] as Map<String, dynamic>?;
+      if (parent == null) break;
+
+      final parentId = _asInt(parent['id']);
+      if (parentId <= 0) break;
+      cursor = byId[parentId] ?? parent;
+    }
+
+    return chain.reversed.toList();
   }
 
   IconData _storageTypeIcon(String? type) {
@@ -309,6 +350,215 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     }
   }
 
+  Future<void> _editNonClothingItem(Map<String, dynamic> item) async {
+    final nameController = TextEditingController(
+      text: (item['name'] ?? '').toString(),
+    );
+    final descriptionController = TextEditingController(
+      text: (item['description'] ?? '').toString(),
+    );
+
+    final save = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Edit Non-Clothing Item',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Update item details',
+              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+            ),
+            const SizedBox(height: 18),
+            TextField(
+              controller: nameController,
+              autofocus: true,
+              style: const TextStyle(fontSize: 15, color: Color(0xFF1A1A1A)),
+              decoration: InputDecoration(
+                labelText: 'Name',
+                filled: true,
+                fillColor: const Color(0xFFF8F9FA),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF1A1A1A),
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descriptionController,
+              maxLines: 3,
+              style: const TextStyle(fontSize: 15, color: Color(0xFF1A1A1A)),
+              decoration: InputDecoration(
+                labelText: 'Description',
+                filled: true,
+                fillColor: const Color(0xFFF8F9FA),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF1A1A1A),
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF374151),
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A1A1A),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Save Changes'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (save != true) return;
+
+    final name = nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Name is required')));
+      return;
+    }
+
+    final ok = await miscService.updateNonClothing(_asInt(item['id']), {
+      'name': name,
+      'description': descriptionController.text.trim(),
+    });
+
+    if (!mounted) return;
+
+    if (!ok) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to update item')));
+      return;
+    }
+
+    hasChanges = true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Item updated'),
+        backgroundColor: Color(0xFF10B981),
+      ),
+    );
+    _load();
+  }
+
+  Future<void> _deleteNonClothingItem(Map<String, dynamic> item) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Item?'),
+        content: Text(
+          'Delete "${(item['name'] ?? 'item').toString()}"? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final ok = await miscService.deleteNonClothing(_asInt(item['id']));
+    if (!mounted) return;
+
+    if (!ok) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to delete item')));
+      return;
+    }
+
+    hasChanges = true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Item deleted'),
+        backgroundColor: Color(0xFF10B981),
+      ),
+    );
+    _load();
+  }
+
   Future<void> _showEditStorageDialog() async {
     final storage = data!['storage'] as Map<String, dynamic>;
     final nameController = TextEditingController(text: storage['name'] ?? '');
@@ -448,7 +698,6 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     final nonClothes = data!['non_clothing_items'] as List;
     final subStorages = storage['sub_storages'] as List;
     final counts = data!['counts'] as Map<String, dynamic>;
-    final parent = storage['parent_storage'] as Map<String, dynamic>?;
     final query = _searchQuery.trim().toLowerCase();
     final filteredClothes = clothes.where((c) {
       if (query.isEmpty) return true;
@@ -487,30 +736,46 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
             RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
                 children: [
-                  if (parent != null) ...[
+                  if (_breadcrumbChain.length > 1) ...[
                     _sectionCard(
-                      child: Row(
+                      child: Wrap(
+                        spacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           const Icon(Icons.account_tree_outlined, size: 18),
-                          const SizedBox(width: 6),
-                          TextButton(
-                            onPressed: () => _openStorage(_asInt(parent['id'])),
-                            child: Text(
-                              (parent['name'] ?? 'Parent').toString(),
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right, size: 18),
-                          Expanded(
-                            child: Text(
-                              (storage['name'] ?? '').toString(),
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
+                          for (int i = 0; i < _breadcrumbChain.length; i++) ...[
+                            if (i > 0)
+                              const Icon(Icons.chevron_right, size: 18),
+                            if (i == _breadcrumbChain.length - 1)
+                              Text(
+                                (_breadcrumbChain[i]['name'] ?? '').toString(),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              )
+                            else
+                              InkWell(
+                                onTap: () => _openStorage(
+                                  _asInt(_breadcrumbChain[i]['id']),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 2,
+                                  ),
+                                  child: Text(
+                                    (_breadcrumbChain[i]['name'] ?? '')
+                                        .toString(),
+                                    style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -842,6 +1107,30 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                               title: Text((n['name'] ?? 'Item').toString()),
                               subtitle: Text(
                                 (n['description'] ?? '').toString(),
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _editNonClothingItem(
+                                      Map<String, dynamic>.from(n as Map),
+                                    );
+                                  }
+                                  if (value == 'delete') {
+                                    _deleteNonClothingItem(
+                                      Map<String, dynamic>.from(n as Map),
+                                    );
+                                  }
+                                },
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(
+                                    value: 'edit',
+                                    child: Text('Edit'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Delete'),
+                                  ),
+                                ],
                               ),
                             ),
                           ),

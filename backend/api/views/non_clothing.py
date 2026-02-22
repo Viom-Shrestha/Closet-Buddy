@@ -26,3 +26,28 @@ def list_non_clothing_items(request):
 
     items = NonClothingItem.objects.filter(user=request.user)
     return Response(NonClothingItemSerializer(items, many=True).data)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def non_clothing_detail(request, pk):
+    try:
+        item = NonClothingItem.objects.get(id=pk, user=request.user)
+    except NonClothingItem.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    if request.method == 'DELETE':
+        item.delete()
+        return Response(status=204)
+
+    if 'name' in request.data:
+        name = (request.data.get('name') or '').strip()
+        if not name:
+            return Response({"error": "Name is required"}, status=400)
+        item.name = name
+
+    if 'description' in request.data:
+        item.description = request.data.get('description') or ''
+
+    item.save()
+    return Response(NonClothingItemSerializer(item).data, status=200)

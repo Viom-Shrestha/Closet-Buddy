@@ -40,13 +40,16 @@ class _AddNonClothingScreenState extends State<AddNonClothingScreen> {
 
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Item added successfully!'),
               backgroundColor: Color(0xFF10B981),
               behavior: SnackBarBehavior.floating,
+              duration: Duration(milliseconds: 900),
             ),
           );
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (!mounted) return;
+          Navigator.pop(context, true);
         } else {
           setState(() => isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(

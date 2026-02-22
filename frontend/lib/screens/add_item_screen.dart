@@ -63,14 +63,17 @@ class _AddItemSelectionPageState extends State<AddItemSelectionPage> {
                 description: 'Add clothes with AI recognition & analysis',
                 icon: Icons.checkroom_outlined,
                 iconColor: Color(0xFF3B82F6),
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) =>
                           StorageSelectorScreen(isClothing: true),
                     ),
                   );
+                  if (result == true && mounted) {
+                    Navigator.pop(context, true);
+                  }
                 },
               ),
 
@@ -82,14 +85,17 @@ class _AddItemSelectionPageState extends State<AddItemSelectionPage> {
                 description: 'Add accessories and other items',
                 icon: Icons.shopping_bag_outlined,
                 iconColor: Color(0xFF10B981),
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) =>
                           StorageSelectorScreen(isClothing: false),
                     ),
                   );
+                  if (result == true && mounted) {
+                    Navigator.pop(context, true);
+                  }
                 },
               ),
 
