@@ -26,6 +26,7 @@ urlpatterns = [
     path('delete-segmented/', delete_segmented_image, name='delete_segmented_image'),
     path('non-clothing/', save_non_clothing_item, name='save_non_clothing_item'),
     path('non-clothing/list/', list_non_clothing_items, name='list_non_clothing_items'),
+    path('non-clothing/<int:pk>/', non_clothing_detail, name='non_clothing_detail'),
     path("clothing/process/", clothing_process),
     path("clothing/save/", clothing_save),
     path("clothing/recent/", recent_clothes),

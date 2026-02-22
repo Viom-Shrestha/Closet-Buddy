@@ -9,6 +9,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from ai_models.classification.occasion import predict_occasion
+
 from ..models import ClothingItem, StorageUnit
 from ..serializer import ClothingItemSerializer, ClothingItemUpdateSerializer
 
@@ -56,6 +58,13 @@ def clothing_process(request):
         colors = extract_colors_with_names(str(image_path))
     except Exception:
         colors = {"dominant_color": "Unknown", "secondary_color": "Unknown"}
+    
+    # -------- Occasion --------
+    try:
+        occasion, occasion_conf = predict_occasion(image_path)
+    except Exception:
+        occasion = "Casual"
+        occasion_conf = 0.0
 
     # -------- TEMP CLASSIFICATION --------
     result = {
@@ -64,7 +73,8 @@ def clothing_process(request):
         "secondary_color": colors.get("secondary_color", "Unknown"),
         "category": "Topwear",
         "subcategory": "Shirt",
-        "occasion": "Casual"
+        "occasion": occasion,
+        "occasion_confidence": occasion_conf
     }
 
     return Response(result, status=200)

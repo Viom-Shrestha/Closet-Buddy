@@ -46,6 +46,20 @@ class _HomeScreenState extends State<HomeScreen> {
     color: Color(0xFF1A1A1A),
   );
 
+  void _handleAddItemResult(dynamic result) {
+    if (result == true) {
+      fetchHomeData();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Item added successfully'),
+          backgroundColor: Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(milliseconds: 900),
+        ),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -169,31 +183,36 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(12),
+          HoverClickable(
+            onTap: () {
+              setState(() => _selectedIndex = 0);
+            },
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.checkroom_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.checkroom_rounded,
-                  color: Colors.white,
-                  size: 20,
+                const SizedBox(width: 12),
+                const Text(
+                  "Closet Buddy",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A1A),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                "Closet Buddy",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A1A1A),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
           Row(
             children: [
@@ -712,7 +731,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(builder: (_) => const AddItemSelectionPage()),
               );
 
-              if (result == true) fetchHomeData();
+              _handleAddItemResult(result);
             }),
             const SizedBox(width: 12),
             _actionButton("AI Stylist", Icons.auto_awesome_outlined, () {}),
@@ -776,7 +795,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStorageOverview() {
-    if (storages.isEmpty) {
+    final topLevelStorages = storages
+        .where((s) => s['parent_storage'] == null)
+        .toList();
+    final previewStorages = topLevelStorages.take(8).toList();
+
+    if (topLevelStorages.isEmpty) {
       return _buildEmptyState(
         'No storage yet',
         'Create your first closet or drawer',
@@ -791,31 +815,57 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text("Your Storage", style: sectionTitle),
-            Text(
-              '${storages.length} spaces',
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF6B7280),
-                fontWeight: FontWeight.w500,
-              ),
+            Row(
+              children: [
+                Text(
+                  '${previewStorages.length}/${topLevelStorages.length} shown',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B7280),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const StorageListScreen(),
+                      ),
+                    );
+
+                    if (result == true) fetchHomeData();
+                  },
+                  child: const Text('View all'),
+                ),
+              ],
             ),
           ],
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 126,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: storages.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) => _storageCard(storages[index]),
-          ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = (constraints.maxWidth * 0.58).clamp(165.0, 230.0);
+
+            return SizedBox(
+              height: 126,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: previewStorages.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) =>
+                    _storageCard(previewStorages[index], cardWidth),
+              ),
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget _storageCard(Map<String, dynamic> storage) {
+  Widget _storageCard(Map<String, dynamic> storage, double width) {
     final String name = (storage['name'] ?? 'Storage').toString();
     final int count = storage['item_count'] is num
         ? (storage['item_count'] as num).toInt()
@@ -836,7 +886,7 @@ class _HomeScreenState extends State<HomeScreen> {
       },
 
       child: Container(
-        width: 190,
+        width: width,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -890,7 +940,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${type[0].toUpperCase()}${type.substring(1)} • $count items',
+              '${type[0].toUpperCase()}${type.substring(1)} - $count items',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13),
@@ -1211,9 +1261,7 @@ class _HomeScreenState extends State<HomeScreen> {
           MaterialPageRoute(builder: (_) => const AddItemSelectionPage()),
         );
 
-        if (result == true) {
-          fetchHomeData();
-        }
+        _handleAddItemResult(result);
       },
 
       backgroundColor: Color(0xFF1A1A1A),
@@ -1231,15 +1279,48 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNav() {
+    final width = MediaQuery.of(context).size.width;
+    final isCompact = width < 380;
+    final isMedium = width >= 380 && width < 450;
+
     return BottomNavigationBar(
       currentIndex: _selectedIndex,
       selectedItemColor: const Color(0xFF1A1A1A),
       unselectedItemColor: const Color(0xFF9CA3AF),
       type: BottomNavigationBarType.fixed,
-      selectedFontSize: 12,
-      unselectedFontSize: 12,
+      selectedFontSize: isCompact
+          ? 10
+          : isMedium
+          ? 11
+          : 12,
+      unselectedFontSize: isCompact
+          ? 10
+          : isMedium
+          ? 11
+          : 12,
+      iconSize: isCompact ? 22 : 24,
+      showUnselectedLabels: !isCompact,
       onTap: (index) {
         setState(() => _selectedIndex = index);
+
+        if (index == 0) {
+          return;
+        }
+
+        if (index == 1) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const StorageListScreen()),
+          ).then((_) => fetchHomeData());
+          return;
+        }
+
+        if (index == 2) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Outfits page coming soon")),
+          );
+          return;
+        }
 
         if (index == 3) {
           Navigator.push(

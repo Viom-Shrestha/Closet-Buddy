@@ -49,7 +49,7 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
     }
   }
 
-  void _continue() {
+  Future<void> _continue() async {
     if (selectedStorageId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -62,21 +62,27 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
     }
 
     if (widget.isClothing) {
-      Navigator.push(
+      final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) =>
               UploadClothingScreen(storageId: selectedStorageId!),
         ),
       );
+      if (result == true && mounted) {
+        Navigator.pop(context, true);
+      }
     } else {
-      Navigator.push(
+      final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) =>
               AddNonClothingScreen(storageId: selectedStorageId!),
         ),
       );
+      if (result == true && mounted) {
+        Navigator.pop(context, true);
+      }
     }
   }
 
