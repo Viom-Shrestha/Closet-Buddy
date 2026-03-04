@@ -109,6 +109,9 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
     final dc = TextEditingController(text: item!['dominant_color']);
     final sec = TextEditingController(text: item!['secondary_color']);
     final occ = TextEditingController(text: item!['occasion']);
+    final attrs = TextEditingController(
+      text: _attributesFromItem().join(', '),
+    );
 
     final save = await showModalBottomSheet(
       context: context,
@@ -137,6 +140,11 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
             _field("Primary Color", dc, Icons.palette),
             _field("Secondary Color", sec, Icons.color_lens),
             _field("Occasion", occ, Icons.event),
+            _field(
+              "Attributes (comma separated)",
+              attrs,
+              Icons.tune,
+            ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -167,6 +175,7 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
       "dominant_color": dc.text,
       "secondary_color": sec.text,
       "occasion": occ.text,
+      "attributes": _splitAttributes(attrs.text),
     };
 
     final ok = await clothingService.updateClothing(item!['id'], payload);
@@ -357,8 +366,10 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
                               Icons.event,
                               "Occasion",
                               item!['occasion'],
-                              isLast: true,
                             ),
+                            _attributesSection(),
+                            const SizedBox(height: 8),
+                            _descriptionSection(),
                           ],
                         ),
                       ),
@@ -519,5 +530,166 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
     }
 
     return Colors.grey.shade400;
+  }
+
+  List<String> _attributesFromItem() {
+    final raw = item?['attributes'];
+    if (raw is List) {
+      return raw.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+    }
+    return const [];
+  }
+
+  List<String> _splitAttributes(String value) {
+    return value
+        .split(',')
+        .map((entry) => entry.trim())
+        .where((entry) => entry.isNotEmpty)
+        .toList();
+  }
+
+  String _generatedDescription() {
+    final category = (item?['category'] ?? '').toString();
+    final subcategory = (item?['subcategory'] ?? '').toString();
+    final dominant = (item?['dominant_color'] ?? '').toString();
+    final secondary = (item?['secondary_color'] ?? '').toString();
+    final occasion = (item?['occasion'] ?? '').toString();
+    final attrs = _attributesFromItem();
+
+    final parts = <String>[];
+    if (category.isNotEmpty || subcategory.isNotEmpty) {
+      parts.add([category, subcategory].where((e) => e.isNotEmpty).join(' - '));
+    }
+    if (dominant.isNotEmpty) {
+      parts.add('Primary color: $dominant');
+    }
+    if (secondary.isNotEmpty) {
+      parts.add('Secondary color: $secondary');
+    }
+    if (occasion.isNotEmpty) {
+      parts.add('Occasion: $occasion');
+    }
+    if (attrs.isNotEmpty) {
+      parts.add('Attributes: ${attrs.join(', ')}');
+    }
+
+    if (parts.isEmpty) return 'No description available.';
+    return parts.join('. ');
+  }
+
+  Widget _attributesSection() {
+    final attrs = _attributesFromItem();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200, width: 1)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.tune, size: 20, color: Colors.blue.shade700),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Attributes',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (attrs.isEmpty)
+                  const Text(
+                    '-',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: attrs
+                        .map(
+                          (a) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              a,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _descriptionSection() {
+    return Container(
+      padding: const EdgeInsets.only(top: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.description_outlined, size: 20, color: Colors.blue.shade700),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Description',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _generatedDescription(),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

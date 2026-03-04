@@ -6,8 +6,13 @@ import 'add_non_clothing_screen.dart';
 
 class StorageSelectorScreen extends StatefulWidget {
   final bool isClothing;
+  final bool isShoe;
 
-  const StorageSelectorScreen({Key? key, required this.isClothing})
+  const StorageSelectorScreen({
+    Key? key,
+    required this.isClothing,
+    this.isShoe = false,
+  })
     : super(key: key);
 
   @override
@@ -66,7 +71,10 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
         context,
         MaterialPageRoute(
           builder: (context) =>
-              UploadClothingScreen(storageId: selectedStorageId!),
+              UploadClothingScreen(
+                storageId: selectedStorageId!,
+                isShoe: widget.isShoe,
+              ),
         ),
       );
       if (result == true && mounted) {
@@ -135,7 +143,7 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'Choose the storage location for your ${widget.isClothing ? "clothing" : "item"}',
+                          'Choose the storage location for your ${widget.isClothing ? (widget.isShoe ? "shoes" : "clothing") : "item"}',
                           style: TextStyle(
                             fontSize: 15,
                             color: Color(0xFF6B7280),

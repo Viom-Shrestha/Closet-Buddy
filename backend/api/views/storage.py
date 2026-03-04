@@ -143,7 +143,9 @@ def storage_view(request, pk):
                 "image": request.build_absolute_uri(c.image.url),
                 "category": c.category,
                 "subcategory": c.subcategory,
+                "occasion": c.occasion,
                 "dominant_color": c.dominant_color,
+                "attributes": c.attributes,
                 "is_favourite": c.is_favourite,
                 "storage_unit": {
                     "id": c.storage_unit.id,

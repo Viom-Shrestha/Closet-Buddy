@@ -38,6 +38,7 @@ class ClothingItemSerializer(serializers.ModelSerializer):
             "occasion",
             "dominant_color",
             "secondary_color",
+            "attributes",
             "is_favourite",
             "created_at",
             "storage_unit",
@@ -59,6 +60,7 @@ class ClothingItemUpdateSerializer(serializers.ModelSerializer):
             "dominant_color",
             "secondary_color",
             "occasion",
+            "attributes",
         ]
 
 

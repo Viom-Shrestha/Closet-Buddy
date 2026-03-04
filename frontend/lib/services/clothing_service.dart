@@ -6,7 +6,7 @@ import 'api_client.dart';
 class ClothingService {
   final ApiClient client = ApiClient();
 
-  Future<Map<String, dynamic>?> process(File image) async {
+  Future<Map<String, dynamic>?> process(File image, {bool isShoe = false}) async {
     final token = await client.token();
 
     final req = http.MultipartRequest(
@@ -16,6 +16,7 @@ class ClothingService {
 
     req.headers['Authorization'] = 'Bearer $token';
     req.files.add(await http.MultipartFile.fromPath('image', image.path));
+    req.fields['is_shoe'] = isShoe.toString();
 
     final res = await req.send();
     final body = await res.stream.bytesToString();
