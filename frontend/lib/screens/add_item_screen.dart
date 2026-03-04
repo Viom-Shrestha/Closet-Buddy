@@ -79,6 +79,27 @@ class _AddItemSelectionPageState extends State<AddItemSelectionPage> {
 
               SizedBox(height: 16),
 
+              _buildItemTypeCard(
+                title: 'Shoes',
+                description: 'Add shoes with shoe type and usage detection',
+                icon: Icons.hiking_outlined,
+                iconColor: Color(0xFFF59E0B),
+                onTap: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          StorageSelectorScreen(isClothing: true, isShoe: true),
+                    ),
+                  );
+                  if (result == true && mounted) {
+                    Navigator.pop(context, true);
+                  }
+                },
+              ),
+
+              SizedBox(height: 16),
+
               // Non-Clothing Item Card
               _buildItemTypeCard(
                 title: 'Non-Clothing Item',

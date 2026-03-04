@@ -8,8 +8,13 @@ enum UploadStep { selectImage, reviewing, editing }
 
 class UploadClothingScreen extends StatefulWidget {
   final int storageId;
+  final bool isShoe;
 
-  const UploadClothingScreen({Key? key, required this.storageId})
+  const UploadClothingScreen({
+    Key? key,
+    required this.storageId,
+    this.isShoe = false,
+  })
     : super(key: key);
 
   @override
@@ -31,12 +36,14 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   String dominantColor = '';
   String secondaryColor = '';
   String occasion = '';
+  List<String> attributes = [];
 
   late TextEditingController categoryController;
   late TextEditingController subcategoryController;
   late TextEditingController dominantColorController;
   late TextEditingController secondaryColorController;
   late TextEditingController occasionController;
+  late TextEditingController attributesController;
 
   @override
   void initState() {
@@ -47,6 +54,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     dominantColorController = TextEditingController();
     secondaryColorController = TextEditingController();
     occasionController = TextEditingController();
+    attributesController = TextEditingController();
   }
 
   @override
@@ -56,6 +64,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     dominantColorController.dispose();
     secondaryColorController.dispose();
     occasionController.dispose();
+    attributesController.dispose();
     super.dispose();
   }
 
@@ -76,7 +85,10 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     if (!mounted) return;
 
     try {
-      final result = await clothingService.process(selectedImage!);
+      final result = await clothingService.process(
+        selectedImage!,
+        isShoe: widget.isShoe,
+      );
 
       if (result == null) throw "Processing failed";
 
@@ -88,6 +100,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         dominantColor = result['dominant_color'];
         secondaryColor = result['secondary_color'];
         occasion = result['occasion'];
+        attributes = List<String>.from(result['attributes'] ?? const []);
 
         // ✅ update controllers AFTER values exist
         categoryController.text = category;
@@ -95,6 +108,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         dominantColorController.text = dominantColor;
         secondaryColorController.text = secondaryColor;
         occasionController.text = occasion;
+        attributesController.text = attributes.join(', ');
 
         isLoading = false;
         currentStep = UploadStep.reviewing;
@@ -140,6 +154,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       "dominant_color": dominantColor,
       "secondary_color": secondaryColor,
       "occasion": occasion,
+      "attributes": attributes,
     };
 
     final success = await clothingService.save(payload);
@@ -178,12 +193,14 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       dominantColor = '';
       secondaryColor = '';
       occasion = '';
+      attributes = [];
 
       categoryController.clear();
       subcategoryController.clear();
       dominantColorController.clear();
       secondaryColorController.clear();
       occasionController.clear();
+      attributesController.clear();
 
       currentStep = UploadStep.selectImage;
     });
@@ -201,7 +218,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Upload Clothing',
+          widget.isShoe ? 'Upload Shoes' : 'Upload Clothing',
           style: TextStyle(
             color: Color(0xFF1A1A1A),
             fontSize: 18,
@@ -262,7 +279,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Upload your clothing',
+            widget.isShoe ? 'Upload your shoes' : 'Upload your clothing',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w700,
@@ -272,7 +289,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            'Take a photo or choose from your gallery',
+            widget.isShoe
+                ? 'Take a shoe photo or choose from your gallery'
+                : 'Take a photo or choose from your gallery',
             style: TextStyle(fontSize: 15, color: Color(0xFF6B7280)),
           ),
           SizedBox(height: 40),
@@ -570,6 +589,12 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                   occasionController,
                   (val) => occasion = val,
                 ),
+                SizedBox(height: 16),
+                _buildTextField(
+                  'Attributes (comma separated)',
+                  attributesController,
+                  (val) => attributes = _splitAttributes(val),
+                ),
               ],
             ),
           ),
@@ -657,6 +682,14 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   }
 
   String _getLoadingMessage() {
-    return 'Processing clothing...';
+    return widget.isShoe ? 'Processing shoes...' : 'Processing clothing...';
+  }
+
+  List<String> _splitAttributes(String value) {
+    return value
+        .split(',')
+        .map((entry) => entry.trim())
+        .where((entry) => entry.isNotEmpty)
+        .toList();
   }
 }

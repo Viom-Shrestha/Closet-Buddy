@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../services/storage_service.dart';
 import '../services/clothing_service.dart';
 import '../services/misc_service.dart';
@@ -148,6 +149,123 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     }
 
     return result;
+  }
+
+  Map<String, int> _itemDistribution(List clothes, List nonClothes) {
+    final result = <String, int>{};
+
+    final nonClothingCount = nonClothes.length;
+    if (nonClothingCount > 0) {
+      result['Non-clothing'] = nonClothingCount;
+    }
+
+    for (final c in clothes) {
+      final raw = (c['subcategory'] ?? c['category'] ?? '').toString().trim();
+      if (raw.isEmpty) continue;
+      final label = _toTitleCase(raw);
+      result[label] = (result[label] ?? 0) + 1;
+    }
+
+    return result;
+  }
+
+  String _toTitleCase(String input) {
+    final clean = input.replaceAll('_', ' ').replaceAll('-', ' ').trim();
+    if (clean.isEmpty) return clean;
+    return clean
+        .split(RegExp(r'\s+'))
+        .map((word) => word.isEmpty
+            ? word
+            : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  Widget _buildDistributionChart(Map<String, int> distribution) {
+    final entries = distribution.entries.where((e) => e.value > 0).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    if (entries.isEmpty) {
+      return Container(
+        height: 220,
+        alignment: Alignment.center,
+        child: const Text('No items yet for analytics'),
+      );
+    }
+
+    final colors = <Color>[
+      const Color(0xFF2563EB),
+      const Color(0xFF10B981),
+      const Color(0xFFF59E0B),
+      const Color(0xFFEC4899),
+      const Color(0xFFEF4444),
+      const Color(0xFF8B5CF6),
+      const Color(0xFF14B8A6),
+      const Color(0xFF64748B),
+    ];
+
+    final total = entries.fold<int>(0, (sum, e) => sum + e.value);
+
+    final sections = <PieChartSectionData>[];
+    for (int i = 0; i < entries.length; i++) {
+      final e = entries[i];
+      final percent = ((e.value / total) * 100).round();
+      sections.add(
+        PieChartSectionData(
+          color: colors[i % colors.length],
+          value: e.value.toDouble(),
+          radius: 74,
+          title: '$percent%',
+          titleStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Item Distribution',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 220,
+          child: PieChart(
+            PieChartData(
+              sections: sections,
+              centerSpaceRadius: 34,
+              sectionsSpace: 2,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (int i = 0; i < entries.length; i++)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: colors[i % colors.length].withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '${entries[i].key}: ${entries[i].value}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
   }
 
   Future<void> _togglePutAway(bool value) async {
@@ -709,6 +827,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
 
     final colorStat = _mostCommonColor(clothes);
     final categoryDist = _categoryDistribution(clothes);
+    final itemDist = _itemDistribution(clothes, nonClothes);
 
     return WillPopScope(
       onWillPop: () async {
@@ -818,6 +937,8 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        _buildDistributionChart(itemDist),
                       ],
                     ),
                   ),
@@ -1152,13 +1273,45 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () async {
+            final addType = await showModalBottomSheet<String>(
+              context: context,
+              builder: (_) => SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const ListTile(
+                      title: Text(
+                        'Add Item',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.checkroom_outlined),
+                      title: const Text('Clothing'),
+                      onTap: () => Navigator.pop(context, 'clothing'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.hiking_outlined),
+                      title: const Text('Shoes'),
+                      onTap: () => Navigator.pop(context, 'shoes'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+
+            if (addType == null) return;
+
             final result = await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    UploadClothingScreen(storageId: widget.storageId),
+                builder: (_) => UploadClothingScreen(
+                  storageId: widget.storageId,
+                  isShoe: addType == 'shoes',
+                ),
               ),
             );
+
             if (result == true || result == null) {
               hasChanges = true;
               _load();

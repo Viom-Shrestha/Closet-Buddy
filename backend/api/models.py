@@ -80,6 +80,7 @@ class ClothingItem(models.Model):
     occasion = models.CharField(max_length=50, null=True, blank=True)
     dominant_color = models.CharField(max_length=30)
     secondary_color = models.CharField(max_length=30, null=True, blank=True)
+    attributes = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_favourite = models.BooleanField(default=False)
 
