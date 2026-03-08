@@ -15,6 +15,8 @@ import 'storage_space_screen.dart';
 import 'admin_screen.dart';
 import 'add_item_screen.dart';
 import 'storage_detail_screen.dart';
+import 'wardrobe_screen.dart';
+import 'outfit_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -135,6 +137,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool showHomeTab = _selectedIndex == 0;
+    final bool showWardrobeTab = _selectedIndex == 1;
+    final bool showOutfitTab = _selectedIndex == 2;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
@@ -142,31 +148,48 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildAppBar(),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                  const SizedBox(height: 24),
-                  _buildWelcomeSection(),
-                  const SizedBox(height: 20),
-                  _buildWeatherCard(),
-                  const SizedBox(height: 20),
-                  _buildTodayOutfitCard(),
-                  const SizedBox(height: 32),
-                  _buildQuickActions(),
-                  const SizedBox(height: 32),
-                  _buildStorageOverview(),
-                  const SizedBox(height: 32),
-                  _buildRecentClothing(),
-                  const SizedBox(height: 32),
-                  _buildRecentOutfits(),
-                  const SizedBox(height: 120),
-                ],
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                child: showHomeTab
+                    ? ListView(
+                        key: const ValueKey('home_tab'),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        children: [
+                          const SizedBox(height: 24),
+                          _buildWelcomeSection(),
+                          const SizedBox(height: 20),
+                          _buildWeatherCard(),
+                          const SizedBox(height: 20),
+                          _buildTodayOutfitCard(),
+                          const SizedBox(height: 32),
+                          _buildQuickActions(),
+                          const SizedBox(height: 32),
+                          _buildStorageOverview(),
+                          const SizedBox(height: 32),
+                          _buildRecentClothing(),
+                          const SizedBox(height: 32),
+                          _buildRecentOutfits(),
+                          const SizedBox(height: 120),
+                        ],
+                      )
+                    : showWardrobeTab
+                    ? const Padding(
+                        key: ValueKey('wardrobe_tab'),
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: WardrobeScreen(embedded: true),
+                      )
+                    : showOutfitTab
+                    ? const OutfitsPage(
+                        key: ValueKey('outfit_tab'),
+                        embedded: true,
+                      )
+                    : const SizedBox.shrink(),
               ),
             ),
           ],
         ),
       ),
-      floatingActionButton: _buildFAB(),
+      floatingActionButton: showOutfitTab ? null : _buildFAB(),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
@@ -740,12 +763,11 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            _actionButton("My Wardrobe", Icons.inventory_2_outlined, () async {
+            _actionButton("My Storage", Icons.inventory_2_outlined, () async {
               final result = await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const StorageListScreen()),
               );
-
               if (result == true) fetchHomeData();
             }),
             const SizedBox(width: 12),
@@ -1301,33 +1323,17 @@ class _HomeScreenState extends State<HomeScreen> {
       iconSize: isCompact ? 22 : 24,
       showUnselectedLabels: !isCompact,
       onTap: (index) {
-        setState(() => _selectedIndex = index);
-
-        if (index == 0) {
-          return;
-        }
-
-        if (index == 1) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const StorageListScreen()),
-          ).then((_) => fetchHomeData());
-          return;
-        }
-
-        if (index == 2) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Outfits page coming soon")),
-          );
-          return;
-        }
-
         if (index == 3) {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const ProfileScreen()),
-          );
+          ).then((_) {
+            if (mounted) setState(() => _selectedIndex = 0);
+          });
+          return;
         }
+
+        setState(() => _selectedIndex = index);
       },
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),

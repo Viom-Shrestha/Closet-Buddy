@@ -367,6 +367,11 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
                               "Occasion",
                               item!['occasion'],
                             ),
+                            _detailRow(
+                              Icons.calendar_today_outlined,
+                              "Date Added",
+                              _formatDate(item!['created_at']),
+                            ),
                             _attributesSection(),
                             const SizedBox(height: 8),
                             _descriptionSection(),
@@ -546,6 +551,27 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
         .map((entry) => entry.trim())
         .where((entry) => entry.isNotEmpty)
         .toList();
+  }
+
+  String _formatDate(dynamic raw) {
+    if (raw == null) return "-";
+    final dt = DateTime.tryParse(raw.toString())?.toLocal();
+    if (dt == null) return "-";
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
 
   String _generatedDescription() {

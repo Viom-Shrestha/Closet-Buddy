@@ -30,6 +30,7 @@ urlpatterns = [
     path("clothing/process/", clothing_process),
     path("clothing/save/", clothing_save),
     path("clothing/recent/", recent_clothes),
+    path("clothing/all/", all_clothes),
     path("clothing/<int:pk>/toggle-favourite/", toggle_favourite),
     path("clothing/<int:pk>/", clothing_detail),
     path("clothing/<int:pk>/delete/", delete_clothing),
@@ -37,6 +38,8 @@ urlpatterns = [
 
     #outfits
     path("outfits/", outfits),
+    path("outfits/<int:pk>/", outfit_detail),
+    path("outfits/<int:pk>/toggle-favourite/", toggle_outfit_favourite),
     
     #storage
     path("storage/<int:pk>/view/", storage_view),

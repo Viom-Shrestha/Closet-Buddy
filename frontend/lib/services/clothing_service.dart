@@ -54,6 +54,13 @@ class ClothingService {
         : [];
   }
 
+  Future<List<Map<String, dynamic>>> getAllClothes() async {
+    final res = await client.get('/clothing/all/');
+    return res.statusCode == 200
+        ? List<Map<String, dynamic>>.from(jsonDecode(res.body))
+        : [];
+  }
+
   Future<bool> toggleFavourite(int id) async {
     final res = await client.post('/clothing/$id/toggle-favourite/', {});
 

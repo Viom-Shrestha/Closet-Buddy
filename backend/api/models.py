@@ -111,6 +111,11 @@ class NonClothingItem(models.Model):
             raise ValidationError("Storage unit must belong to the same user.")
         
 class Outfit(models.Model):
+    SILHOUETTE_CHOICES = [
+        ("male", "Male"),
+        ("female", "Female"),
+    ]
+
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -125,5 +130,28 @@ class Outfit(models.Model):
     rating = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
     created_at = models.DateTimeField(auto_now_add=True)
     is_favourite = models.BooleanField(default=False)
+    silhouette = models.CharField(max_length=10, choices=SILHOUETTE_CHOICES, default="male")
+    topwear = models.ForeignKey(
+        ClothingItem,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="as_topwear_in_outfits",
+    )
+    bottomwear = models.ForeignKey(
+        ClothingItem,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="as_bottomwear_in_outfits",
+    )
+    shoes = models.ForeignKey(
+        ClothingItem,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="as_shoes_in_outfits",
+    )
+
     def __str__(self):
         return f"{self.name} ({self.user.username})"

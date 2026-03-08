@@ -272,6 +272,14 @@ def recent_clothes(request):
         for i in items
     ])
 
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def all_clothes(request):
+    items = ClothingItem.objects.filter(user=request.user).order_by("-created_at")
+    serializer = ClothingItemSerializer(items, many=True, context={"request": request})
+    return Response(serializer.data, status=200)
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def toggle_favourite(request, pk):
