@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../services/storage_service.dart';
 import '../services/clothing_service.dart';
 import '../services/misc_service.dart';
+import '../services/clothing_query_service.dart';
 import '../services/api_client.dart';
 import 'clothing_detail_screen.dart';
 import 'upload_clothing_screen.dart';
@@ -26,6 +27,12 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
   bool hasChanges = false;
   bool _movingItem = false;
   String _searchQuery = '';
+  String _storageFilterColor = 'All';
+  String _storageFilterSubcategory = 'All';
+  String _storageFilterOccasion = 'All';
+  String _storageFilterTag = 'All';
+  bool _storageFavoritesOnly = false;
+  String _storageSortBy = 'Category (A-Z)';
   bool _selectionMode = false;
   final Set<int> _selectedClothingIds = <int>{};
   List<Map<String, dynamic>> _breadcrumbChain = const [];
@@ -789,6 +796,161 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     );
   }
 
+  List<String> _storageOptionsFor(List clothes, String field) {
+    final mapped = clothes
+        .map((c) => Map<String, dynamic>.from(c as Map))
+        .toList();
+    return ClothingQueryService.optionsForField(mapped, field);
+  }
+
+  List<String> _storageTagOptions(List clothes) {
+    final mapped = clothes
+        .map((c) => Map<String, dynamic>.from(c as Map))
+        .toList();
+    return ClothingQueryService.tagOptions(mapped);
+  }
+
+  int _storageActiveFilterCount() {
+    int count = 0;
+    if (_storageFilterColor != 'All') count++;
+    if (_storageFilterSubcategory != 'All') count++;
+    if (_storageFilterOccasion != 'All') count++;
+    if (_storageFilterTag != 'All') count++;
+    if (_storageFavoritesOnly) count++;
+    if (_storageSortBy != 'Category (A-Z)') count++;
+    return count;
+  }
+
+  Future<void> _openStorageFilterSheet(List clothes) async {
+    String color = _storageFilterColor;
+    String subcategory = _storageFilterSubcategory;
+    String occasion = _storageFilterOccasion;
+    String tag = _storageFilterTag;
+    bool favoritesOnly = _storageFavoritesOnly;
+    String sortBy = _storageSortBy;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setModalState) {
+          Widget dd(String label, String value, List<String> options, ValueChanged<String?> onChanged) {
+            return DropdownButtonFormField<String>(
+              value: options.contains(value) ? value : 'All',
+              decoration: InputDecoration(
+                labelText: label,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              items: options.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+              onChanged: onChanged,
+            );
+          }
+
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Search Filters', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 12),
+                    dd('Subcategory', subcategory, _storageOptionsFor(clothes, 'subcategory'), (v) {
+                      setModalState(() => subcategory = v ?? 'All');
+                    }),
+                    const SizedBox(height: 10),
+                    dd('Occasion', occasion, _storageOptionsFor(clothes, 'occasion'), (v) {
+                      setModalState(() => occasion = v ?? 'All');
+                    }),
+                    const SizedBox(height: 10),
+                    dd('Color', color, _storageOptionsFor(clothes, 'dominant_color'), (v) {
+                      setModalState(() => color = v ?? 'All');
+                    }),
+                    const SizedBox(height: 10),
+                    dd('Tag', tag, _storageTagOptions(clothes), (v) {
+                      setModalState(() => tag = v ?? 'All');
+                    }),
+                    const SizedBox(height: 10),
+                    dd('Sort', sortBy, const ['Category (A-Z)', 'Subcategory (A-Z)', 'Favorites first'], (v) {
+                      setModalState(() => sortBy = v ?? 'Category (A-Z)');
+                    }),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      title: const Text('Favorites only'),
+                      value: favoritesOnly,
+                      contentPadding: EdgeInsets.zero,
+                      onChanged: (v) => setModalState(() => favoritesOnly = v),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setModalState(() {
+                                color = 'All';
+                                subcategory = 'All';
+                                occasion = 'All';
+                                tag = 'All';
+                                favoritesOnly = false;
+                                sortBy = 'Category (A-Z)';
+                              });
+                            },
+                            child: const Text('Reset'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              setState(() {
+                                _storageFilterColor = color;
+                                _storageFilterSubcategory = subcategory;
+                                _storageFilterOccasion = occasion;
+                                _storageFilterTag = tag;
+                                _storageFavoritesOnly = favoritesOnly;
+                                _storageSortBy = sortBy;
+                              });
+                              Navigator.pop(context);
+                            },
+                            child: const Text('Apply'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _toggleStorageFavourite(Map<String, dynamic> item) async {
+    final oldValue = item['is_favourite'] == true;
+    setState(() => item['is_favourite'] = !oldValue);
+
+    final ok = await clothingService.toggleFavourite(_asInt(item['id']));
+    if (!mounted) return;
+
+    if (!ok) {
+      setState(() => item['is_favourite'] = oldValue);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update favourite')),
+      );
+      return;
+    }
+
+    hasChanges = true;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -817,13 +979,16 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     final subStorages = storage['sub_storages'] as List;
     final counts = data!['counts'] as Map<String, dynamic>;
     final query = _searchQuery.trim().toLowerCase();
-    final filteredClothes = clothes.where((c) {
-      if (query.isEmpty) return true;
-      final haystack =
-          '${c['category'] ?? ''} ${c['subcategory'] ?? ''} ${c['dominant_color'] ?? ''}'
-              .toLowerCase();
-      return haystack.contains(query);
-    }).toList();
+    final filteredClothes = ClothingQueryService.filterAndSort(
+      items: clothes.map((c) => Map<String, dynamic>.from(c as Map)).toList(),
+      query: query,
+      selectedSubcategory: _storageFilterSubcategory,
+      selectedOccasion: _storageFilterOccasion,
+      selectedColor: _storageFilterColor,
+      selectedTag: _storageFilterTag,
+      favoritesOnly: _storageFavoritesOnly,
+      sortBy: _storageSortBy,
+    );
 
     final colorStat = _mostCommonColor(clothes);
     final categoryDist = _categoryDistribution(clothes);
@@ -1071,19 +1236,62 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        TextField(
-                          onChanged: (v) => setState(() => _searchQuery = v),
-                          decoration: InputDecoration(
-                            hintText: 'Search in this storage',
-                            prefixIcon: const Icon(Icons.search),
-                            filled: true,
-                            fillColor: Colors.grey.shade100,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                onChanged: (v) => setState(() => _searchQuery = v),
+                                decoration: InputDecoration(
+                                  hintText: 'Smart search: "black casual shirt", "winter jacket"',
+                                  prefixIcon: const Icon(Icons.search),
+                                  filled: true,
+                                  fillColor: Colors.grey.shade100,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  isDense: true,
+                                ),
+                              ),
                             ),
-                            isDense: true,
-                          ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: () => _openStorageFilterSheet(clothes),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 46,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.grey.shade300),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.tune, size: 20),
+                                    if (_storageActiveFilterCount() > 0) ...[
+                                      const SizedBox(width: 5),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF111827),
+                                          borderRadius: BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          '${_storageActiveFilterCount()}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 10),
                         if (filteredClothes.isEmpty)
@@ -1194,6 +1402,25 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                                 ),
                                               ),
                                             ),
+                                            if (!_selectionMode)
+                                              SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: IconButton(
+                                                  padding: EdgeInsets.zero,
+                                                  iconSize: 16,
+                                                  onPressed: () =>
+                                                      _toggleStorageFavourite(item),
+                                                  icon: Icon(
+                                                    item['is_favourite'] == true
+                                                        ? Icons.favorite
+                                                        : Icons.favorite_border,
+                                                    color: item['is_favourite'] == true
+                                                        ? Colors.red
+                                                        : Colors.grey,
+                                                  ),
+                                                ),
+                                              ),
                                           ],
                                         ),
                                       ),

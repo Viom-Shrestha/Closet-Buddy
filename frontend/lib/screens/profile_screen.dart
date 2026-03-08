@@ -5,7 +5,6 @@ import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../services/outfit_service.dart';
 import 'login_screen.dart';
-import '../widgets/primary_buttons.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,15 +13,19 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   final ProfileService profileService = ProfileService();
   final AuthService authService = AuthService();
   final StorageService storageService = StorageService();
   final OutfitService outfitService = OutfitService();
+
   bool _isEditing = false;
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
   late Future<Map<String, dynamic>?> _profileBundleFuture;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
@@ -30,13 +33,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _firstNameController = TextEditingController();
     _lastNameController = TextEditingController();
     _profileBundleFuture = _loadProfileBundle();
+
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+    _animationController.forward();
   }
 
   @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _animationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshProfile() async {
+    setState(() {
+      _profileBundleFuture = _loadProfileBundle();
+    });
+    await _profileBundleFuture;
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout, color: Color(0xFFDC2626)),
+            SizedBox(width: 12),
+            Text('Logout?'),
+          ],
+        ),
+        content: const Text(
+          'You will need to sign in again to continue using the app.',
+          style: TextStyle(color: Color(0xFF6B7280)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      await _logout(context);
+    }
   }
 
   Future<void> _logout(BuildContext context) async {
@@ -54,20 +115,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_firstNameController.text.trim().isEmpty ||
         _lastNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Names cannot be empty'),
+        SnackBar(
+          content: const Text('Names cannot be empty'),
           backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
-      return; // Stop the function here
+      return;
     }
-    // Prepare the data map
+
     final Map<String, String> updatedData = {
       'first_name': _firstNameController.text.trim(),
       'last_name': _lastNameController.text.trim(),
     };
 
-    // Show a loading indicator (optional but recommended)
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -77,7 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final success = await profileService.updateProfile(updatedData);
 
     if (!context.mounted) return;
-    Navigator.pop(context); // Remove loading indicator
+    Navigator.pop(context);
 
     if (success) {
       setState(() {
@@ -85,18 +149,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _profileBundleFuture = _loadProfileBundle();
       });
 
-      // Refresh the screen data
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully'),
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 12),
+              Text('Profile updated successfully'),
+            ],
+          ),
           backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to update profile'),
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.error, color: Colors.white),
+              SizedBox(width: 12),
+              Text('Failed to update profile'),
+            ],
+          ),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -134,7 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (clothingId > 0) clothesById[clothingId] = c;
         }
       } catch (_) {
-        // skip failing storage detail requests and continue building profile data
+        // skip failing storage detail requests
       }
     }
 
@@ -157,18 +240,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     };
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon) {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    Color bgColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        gradient: LinearGradient(
+          colors: [color, color.withOpacity(0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: color.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -178,28 +270,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, size: 20, color: const Color(0xFF1A1A1A)),
+            child: Icon(icon, size: 24, color: Colors.white),
           ),
-          const SizedBox(height: 12),
+          const Spacer(),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A1A),
-              letterSpacing: -0.5,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: -1,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF9CA3AF),
-              letterSpacing: 0.2,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withOpacity(0.9),
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -211,114 +303,106 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String label,
     String value,
     TextEditingController? controller,
+    IconData icon,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF6B7280),
-            letterSpacing: 0.3,
-          ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _isEditing && controller != null
+            ? Colors.white
+            : const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _isEditing && controller != null
+              ? const Color(0xFF3B82F6)
+              : const Color(0xFFE5E7EB),
+          width: _isEditing && controller != null ? 2 : 1,
         ),
-        const SizedBox(height: 8),
-        _isEditing && controller != null
-            ? Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
-                child: TextField(
-                  controller: controller,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 20, color: const Color(0xFF3B82F6)),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
                   style: const TextStyle(
-                    fontSize: 15,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                  decoration: const InputDecoration(
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    border: InputBorder.none,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B7280),
+                    letterSpacing: 0.5,
                   ),
                 ),
-              )
-            : Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
-                child: Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                ),
-              ),
-      ],
+                const SizedBox(height: 6),
+                _isEditing && controller != null
+                    ? TextField(
+                        controller: controller,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827),
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      )
+                    : Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  String _initial(String? value) {
+    final clean = (value ?? '').trim();
+    if (clean.isEmpty) return '';
+    return clean[0].toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF8F9FA),
-        elevation: 0,
-        title: const Text(
-          'Profile',
-          style: TextStyle(
-            color: Color(0xFF1A1A1A),
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.5,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFF1A1A1A)),
-            onPressed: () {
-              setState(() {
-                _profileBundleFuture = _loadProfileBundle();
-              });
-            },
-          ),
-          if (!_isEditing)
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, color: Color(0xFF1A1A1A)),
-              onPressed: () {
-                setState(() {
-                  _isEditing = true;
-                });
-              },
-            ),
-        ],
-      ),
+      backgroundColor: const Color(0xFFF9FAFB),
       body: FutureBuilder<Map<String, dynamic>?>(
         future: _profileBundleFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF1A1A1A)),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (!snapshot.hasData || snapshot.data == null) {
             return const Center(
-              child: Text(
-                'Failed to load profile',
-                style: TextStyle(color: Color(0xFF6B7280)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Color(0xFFD1D5DB)),
+                  SizedBox(height: 16),
+                  Text(
+                    'Failed to load profile',
+                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 16),
+                  ),
+                ],
               ),
             );
           }
@@ -331,13 +415,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final categoryCounts = List<MapEntry<String, int>>.from(
             bundle['category_counts'] ?? const <MapEntry<String, int>>[],
           );
-          final topCategories = categoryCounts.take(4).toList();
+          final topCategories = categoryCounts.take(5).toList();
+          final topTotal = topCategories.fold<int>(
+            0,
+            (sum, e) => sum + e.value,
+          );
 
-          const chartColors = <Color>[
-            Color(0xFF1A1A1A),
-            Color(0xFF4B5563),
-            Color(0xFF6B7280),
-            Color(0xFF9CA3AF),
+          final chartColors = <Color>[
+            const Color(0xFF3B82F6),
+            const Color(0xFF8B5CF6),
+            const Color(0xFFEC4899),
+            const Color(0xFFF59E0B),
+            const Color(0xFF10B981),
           ];
 
           if (!_isEditing) {
@@ -345,343 +434,521 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _lastNameController.text = profile['last_name'] ?? '';
           }
 
-          return SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Profile Header
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+          return FadeTransition(
+            opacity: _fadeAnimation,
+            child: RefreshIndicator(
+              onRefresh: _refreshProfile,
+              child: CustomScrollView(
+                slivers: [
+                  // Modern App Bar with Gradient
+                  SliverAppBar(
+                    expandedHeight: 200,
+                    pinned: true,
+                    backgroundColor: const Color(0xFF111827),
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF111827), Color(0xFF1F2937)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF1A1A1A), Color(0xFF4B5563)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '${profile['first_name']?[0] ?? ''}${profile['last_name']?[0] ?? ''}',
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
+                        ),
+                        child: SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                Text(
-                                  '${profile['first_name'] ?? ''} ${profile['last_name'] ?? ''}',
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1A1A1A),
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  profile['email'] ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF6B7280),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF8F9FA),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: const Color(0xFFE5E7EB),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 70,
+                                      height: 70,
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFF3B82F6),
+                                            Color(0xFF8B5CF6),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(
+                                              0xFF3B82F6,
+                                            ).withOpacity(0.4),
+                                            blurRadius: 12,
+                                            offset: const Offset(0, 6),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '${_initial(profile['first_name']?.toString())}${_initial(profile['last_name']?.toString())}',
+                                          style: const TextStyle(
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                  child: Text(
-                                    profile['role'] ?? 'User',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF1A1A1A),
-                                      letterSpacing: 0.5,
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${profile['first_name'] ?? ''} ${profile['last_name'] ?? ''}',
+                                            style: const TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            profile['email'] ?? '',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.white.withOpacity(
+                                                0.8,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
                               ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Stats Grid
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 3,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 1.2,
-                      children: [
-                        _buildStatCard(
-                          'Total Clothes',
-                          '$totalClothes',
-                          Icons.checkroom_outlined,
+                    actions: [
+                      if (!_isEditing)
+                        IconButton(
+                          onPressed: () => setState(() => _isEditing = true),
+                          icon: const Icon(Icons.edit, color: Colors.white),
                         ),
-                        _buildStatCard(
-                          'Outfits',
-                          '$totalOutfits',
-                          Icons.style_outlined,
-                        ),
-                        _buildStatCard(
-                          'Storages',
-                          '$totalStorages',
-                          Icons.inventory_2_outlined,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Analytics Section
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                      IconButton(
+                        onPressed: _refreshProfile,
+                        icon: const Icon(Icons.refresh, color: Colors.white),
                       ),
+                    ],
+                  ),
+
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Wardrobe Breakdown',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1A1A1A),
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Distribution of your clothing items',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF9CA3AF),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          if (topCategories.isEmpty)
-                            const SizedBox(
-                              height: 160,
-                              child: Center(
-                                child: Text(
-                                  'No clothing data yet',
-                                  style: TextStyle(color: Color(0xFF9CA3AF)),
+                          // Edit Mode Banner
+                          if (_isEditing)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 20),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF3B82F6),
+                                    Color(0xFF2563EB),
+                                  ],
                                 ),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF3B82F6,
+                                    ).withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                            )
-                          else
-                            SizedBox(
-                              height: 200,
-                              child: PieChart(
-                                PieChartData(
-                                  sectionsSpace: 2,
-                                  centerSpaceRadius: 50,
-                                  sections: [
-                                    for (
-                                      int i = 0;
-                                      i < topCategories.length;
-                                      i++
-                                    )
-                                      PieChartSectionData(
-                                        value: topCategories[i].value
-                                            .toDouble(),
-                                        title: '${topCategories[i].value}',
-                                        color:
-                                            chartColors[i % chartColors.length],
-                                        radius: 60,
-                                        titleStyle: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.edit,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Text(
+                                      'Edit mode active',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        setState(() => _isEditing = false),
+                                    style: TextButton.styleFrom(
+                                      backgroundColor: Colors.white.withOpacity(
+                                        0.2,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          // Stats Cards
+                          GridView.count(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisCount: 3,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1,
+                            children: [
+                              _buildStatCard(
+                                'Items',
+                                '$totalClothes',
+                                Icons.checkroom_rounded,
+                                const Color(0xFF3B82F6),
+                                const Color(0xFFEFF6FF),
+                              ),
+                              _buildStatCard(
+                                'Outfits',
+                                '$totalOutfits',
+                                Icons.style_rounded,
+                                const Color(0xFF8B5CF6),
+                                const Color(0xFFF5F3FF),
+                              ),
+                              _buildStatCard(
+                                'Storage',
+                                '$totalStorages',
+                                Icons.inventory_2_rounded,
+                                const Color(0xFFEC4899),
+                                const Color(0xFFFDF2F8),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // Wardrobe Analytics
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.pie_chart_rounded,
+                                        color: Color(0xFF3B82F6),
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Wardrobe Breakdown',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF111827),
+                                          ),
+                                        ),
+                                        Text(
+                                          'Category distribution',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 24),
+                                if (topCategories.isEmpty)
+                                  Container(
+                                    height: 200,
+                                    alignment: Alignment.center,
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.pie_chart_outline,
+                                          size: 64,
+                                          color: Colors.grey.shade300,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          'No clothing data yet',
+                                          style: TextStyle(
+                                            color: Colors.grey.shade500,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  Column(
+                                    children: [
+                                      SizedBox(
+                                        height: 220,
+                                        child: PieChart(
+                                          PieChartData(
+                                            sectionsSpace: 3,
+                                            centerSpaceRadius: 60,
+                                            sections: [
+                                              for (
+                                                int i = 0;
+                                                i < topCategories.length;
+                                                i++
+                                              )
+                                                PieChartSectionData(
+                                                  value: topCategories[i].value
+                                                      .toDouble(),
+                                                  title: topTotal == 0
+                                                      ? '0%'
+                                                      : '${((topCategories[i].value * 100) / topTotal).round()}%',
+                                                  color:
+                                                      chartColors[i %
+                                                          chartColors.length],
+                                                  radius: 70,
+                                                  titleStyle: const TextStyle(
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
                                         ),
                                       ),
+                                      const SizedBox(height: 24),
+                                      Wrap(
+                                        spacing: 12,
+                                        runSpacing: 12,
+                                        children: [
+                                          for (
+                                            int i = 0;
+                                            i < topCategories.length;
+                                            i++
+                                          )
+                                            _buildLegendItem(
+                                              topCategories[i].key,
+                                              topCategories[i].value,
+                                              chartColors[i %
+                                                  chartColors.length],
+                                              topTotal == 0
+                                                  ? 0
+                                                  : ((topCategories[i].value *
+                                                                100) /
+                                                            topTotal)
+                                                        .round(),
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // Account Information
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.person_rounded,
+                                        color: Color(0xFF3B82F6),
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Account Information',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF111827),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                _buildInfoField(
+                                  'Username',
+                                  profile['username'] ?? '',
+                                  null,
+                                  Icons.account_circle,
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInfoField(
+                                  'Email Address',
+                                  profile['email'] ?? '',
+                                  null,
+                                  Icons.email,
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInfoField(
+                                  'First Name',
+                                  profile['first_name'] ?? '',
+                                  _firstNameController,
+                                  Icons.person_outline,
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInfoField(
+                                  'Last Name',
+                                  profile['last_name'] ?? '',
+                                  _lastNameController,
+                                  Icons.person_outline,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // Action Buttons
+                          if (_isEditing) ...[
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton(
+                                onPressed: () => _saveProfile(context),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF3B82F6),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.check_circle, size: 20),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Save Changes',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
                             ),
-                          const SizedBox(height: 24),
-                          Wrap(
-                            spacing: 16,
-                            runSpacing: 12,
-                            children: [
-                              for (int i = 0; i < topCategories.length; i++)
-                                _buildLegendItem(
-                                  topCategories[i].key,
-                                  topCategories[i].value,
-                                  chartColors[i % chartColors.length],
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                            const SizedBox(height: 12),
+                          ],
 
-                    const SizedBox(height: 24),
-
-                    // Account Information
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Account Information',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1A1A1A),
-                                  letterSpacing: -0.3,
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () => _confirmLogout(context),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
                                 ),
+                                side: const BorderSide(
+                                  color: Color(0xFFDC2626),
+                                  width: 2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                foregroundColor: const Color(0xFFDC2626),
                               ),
-                              if (_isEditing)
-                                TextButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _isEditing = false;
-                                    });
-                                  },
-                                  child: const Text(
-                                    'Cancel',
-                                    style: TextStyle(color: Color(0xFF6B7280)),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.logout, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Logout',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          _buildInfoField(
-                            'Username',
-                            profile['username'] ?? '',
-                            null,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildInfoField(
-                            'Email Address',
-                            profile['email'] ?? '',
-                            null,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildInfoField(
-                            'First Name',
-                            profile['first_name'] ?? '',
-                            _firstNameController,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildInfoField(
-                            'Last Name',
-                            profile['last_name'] ?? '',
-                            _lastNameController,
-                          ),
-                          if (_isEditing) ...[
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              width: double.infinity,
-                              child: PrimaryButton(
-                                text: 'Save Changes',
-                                onPressed: () => _saveProfile(context),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
+
+                          const SizedBox(height: 40),
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Logout Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => _logout(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: const BorderSide(color: Color(0xFFE5E7EB)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Logout',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF1A1A1A),
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 40),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           );
@@ -690,37 +957,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLegendItem(String label, int value, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
+  Widget _buildLegendItem(String label, int value, Color color, int percent) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.4),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
-            ),
-            Text(
-              '$value items',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1A1A1A),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF111827),
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+              Text(
+                '$value items • $percent%',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
