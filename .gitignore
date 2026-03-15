@@ -39,3 +39,8 @@ Thumbs.db
 *.cache
 *.bak
 *.tmp
+
+# --- Documents ---
+*.pdf
+*.docx
+Documents/
