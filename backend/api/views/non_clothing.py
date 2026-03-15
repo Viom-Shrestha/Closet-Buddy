@@ -28,13 +28,16 @@ def list_non_clothing_items(request):
     return Response(NonClothingItemSerializer(items, many=True).data)
 
 
-@api_view(['PUT', 'DELETE'])
+@api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def non_clothing_detail(request, pk):
     try:
         item = NonClothingItem.objects.get(id=pk, user=request.user)
     except NonClothingItem.DoesNotExist:
         return Response({"error": "Not found"}, status=404)
+
+    if request.method == 'GET':
+        return Response(NonClothingItemSerializer(item).data, status=200)
 
     if request.method == 'DELETE':
         item.delete()

@@ -10,6 +10,7 @@ dependencies = [
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.16.1",
     "djangorestframework-simplejwt>=5.5.1",
+    "drf-spectacular>=0.29.0",
     "huggingface-hub>=0.36.0",
     "numpy>=2.3.4",
     "onnxruntime-gpu>=1.23.2",

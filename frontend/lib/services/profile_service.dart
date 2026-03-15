@@ -10,12 +10,12 @@ class ProfileService {
   }
 
   Future<bool> updateProfile(Map<String, String> data) async {
-    final res = await client.put('/profile/update/', data);
+    final res = await client.put('/profile/', data);
     return res.statusCode == 200;
   }
 
   Future<Map<String, dynamic>?> fetchAdminDashboard() async {
-    final res = await client.get('/admin-dashboard/');
+    final res = await client.get('/admin/dashboard/');
     return res.statusCode == 200 ? jsonDecode(res.body) : null;
   }
 }

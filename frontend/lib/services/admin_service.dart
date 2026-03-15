@@ -6,7 +6,7 @@ class AdminService {
   final ApiClient _client = ApiClient();
 
   Future<Map<String, dynamic>?> fetchDashboard() async {
-    final res = await _client.get('/admin-dashboard/');
+    final res = await _client.get('/admin/dashboard/');
     if (res.statusCode != 200) return null;
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
@@ -53,4 +53,3 @@ class AdminService {
     return res.statusCode == 200;
   }
 }
-
