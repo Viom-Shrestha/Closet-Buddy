@@ -64,7 +64,7 @@ class _StorageListScreenState extends State<StorageListScreen> {
   final StorageService storageService = StorageService();
   List<StorageSpace> _storages = [];
   bool _isLoading = true;
-  Set<String> _expandedStorages = {};
+  final Set<String> _expandedStorages = {};
 
   @override
   void initState() {
@@ -288,7 +288,7 @@ class _StorageListScreenState extends State<StorageListScreen> {
             border: Border.all(color: const Color(0xFFE5E7EB)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -310,7 +310,7 @@ class _StorageListScreenState extends State<StorageListScreen> {
                           decoration: BoxDecoration(
                             color: _getStorageColor(
                               storage.type,
-                            ).withOpacity(0.1),
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
@@ -373,7 +373,7 @@ class _StorageListScreenState extends State<StorageListScreen> {
                           children: [
                             Switch(
                               value: storage.isPutAway,
-                              activeColor: const Color(0xFF10B981),
+                              activeThumbColor: const Color(0xFF10B981),
                               onChanged: (val) async {
                                 final oldValue = storage.isPutAway;
 
@@ -486,10 +486,11 @@ class _StorageListScreenState extends State<StorageListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
         Navigator.pop(context, _hasChanges);
-        return false;
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
@@ -535,7 +536,7 @@ class _StorageListScreenState extends State<StorageListScreen> {
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -553,7 +554,7 @@ class _StorageListScreenState extends State<StorageListScreen> {
                           Container(
                             width: 1,
                             height: 40,
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                           ),
                           Expanded(
                             child: _buildSummaryItem(
@@ -612,7 +613,7 @@ class _StorageListScreenState extends State<StorageListScreen> {
   Widget _buildSummaryItem(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, color: Colors.white.withOpacity(0.8), size: 24),
+        Icon(icon, color: Colors.white.withValues(alpha: 0.8), size: 24),
         const SizedBox(height: 8),
         Text(
           value,
@@ -626,7 +627,7 @@ class _StorageListScreenState extends State<StorageListScreen> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7)),
+          style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7)),
         ),
       ],
     );
@@ -1091,3 +1092,4 @@ class _EditStorageSheetState extends State<EditStorageSheet> {
     );
   }
 }
+

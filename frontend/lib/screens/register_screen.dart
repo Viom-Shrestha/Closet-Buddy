@@ -132,7 +132,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0xFF1A1A1A).withOpacity(0.15),
+                                color: Color(0xFF1A1A1A).withValues(alpha: 0.15),
                                 blurRadius: 24,
                                 offset: Offset(0, 8),
                               ),
@@ -315,7 +315,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       _agreeToTerms = value ?? false;
                                     });
                                   },
-                                  activeColor: Color(0xFF1A1A1A),
+                                  fillColor:
+                                      const WidgetStatePropertyAll<Color>(
+                                        Color(0xFF1A1A1A),
+                                      ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(4),
                                   ),
@@ -366,7 +369,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 foregroundColor: Colors.white,
                                 disabledBackgroundColor: Color(
                                   0xFF1A1A1A,
-                                ).withOpacity(0.6),
+                                ).withValues(alpha: 0.6),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -523,7 +526,7 @@ class _RegisterScreenState extends State<RegisterScreen>
             border: Border.all(color: Color(0xFFE5E7EB), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: Offset(0, 2),
               ),
@@ -589,7 +592,7 @@ class _SocialButton extends StatelessWidget {
           border: Border.all(color: Color(0xFFE5E7EB), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: Offset(0, 2),
             ),
@@ -614,3 +617,4 @@ class _SocialButton extends StatelessWidget {
     );
   }
 }
+

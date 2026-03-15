@@ -3,17 +3,19 @@ import 'package:frontend/widgets/hover_clickable.dart';
 import '../services/storage_service.dart';
 import 'upload_clothing_screen.dart';
 import 'add_non_clothing_screen.dart';
+import 'upload_accessory_screen.dart';
 
 class StorageSelectorScreen extends StatefulWidget {
   final bool isClothing;
   final bool isShoe;
+  final bool isAccessory;
 
   const StorageSelectorScreen({
-    Key? key,
+    super.key,
     required this.isClothing,
     this.isShoe = false,
-  })
-    : super(key: key);
+    this.isAccessory = false,
+  });
 
   @override
   State<StorageSelectorScreen> createState() => _StorageSelectorScreenState();
@@ -66,15 +68,24 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
       return;
     }
 
-    if (widget.isClothing) {
+    if (widget.isAccessory) {
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              UploadClothingScreen(
-                storageId: selectedStorageId!,
-                isShoe: widget.isShoe,
-              ),
+          builder: (context) => UploadAccessoryScreen(storageId: selectedStorageId!),
+        ),
+      );
+      if (result == true && mounted) {
+        Navigator.pop(context, true);
+      }
+    } else if (widget.isClothing) {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UploadClothingScreen(
+            storageId: selectedStorageId!,
+            isShoe: widget.isShoe,
+          ),
         ),
       );
       if (result == true && mounted) {
@@ -143,7 +154,7 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'Choose the storage location for your ${widget.isClothing ? (widget.isShoe ? "shoes" : "clothing") : "item"}',
+                          'Choose the storage location for your ${widget.isAccessory ? "accessory" : widget.isClothing ? (widget.isShoe ? "shoes" : "clothing") : "item"}',
                           style: TextStyle(
                             fontSize: 15,
                             color: Color(0xFF6B7280),
@@ -197,7 +208,7 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: Offset(0, 2),
             ),
@@ -211,7 +222,7 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
               decoration: BoxDecoration(
                 color: isSelected
                     ? Color(0xFF1A1A1A)
-                    : Color(0xFF1A1A1A).withOpacity(0.05),
+                    : Color(0xFF1A1A1A).withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -304,7 +315,7 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
         border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: Offset(0, -2),
           ),
@@ -319,7 +330,7 @@ class _StorageSelectorScreenState extends State<StorageSelectorScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Color(0xFF1A1A1A),
               foregroundColor: Colors.white,
-              disabledBackgroundColor: Color(0xFF1A1A1A).withOpacity(0.3),
+              disabledBackgroundColor: Color(0xFF1A1A1A).withValues(alpha: 0.3),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

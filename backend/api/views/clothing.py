@@ -1,10 +1,12 @@
 import os
+import io
 from pathlib import Path
 from urllib.parse import urlparse
 from typing import Dict, List, Optional, Tuple
 
 from django.conf import settings
 from django.core.files import File
+from django.core.files.base import ContentFile
 from PIL import Image
 
 from rest_framework.decorators import api_view, permission_classes
@@ -12,8 +14,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ai_models.classification.attribute_clip import extract_attributes, extract_shoe_details
+from ai_models.classification.clothing_classification import (
+    classify_subcategory,
+    map_category_from_subcategory,
+)
 from ai_models.classification.occasion import predict_occasion
-from ai_models.classification.subcategory import test_subcategory
 
 from ..models import ClothingItem, StorageUnit
 from ..serializer import ClothingItemSerializer, ClothingItemUpdateSerializer
@@ -43,17 +48,83 @@ def _title_label(raw):
 
 
 def _infer_category(subcategory):
-    value = (subcategory or "").lower()
+    return map_category_from_subcategory(subcategory)
 
-    if any(k in value for k in ["shoe", "sneaker", "boot", "sandal", "heel", "loafer"]):
-        return "Shoe"
-    if any(k in value for k in ["shirt", "tee", "top", "blouse", "jacket", "coat", "hoodie", "sweater"]):
-        return "Topwear"
-    if any(k in value for k in ["pant", "jean", "short", "skirt", "trouser", "legging"]):
-        return "Bottomwear"
-    if any(k in value for k in ["dress", "jumpsuit"]):
-        return "One-piece"
-    return "Clothing"
+
+def _is_shoe_label(category: str, subcategory: str) -> bool:
+    text = f"{category} {subcategory}".lower()
+    keys = ["shoe", "sneaker", "boot", "heel", "footwear", "slipper", "sandal", "loafer"]
+    return any(key in text for key in keys)
+
+
+def _is_bottom_label(category: str, subcategory: str) -> bool:
+    text = f"{category} {subcategory}".lower()
+    keys = ["pant", "trouser", "jean", "short", "skirt", "bottom", "jogger", "legging", "cargo"]
+    return any(key in text for key in keys)
+
+
+def _first_value(raw):
+    if isinstance(raw, list):
+        return raw[0] if raw else None
+    return raw
+
+
+def _coerce_float(raw, fallback: float, min_value: float, max_value: float) -> float:
+    candidate = _first_value(raw)
+    try:
+        parsed = float(candidate)
+    except (TypeError, ValueError):
+        parsed = fallback
+    return max(min(parsed, max_value), min_value)
+
+
+def _default_fit_values(category: str, subcategory: str) -> Dict[str, float]:
+    if _is_shoe_label(category, subcategory):
+        return {"fit_scale": 1.08, "fit_offset_x": 0.0, "fit_offset_y": -0.03}
+    if _is_bottom_label(category, subcategory):
+        return {"fit_scale": 1.12, "fit_offset_x": 0.0, "fit_offset_y": -0.05}
+    return {"fit_scale": 1.0, "fit_offset_x": 0.0, "fit_offset_y": 0.0}
+
+
+def _extract_fit_values(data, category: str, subcategory: str) -> Dict[str, float]:
+    defaults = _default_fit_values(category, subcategory)
+    return {
+        "fit_scale": _coerce_float(data.get("fit_scale"), defaults["fit_scale"], 0.5, 2.0),
+        "fit_offset_x": _coerce_float(data.get("fit_offset_x"), defaults["fit_offset_x"], -1.0, 1.0),
+        "fit_offset_y": _coerce_float(data.get("fit_offset_y"), defaults["fit_offset_y"], -1.0, 1.0),
+    }
+
+
+def _normalize_segmented_image(image_path: Path) -> ContentFile:
+    # Normalize cutouts to a consistent canvas so overlay sizing is predictable.
+    with Image.open(image_path).convert("RGBA") as raw_image:
+        alpha = raw_image.getchannel("A")
+        opaque_bbox = alpha.point(lambda a: 255 if a > 8 else 0).getbbox()
+        cropped = raw_image.crop(opaque_bbox) if opaque_bbox else raw_image.copy()
+
+        target_width = 1024
+        target_height = 1024
+        padding_ratio = 0.08
+        inner_width = int(target_width * (1 - (2 * padding_ratio)))
+        inner_height = int(target_height * (1 - (2 * padding_ratio)))
+
+        scale = min(inner_width / max(cropped.width, 1), inner_height / max(cropped.height, 1))
+        resized_width = max(1, int(cropped.width * scale))
+        resized_height = max(1, int(cropped.height * scale))
+
+        resampling = getattr(Image, "Resampling", Image).LANCZOS
+        resized = cropped.resize((resized_width, resized_height), resampling)
+        canvas = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
+        paste_x = (target_width - resized_width) // 2
+        paste_y = (target_height - resized_height) // 2
+        canvas.paste(resized, (paste_x, paste_y), resized)
+
+        buffer = io.BytesIO()
+        canvas.save(buffer, format="PNG", optimize=True)
+
+    output = ContentFile(buffer.getvalue())
+    output.name = f"{image_path.stem}_norm.png"
+    return output
 
 
 def _auth_error_payload(is_shoe: bool) -> str:
@@ -106,14 +177,24 @@ def _classify_shoe_safe(image_path: Path) -> Tuple[str, str, str, List[str]]:
 
 
 def _classify_clothing_safe(image_path: Path) -> Tuple[str, str, List[str]]:
+    subcategory = "Shirt"
+    category = "Topwear"
     try:
         with Image.open(image_path).convert("RGB") as segmented_image:
-            predicted_subcategory, _ = test_subcategory(segmented_image)
+            predicted_subcategory, _ = classify_subcategory(segmented_image)
         subcategory = _title_label(predicted_subcategory) or "Shirt"
         category = _infer_category(subcategory)
     except Exception:
-        category = "Topwear"
-        subcategory = "Shirt"
+        # Backward-compatible fallback to prior classifier when local .pth inference fails.
+        try:
+            from ai_models.classification.subcategory import test_subcategory
+
+            with Image.open(image_path).convert("RGB") as segmented_image:
+                predicted_subcategory, _ = test_subcategory(segmented_image)
+            subcategory = _title_label(predicted_subcategory) or "Shirt"
+            category = _infer_category(subcategory)
+        except Exception:
+            pass
 
     try:
         attributes = extract_attributes(image_path, subcategory)
@@ -210,20 +291,25 @@ def clothing_save(request):
     if missing_fields:
         return Response({"error": f"Missing fields: {', '.join(missing_fields)}"}, status=400)
 
-    with open(image_path, "rb") as f:
-        attributes = _coerce_attributes(data.get("attributes", []))
+    attributes = _coerce_attributes(data.get("attributes", []))
+    fit_values = _extract_fit_values(data, data["category"], data["subcategory"])
 
-        clothing = ClothingItem.objects.create(
-            user=request.user,
-            storage_unit=storage,
-            image=File(f, name=image_path.name),
-            dominant_color=data["dominant_color"],
-            secondary_color=data.get("secondary_color"),
-            category=data["category"],
-            subcategory=data["subcategory"],
-            occasion=data.get("occasion"),
-            attributes=attributes,
-        )
+    normalized_image = _normalize_segmented_image(image_path)
+
+    clothing = ClothingItem.objects.create(
+        user=request.user,
+        storage_unit=storage,
+        image=File(normalized_image, name=normalized_image.name),
+        dominant_color=data["dominant_color"],
+        secondary_color=data.get("secondary_color"),
+        category=data["category"],
+        subcategory=data["subcategory"],
+        occasion=data.get("occasion"),
+        attributes=attributes,
+        fit_scale=fit_values["fit_scale"],
+        fit_offset_x=fit_values["fit_offset_x"],
+        fit_offset_y=fit_values["fit_offset_y"],
+    )
     try:
         os.remove(image_path)
     except Exception as e:
