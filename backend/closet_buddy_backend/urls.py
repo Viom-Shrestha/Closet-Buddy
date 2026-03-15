@@ -18,11 +18,19 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf.urls.static import static
 from django.conf import settings
-
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path("api/auth/", include("api.urls")),
+    path("api/", include("api.urls")),
+
+    # 2. Add Swagger/Docs Routes
+    # This downloads the actual schema file
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    # This renders the Swagger UI
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    # Optional: Redoc UI (an alternative to Swagger)
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 
 urlpatterns += static(
