@@ -146,4 +146,3 @@ class OutfitSlotRules {
     return '$category $subcategory';
   }
 }
-

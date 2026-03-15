@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClothingItem, NonClothingItem, Outfit, StorageUnit
+from .models import AccessoryItem, ClothingItem, NonClothingItem, Outfit, StorageUnit
 from django.contrib.auth.models import User
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -39,6 +39,9 @@ class ClothingItemSerializer(serializers.ModelSerializer):
             "dominant_color",
             "secondary_color",
             "attributes",
+            "fit_scale",
+            "fit_offset_x",
+            "fit_offset_y",
             "is_favourite",
             "created_at",
             "storage_unit",
@@ -61,6 +64,9 @@ class ClothingItemUpdateSerializer(serializers.ModelSerializer):
             "secondary_color",
             "occasion",
             "attributes",
+            "fit_scale",
+            "fit_offset_x",
+            "fit_offset_y",
         ]
 
 
@@ -134,8 +140,9 @@ class StorageUnitSerializer(serializers.ModelSerializer):
 
         clothing = ClothingItem.objects.filter(storage_unit__in=ids).count()
         non_clothing = NonClothingItem.objects.filter(storage_unit__in=ids).count()
+        accessories = AccessoryItem.objects.filter(storage_unit__in=ids).count()
 
-        return clothing + non_clothing
+        return clothing + non_clothing + accessories
 
 class NonClothingItemSerializer(serializers.ModelSerializer):
     storage_unit = serializers.SerializerMethodField()
@@ -150,6 +157,31 @@ class NonClothingItemSerializer(serializers.ModelSerializer):
             "id": obj.storage_unit.id,
             "name": obj.storage_unit.name,
             "type": obj.storage_unit.type
+        }
+
+
+class AccessoryItemSerializer(serializers.ModelSerializer):
+    storage_unit = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AccessoryItem
+        fields = [
+            "id",
+            "image",
+            "name",
+            "description",
+            "dominant_color",
+            "secondary_color",
+            "is_favourite",
+            "created_at",
+            "storage_unit",
+        ]
+
+    def get_storage_unit(self, obj):
+        return {
+            "id": obj.storage_unit.id,
+            "name": obj.storage_unit.name,
+            "type": obj.storage_unit.type,
         }
 
 
@@ -181,6 +213,21 @@ def _is_bottom(item: ClothingItem) -> bool:
     return any(key in text for key in keys)
 
 
+def _is_outerwear(item: ClothingItem) -> bool:
+    text = _slot_text(item)
+    keys = [
+        "jacket",
+        "coat",
+        "blazer",
+        "cardigan",
+        "hoodie",
+        "outerwear",
+        "parka",
+        "trench",
+    ]
+    return any(key in text for key in keys)
+
+
 class OutfitSlotItemSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
 
@@ -192,6 +239,32 @@ class OutfitSlotItemSerializer(serializers.ModelSerializer):
             "category",
             "subcategory",
             "dominant_color",
+            "fit_scale",
+            "fit_offset_x",
+            "fit_offset_y",
+            "is_favourite",
+        ]
+
+    def get_image(self, obj):
+        request = self.context.get("request")
+        if not obj.image:
+            return ""
+        if request:
+            return request.build_absolute_uri(obj.image.url)
+        return obj.image.url
+
+
+class OutfitAccessoryItemSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AccessoryItem
+        fields = [
+            "id",
+            "image",
+            "name",
+            "dominant_color",
+            "secondary_color",
             "is_favourite",
         ]
 
@@ -205,9 +278,11 @@ class OutfitSlotItemSerializer(serializers.ModelSerializer):
 
 
 class OutfitReadSerializer(serializers.ModelSerializer):
+    outerwear_item = OutfitSlotItemSerializer(source="outerwear", read_only=True)
     topwear_item = OutfitSlotItemSerializer(source="topwear", read_only=True)
     bottomwear_item = OutfitSlotItemSerializer(source="bottomwear", read_only=True)
     shoes_item = OutfitSlotItemSerializer(source="shoes", read_only=True)
+    accessory_items = OutfitAccessoryItemSerializer(source="accessories", many=True, read_only=True)
 
     class Meta:
         model = Outfit
@@ -219,13 +294,22 @@ class OutfitReadSerializer(serializers.ModelSerializer):
             "is_favourite",
             "silhouette",
             "created_at",
+            "preview_layout",
+            "outerwear_item",
             "topwear_item",
             "bottomwear_item",
             "shoes_item",
+            "accessory_items",
         ]
 
 
 class OutfitWriteSerializer(serializers.ModelSerializer):
+    outerwear_id = serializers.PrimaryKeyRelatedField(
+        queryset=ClothingItem.objects.all(),
+        source="outerwear",
+        required=False,
+        allow_null=True,
+    )
     topwear_id = serializers.PrimaryKeyRelatedField(
         queryset=ClothingItem.objects.all(),
         source="topwear",
@@ -244,6 +328,12 @@ class OutfitWriteSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    accessory_ids = serializers.PrimaryKeyRelatedField(
+        queryset=AccessoryItem.objects.all(),
+        source="accessories",
+        many=True,
+        required=False,
+    )
 
     class Meta:
         model = Outfit
@@ -253,9 +343,12 @@ class OutfitWriteSerializer(serializers.ModelSerializer):
             "rating",
             "is_favourite",
             "silhouette",
+            "preview_layout",
+            "outerwear_id",
             "topwear_id",
             "bottomwear_id",
             "shoes_id",
+            "accessory_ids",
         ]
 
     def validate(self, attrs):
@@ -263,14 +356,32 @@ class OutfitWriteSerializer(serializers.ModelSerializer):
         user = getattr(request, "user", None)
 
         instance = getattr(self, "instance", None)
+        outerwear = attrs.get("outerwear", getattr(instance, "outerwear", None))
         topwear = attrs.get("topwear", getattr(instance, "topwear", None))
         bottomwear = attrs.get("bottomwear", getattr(instance, "bottomwear", None))
         shoes = attrs.get("shoes", getattr(instance, "shoes", None))
+        accessories = attrs.get(
+            "accessories",
+            list(getattr(instance, "accessories", []).all()) if instance else [],
+        )
 
-        for field_name, item in [("topwear_id", topwear), ("bottomwear_id", bottomwear), ("shoes_id", shoes)]:
+        for field_name, item in [
+            ("outerwear_id", outerwear),
+            ("topwear_id", topwear),
+            ("bottomwear_id", bottomwear),
+            ("shoes_id", shoes),
+        ]:
             if item and user and item.user_id != user.id:
                 raise serializers.ValidationError({field_name: "Selected item must belong to current user."})
+        if user:
+            for acc in accessories:
+                if acc.user_id != user.id:
+                    raise serializers.ValidationError({"accessory_ids": "Selected accessory must belong to current user."})
 
+        if outerwear and (_is_shoe(outerwear) or _is_bottom(outerwear)):
+            raise serializers.ValidationError({"outerwear_id": "Outerwear slot expects an outerwear item."})
+        if outerwear and not _is_outerwear(outerwear):
+            raise serializers.ValidationError({"outerwear_id": "Outerwear slot expects jacket/coat/blazer-like item."})
         if topwear and (_is_shoe(topwear) or _is_bottom(topwear)):
             raise serializers.ValidationError({"topwear_id": "Topwear slot cannot contain footwear or bottomwear."})
         if bottomwear and not _is_bottom(bottomwear):
@@ -281,17 +392,23 @@ class OutfitWriteSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        accessories = validated_data.pop("accessories", [])
         outfit = Outfit.objects.create(**validated_data)
+        if accessories is not None:
+            outfit.accessories.set(accessories)
         self._sync_clothing_items(outfit)
         return outfit
 
     def update(self, instance, validated_data):
+        accessories = validated_data.pop("accessories", None)
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()
+        if accessories is not None:
+            instance.accessories.set(accessories)
         self._sync_clothing_items(instance)
         return instance
 
     def _sync_clothing_items(self, outfit: Outfit):
-        selected = [item for item in [outfit.topwear, outfit.bottomwear, outfit.shoes] if item]
+        selected = [item for item in [outfit.outerwear, outfit.topwear, outfit.bottomwear, outfit.shoes] if item]
         outfit.clothing_items.set(selected)

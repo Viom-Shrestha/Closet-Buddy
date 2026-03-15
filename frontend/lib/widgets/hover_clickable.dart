@@ -7,12 +7,12 @@ class HoverClickable extends StatefulWidget {
   final bool enableShadow;
 
   const HoverClickable({
-    Key? key,
+    super.key,
     required this.child,
     this.onTap,
     this.hoverScale = 1.03,
     this.enableShadow = true,
-  }) : super(key: key);
+  });
 
   @override
   State<HoverClickable> createState() => _HoverClickableState();
@@ -41,7 +41,7 @@ class _HoverClickableState extends State<HoverClickable> {
                 ? BoxDecoration(
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),
@@ -55,3 +55,4 @@ class _HoverClickableState extends State<HoverClickable> {
     );
   }
 }
+

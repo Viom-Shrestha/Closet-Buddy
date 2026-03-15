@@ -81,6 +81,19 @@ class ClothingItem(models.Model):
     dominant_color = models.CharField(max_length=30)
     secondary_color = models.CharField(max_length=30, null=True, blank=True)
     attributes = models.JSONField(default=list, blank=True)
+    # Per-item render tuning used by outfit overlays.
+    fit_scale = models.FloatField(
+        default=1.0,
+        validators=[MinValueValidator(0.5), MaxValueValidator(2.0)],
+    )
+    fit_offset_x = models.FloatField(
+        default=0.0,
+        validators=[MinValueValidator(-1.0), MaxValueValidator(1.0)],
+    )
+    fit_offset_y = models.FloatField(
+        default=0.0,
+        validators=[MinValueValidator(-1.0), MaxValueValidator(1.0)],
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     is_favourite = models.BooleanField(default=False)
 
@@ -106,6 +119,33 @@ class NonClothingItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         return self.name
+    def clean(self):
+        if self.storage_unit.user != self.user:
+            raise ValidationError("Storage unit must belong to the same user.")
+
+
+class AccessoryItem(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="accessory_items",
+    )
+    storage_unit = models.ForeignKey(
+        StorageUnit,
+        on_delete=models.PROTECT,
+        related_name="accessory_items",
+    )
+    image = models.ImageField(upload_to="accessories/")
+    name = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
+    dominant_color = models.CharField(max_length=30, default="Unknown")
+    secondary_color = models.CharField(max_length=30, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_favourite = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.name} ({self.user.username})"
+
     def clean(self):
         if self.storage_unit.user != self.user:
             raise ValidationError("Storage unit must belong to the same user.")
@@ -152,6 +192,19 @@ class Outfit(models.Model):
         blank=True,
         related_name="as_shoes_in_outfits",
     )
+    outerwear = models.ForeignKey(
+        ClothingItem,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="as_outerwear_in_outfits",
+    )
+    accessories = models.ManyToManyField(
+        AccessoryItem,
+        related_name="outfits",
+        blank=True,
+    )
+    preview_layout = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.user.username})"

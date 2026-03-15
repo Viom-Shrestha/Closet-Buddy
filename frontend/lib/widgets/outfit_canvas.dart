@@ -2,113 +2,474 @@ import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
 
+/// A static, slot-based outfit canvas.
+///
+/// Use this when you want stable fixed slots (gallery cards/detail fallback).
+///
+/// Slots:
+///   • outerwear  — optional, full-width, shown at top only when set
+///   • topwear    — full-width
+///   • bottomwear — left half  (same row as shoes)
+///   • shoes      — right half (same row as bottomwear)
+///   • accessories — optional, horizontal strip at bottom, shown only when non-empty
+///
+/// Each slot renders the item's network image inside a styled card.
+/// When no item is set for an optional slot the slot is hidden entirely.
+/// Required slots (top/bottom/shoes) show an empty-state placeholder instead.
 class OutfitCanvas extends StatelessWidget {
+  final Map<String, dynamic>? outerwear;
   final Map<String, dynamic>? topwear;
   final Map<String, dynamic>? bottomwear;
   final Map<String, dynamic>? shoes;
-  final String silhouette;
-  final double height;
+  final List<Map<String, dynamic>> accessories;
+
+  /// Callback fired when the user taps a slot — passes the slot name.
+  final void Function(String slot)? onSlotTap;
+
+  /// When true the canvas is rendered smaller for use in gallery grid cards.
   final bool compact;
+
+  /// Scales slot heights in non-compact mode.
+  final double slotScale;
 
   const OutfitCanvas({
     super.key,
+    this.outerwear,
     this.topwear,
     this.bottomwear,
     this.shoes,
-    this.silhouette = 'male',
-    this.height = 420,
+    this.accessories = const [],
+    this.onSlotTap,
     this.compact = false,
+    this.slotScale = 1.0,
+  });
+
+  // ── Design tokens ────────────────────────────────────────────────────────
+  static const Color _bg = Color(0xFFF7F5F2);
+  static const Color _cardBg = Colors.white;
+  static const Color _borderColor = Color(0xFFE8E3DB);
+  static const Color _emptyBorder = Color(0xFFD5CFC6);
+  static const Color _labelBg = Color(0xFFFAF8F5);
+  static const Color _categoryText = Color(0xFF9A8F7F);
+  static const Color _inkColor = Color(0xFF0F0F0F);
+
+  @override
+  Widget build(BuildContext context) {
+    final double scale = compact ? 1.0 : slotScale.clamp(0.8, 1.5);
+    final bool showOptionalSlots = onSlotTap != null;
+    final double gap = (compact ? 6 : 8) * scale;
+    final double radius = compact ? 12 : 16;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: _bg,
+        borderRadius: BorderRadius.circular(compact ? 14 : 20),
+        border: Border.all(color: _borderColor),
+      ),
+      padding: EdgeInsets.all(compact ? 8 : 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Outerwear (optional) ───────────────────────────────────────
+          if (outerwear != null || showOptionalSlots) ...[
+            _FullWidthSlot(
+              slot: 'outerwear',
+              item: outerwear,
+              label: 'Outerwear',
+              height: (compact ? 80 : 120) * scale,
+              radius: radius,
+              compact: compact,
+              onTap: onSlotTap,
+            ),
+            SizedBox(height: gap),
+          ],
+
+          // ── Topwear (required slot) ────────────────────────────────────
+          _FullWidthSlot(
+            slot: 'topwear',
+            item: topwear,
+            label: 'Topwear',
+            height: (compact ? 90 : 140) * scale,
+            radius: radius,
+            compact: compact,
+            onTap: onSlotTap,
+          ),
+          SizedBox(height: gap),
+
+          // ── Bottomwear + Shoes (required slots, side by side) ──────────
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _HalfSlot(
+                    slot: 'bottomwear',
+                    item: bottomwear,
+                    label: 'Bottoms',
+                    height: (compact ? 100 : 152) * scale,
+                    radius: radius,
+                    compact: compact,
+                    onTap: onSlotTap,
+                  ),
+                ),
+                SizedBox(width: gap),
+                Expanded(
+                  child: _HalfSlot(
+                    slot: 'shoes',
+                    item: shoes,
+                    label: 'Footwear',
+                    height: (compact ? 100 : 152) * scale,
+                    radius: radius,
+                    compact: compact,
+                    onTap: onSlotTap,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Accessories strip (optional) ───────────────────────────────
+          if (accessories.isNotEmpty || showOptionalSlots) ...[
+            SizedBox(height: gap),
+            _AccessoriesStrip(
+              accessories: accessories,
+              compact: compact,
+              radius: radius,
+              showWhenEmpty: showOptionalSlots,
+              scale: scale,
+              onTap: onSlotTap,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Full-width slot (outerwear / topwear)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _FullWidthSlot extends StatelessWidget {
+  final String slot;
+  final Map<String, dynamic>? item;
+  final String label;
+  final double height;
+  final double radius;
+  final bool compact;
+  final void Function(String)? onTap;
+
+  const _FullWidthSlot({
+    required this.slot,
+    required this.item,
+    required this.label,
+    required this.height,
+    required this.radius,
+    required this.compact,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final silhouetteAsset = silhouette.toLowerCase() == 'female'
-        ? 'assets/images/Female_N.png'
-        : 'assets/images/Male_N.png';
+    return _SlotTapArea(
+      onTap: onTap == null ? null : () => onTap!(slot),
+      radius: radius,
+      child: _SlotCard(
+        item: item,
+        label: label,
+        height: height,
+        radius: radius,
+        compact: compact,
+        isHalf: false,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Half-width slot (bottomwear / shoes)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HalfSlot extends StatelessWidget {
+  final String slot;
+  final Map<String, dynamic>? item;
+  final String label;
+  final double height;
+  final double radius;
+  final bool compact;
+  final void Function(String)? onTap;
+
+  const _HalfSlot({
+    required this.slot,
+    required this.item,
+    required this.label,
+    required this.height,
+    required this.radius,
+    required this.compact,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _SlotTapArea(
+      onTap: onTap == null ? null : () => onTap!(slot),
+      radius: radius,
+      child: _SlotCard(
+        item: item,
+        label: label,
+        height: height,
+        radius: radius,
+        compact: compact,
+        isHalf: true,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared slot card UI
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SlotCard extends StatelessWidget {
+  final Map<String, dynamic>? item;
+  final String label;
+  final double height;
+  final double radius;
+  final bool compact;
+  final bool isHalf;
+
+  const _SlotCard({
+    required this.item,
+    required this.label,
+    required this.height,
+    required this.radius,
+    required this.compact,
+    required this.isHalf,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = _resolveImage(item?['image']);
+    final hasItem = imageUrl.isNotEmpty;
+    final itemName = _itemName();
+    final accentColor = _accentColor();
 
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(compact ? 14 : 20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        color: OutfitCanvas._cardBg,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: hasItem
+              ? OutfitCanvas._borderColor
+              : OutfitCanvas._emptyBorder,
+          width: hasItem ? 1 : 1.5,
+        ),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.all(compact ? 10 : 16),
-              child: Opacity(
-                opacity: compact ? 0.28 : 0.3,
-                child: Image.asset(
-                  silhouetteAsset,
+          // ── Item image ────────────────────────────────────────────────
+          if (hasItem)
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.all(compact ? 8 : 9),
+                child: Image.network(
+                  imageUrl,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Icon(
-                        Icons.accessibility_new_outlined,
-                        color: Color(0xFF9CA3AF),
-                        size: 46,
-                      ),
-                    );
-                  },
+                  filterQuality: FilterQuality.medium,
+                  errorBuilder: (context, error, stackTrace) =>
+                      _EmptyState(label: label, compact: compact),
+                ),
+              ),
+            )
+          else
+            Positioned.fill(
+              child: _EmptyState(label: label, compact: compact),
+            ),
+
+          // ── Accent color strip at bottom ──────────────────────────────
+          if (hasItem && accentColor != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  color: accentColor,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(radius),
+                    bottomRight: Radius.circular(radius),
+                  ),
                 ),
               ),
             ),
-          ),
-          _slotLayer(
-            item: topwear,
-            topFraction: 0.08,
-            heightFraction: 0.38,
-            horizontalPaddingFraction: compact ? 0.2 : 0.18,
-          ),
-          _slotLayer(
-            item: bottomwear,
-            topFraction: 0.43,
-            heightFraction: 0.35,
-            horizontalPaddingFraction: compact ? 0.23 : 0.2,
-          ),
-          _slotLayer(
-            item: shoes,
-            topFraction: 0.78,
-            heightFraction: 0.18,
-            horizontalPaddingFraction: compact ? 0.28 : 0.26,
-          ),
+
+          // ── Category chip (top-left) ──────────────────────────────────
+          if (!compact)
+            Positioned(top: 8, left: 8, child: _CategoryChip(label: label)),
+
+          // ── Item name label (bottom-left) ─────────────────────────────
+          if (hasItem && itemName.isNotEmpty && !compact)
+            Positioned(
+              bottom: 10,
+              left: 8,
+              right: 32,
+              child: _NameLabel(name: itemName),
+            ),
+
+          // ── Tap ripple indicator (edit icon, top-right) ───────────────
+          if (!compact && item != null)
+            const Positioned(top: 8, right: 8, child: _EditBadge()),
         ],
       ),
     );
   }
 
-  Widget _slotLayer({
-    required Map<String, dynamic>? item,
-    required double topFraction,
-    required double heightFraction,
-    required double horizontalPaddingFraction,
-  }) {
-    final imageUrl = _resolveImage(item?['image']);
-    if (imageUrl.isEmpty) return const SizedBox.shrink();
+  String _itemName() {
+    if (item == null) return '';
+    final sub = item!['subcategory']?.toString() ?? '';
+    final cat = item!['category']?.toString() ?? '';
+    return sub.isNotEmpty ? sub : cat;
+  }
 
-    final alignmentY = ((topFraction + (heightFraction / 2)) * 2) - 1;
-    final widthFactor = 1 - (horizontalPaddingFraction * 2);
+  Color? _accentColor() {
+    final color = item?['color']?.toString().toLowerCase() ?? '';
+    const colorMap = {
+      'navy': Color(0xFF2C3E6B),
+      'blue': Color(0xFF3B8BD4),
+      'black': Color(0xFF222222),
+      'white': Color(0xFFD0CCC6),
+      'grey': Color(0xFF888888),
+      'gray': Color(0xFF888888),
+      'olive': Color(0xFF7A8C5A),
+      'green': Color(0xFF2D7A4F),
+      'red': Color(0xFFC94040),
+      'brown': Color(0xFF8B6347),
+      'tan': Color(0xFFC9A96E),
+      'beige': Color(0xFFD4B896),
+      'pink': Color(0xFFE8A0B0),
+      'purple': Color(0xFF7B5EA7),
+      'yellow': Color(0xFFE8C547),
+      'orange': Color(0xFFE8843C),
+    };
+    for (final entry in colorMap.entries) {
+      if (color.contains(entry.key)) return entry.value;
+    }
+    return const Color(0xFFD5CFC6);
+  }
 
-    return Align(
-      alignment: Alignment(0, alignmentY),
-      child: FractionallySizedBox(
-        widthFactor: widthFactor,
-        heightFactor: heightFraction,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => Container(
-              color: const Color(0xFFF3F4F6),
-              alignment: Alignment.center,
-              child: const Icon(Icons.broken_image_outlined, color: Color(0xFF9CA3AF)),
-            ),
+  String _resolveImage(dynamic rawUrl) {
+    final url = (rawUrl ?? '').toString().trim();
+    if (url.isEmpty) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('/')) return '${ApiClient.host}$url';
+    return '${ApiClient.host}/$url';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Accessories horizontal strip
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AccessoriesStrip extends StatelessWidget {
+  final List<Map<String, dynamic>> accessories;
+  final bool compact;
+  final double radius;
+  final bool showWhenEmpty;
+  final double scale;
+  final void Function(String)? onTap;
+
+  const _AccessoriesStrip({
+    required this.accessories,
+    required this.compact,
+    required this.radius,
+    this.showWhenEmpty = false,
+    this.scale = 1.0,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final double tileSize = (compact ? 44 : 64) * scale;
+    final bool showPlaceholder = showWhenEmpty && accessories.isEmpty;
+    final int itemCount = showPlaceholder ? 1 : accessories.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!compact)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 6),
+            child: _CategoryChip(label: 'Accessories'),
+          ),
+        SizedBox(
+          height: tileSize,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: itemCount,
+            separatorBuilder: (context, index) => const SizedBox(width: 6),
+            itemBuilder: (context, index) {
+              if (showPlaceholder) {
+                return _SlotTapArea(
+                  onTap: onTap == null ? null : () => onTap!('accessories'),
+                  radius: compact ? 8 : 12,
+                  child: Container(
+                    width: tileSize,
+                    height: tileSize,
+                    decoration: BoxDecoration(
+                      color: OutfitCanvas._cardBg,
+                      borderRadius: BorderRadius.circular(compact ? 8 : 12),
+                      border: Border.all(color: OutfitCanvas._emptyBorder),
+                    ),
+                    child: Icon(
+                      Icons.add_rounded,
+                      size: tileSize * 0.36,
+                      color: OutfitCanvas._categoryText,
+                    ),
+                  ),
+                );
+              }
+              final acc = accessories[index];
+              final imageUrl = _resolveImage(acc['image']);
+              return _SlotTapArea(
+                onTap: onTap == null ? null : () => onTap!('accessories'),
+                radius: compact ? 8 : 12,
+                child: Container(
+                  width: tileSize,
+                  height: tileSize,
+                  decoration: BoxDecoration(
+                    color: OutfitCanvas._cardBg,
+                    borderRadius: BorderRadius.circular(compact ? 8 : 12),
+                    border: Border.all(color: OutfitCanvas._borderColor),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: imageUrl.isEmpty
+                      ? Icon(
+                          Icons.watch_outlined,
+                          size: tileSize * 0.4,
+                          color: OutfitCanvas._categoryText,
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Image.network(
+                            imageUrl,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.medium,
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                              Icons.watch_outlined,
+                              size: tileSize * 0.4,
+                              color: OutfitCanvas._categoryText,
+                            ),
+                          ),
+                        ),
+                ),
+              );
+            },
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -118,5 +479,158 @@ class OutfitCanvas extends StatelessWidget {
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
     if (url.startsWith('/')) return '${ApiClient.host}$url';
     return '${ApiClient.host}/$url';
+  }
+}
+
+class _SlotTapArea extends StatelessWidget {
+  final VoidCallback? onTap;
+  final double radius;
+  final Widget child;
+
+  const _SlotTapArea({
+    required this.onTap,
+    required this.radius,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (onTap == null) return child;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(radius),
+        child: child,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Small reusable widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  final String label;
+  final bool compact;
+
+  const _EmptyState({required this.label, required this.compact});
+
+  @override
+  Widget build(BuildContext context) {
+    if (compact) {
+      return Center(
+        child: Icon(_iconFor(label), color: const Color(0xFFCCC7C0), size: 22),
+      );
+    }
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_iconFor(label), color: const Color(0xFFCCC7C0), size: 28),
+          const SizedBox(height: 6),
+          Text(
+            'Add $label',
+            style: const TextStyle(
+              fontSize: 11,
+              color: OutfitCanvas._categoryText,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _iconFor(String label) {
+    final l = label.toLowerCase();
+    if (l.contains('shoe') || l.contains('foot')) {
+      return Icons.directions_walk_outlined;
+    }
+    if (l.contains('outer') || l.contains('jacket')) {
+      return Icons.layers_outlined;
+    }
+    if (l.contains('access')) {
+      return Icons.watch_outlined;
+    }
+    return Icons.checkroom_outlined;
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  final String label;
+
+  const _CategoryChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: OutfitCanvas._labelBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: OutfitCanvas._borderColor),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: OutfitCanvas._categoryText,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _NameLabel extends StatelessWidget {
+  final String name;
+
+  const _NameLabel({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OutfitCanvas._borderColor),
+      ),
+      child: Text(
+        name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: OutfitCanvas._inkColor,
+        ),
+      ),
+    );
+  }
+}
+
+class _EditBadge extends StatelessWidget {
+  const _EditBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        shape: BoxShape.circle,
+        border: Border.all(color: OutfitCanvas._borderColor),
+      ),
+      child: const Icon(
+        Icons.swap_horiz_rounded,
+        size: 14,
+        color: OutfitCanvas._categoryText,
+      ),
+    );
   }
 }

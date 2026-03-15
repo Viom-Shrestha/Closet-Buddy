@@ -385,7 +385,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                                       onChanged: (v) => setModalState(
                                         () => favoritesOnly = v,
                                       ),
-                                      activeColor: const Color(0xFFDC2626),
+                                      activeThumbColor: const Color(0xFFDC2626),
                                     ),
                                   ],
                                 ),
@@ -583,7 +583,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -635,7 +635,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 11,
             ),
             maxLines: 1,
@@ -664,7 +664,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -716,7 +716,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -788,7 +788,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -842,7 +842,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: colors[i % colors.length].withOpacity(0.1),
+                    color: colors[i % colors.length].withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
@@ -901,7 +901,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
           mainAxisSpacing: 12,
           childAspectRatio: 0.68,
         ),
-        delegate: SliverChildBuilderDelegate((_, i) {
+        delegate: SliverChildBuilderDelegate((context, i) {
           final item = _filteredItems[i];
           final image = _resolveImage(item['image']);
 
@@ -920,7 +920,9 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                   builder: (_) => ClothingDetailScreen(clothingId: itemId),
                 ),
               );
-              if (changed == true) _loadWardrobe();
+              if (changed == true) {
+                _loadWardrobe();
+              }
             },
             child: Container(
               decoration: BoxDecoration(
@@ -928,7 +930,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -955,18 +957,24 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                                     ),
                                   ),
                                 )
-                              : Image.network(
-                                  image,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color: const Color(0xFFF3F4F6),
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.broken_image_outlined,
-                                        size: 48,
-                                        color: Color(0xFFD1D5DB),
+                              : Container(
+                                  color: const Color(0xFFF9FAFB),
+                                  padding: const EdgeInsets.all(10),
+                                  child: Image.network(
+                                    image,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.contain,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            Container(
+                                      color: const Color(0xFFF3F4F6),
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.broken_image_outlined,
+                                          size: 48,
+                                          color: Color(0xFFD1D5DB),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -984,7 +992,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
+                                    color: Colors.black.withValues(alpha: 0.1),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -1224,3 +1232,4 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
     );
   }
 }
+
