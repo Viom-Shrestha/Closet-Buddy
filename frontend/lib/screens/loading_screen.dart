@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class LoadingPage extends StatefulWidget {
-  const LoadingPage({Key? key}) : super(key: key);
+  const LoadingPage({super.key});
 
   @override
   State<LoadingPage> createState() => _ClosetBuddyLoadingPageState();
@@ -101,7 +101,7 @@ class _ClosetBuddyLoadingPageState extends State<LoadingPage>
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: Color(0xFF1A1A1A).withOpacity(0.2),
+                          color: Color(0xFF1A1A1A).withValues(alpha: 0.2),
                           blurRadius: 32,
                           offset: Offset(0, 12),
                         ),
@@ -236,3 +236,4 @@ class _ClosetBuddyLoadingPageState extends State<LoadingPage>
     );
   }
 }
+

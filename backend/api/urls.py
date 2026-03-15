@@ -7,6 +7,7 @@ from .views.clothing import *
 from .views.storage import *
 from .views.non_clothing import *
 from .views.outfit import *
+from .views.accessory import *
 
 urlpatterns = [
     # Auth
@@ -21,6 +22,10 @@ urlpatterns = [
 
     # Admin
     path('admin-dashboard/', admin_dashboard, name='admin_dashboard'),
+    path('admin/users/', admin_users, name='admin_users'),
+    path('admin/activity/', admin_activity, name='admin_activity'),
+    path('admin/users/<int:user_id>/active/', admin_set_user_active, name='admin_set_user_active'),
+    path('admin/users/<int:user_id>/staff/', admin_set_user_staff, name='admin_set_user_staff'),
 
     # Clothing item
     path('delete-segmented/', delete_segmented_image, name='delete_segmented_image'),
@@ -35,6 +40,11 @@ urlpatterns = [
     path("clothing/<int:pk>/", clothing_detail),
     path("clothing/<int:pk>/delete/", delete_clothing),
     path("clothing/<int:pk>/update/", update_clothing),
+    path("accessories/process/", accessory_process),
+    path("accessories/save/", accessory_save),
+    path("accessories/all/", list_accessories),
+    path("accessories/<int:pk>/", accessory_detail),
+    path("accessories/<int:pk>/toggle-favourite/", toggle_accessory_favourite),
 
     #outfits
     path("outfits/", outfits),

@@ -4,8 +4,7 @@ import '../services/misc_service.dart';
 class AddNonClothingScreen extends StatefulWidget {
   final int storageId;
 
-  const AddNonClothingScreen({Key? key, required this.storageId})
-    : super(key: key);
+  const AddNonClothingScreen({super.key, required this.storageId});
 
   @override
   State<AddNonClothingScreen> createState() => _AddNonClothingScreenState();
@@ -148,10 +147,10 @@ class _AddNonClothingScreenState extends State<AddNonClothingScreen> {
                         Container(
                           padding: EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Color(0xFF10B981).withOpacity(0.1),
+                            color: Color(0xFF10B981).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: Color(0xFF10B981).withOpacity(0.2),
+                              color: Color(0xFF10B981).withValues(alpha: 0.2),
                             ),
                           ),
                           child: Row(
@@ -186,7 +185,7 @@ class _AddNonClothingScreenState extends State<AddNonClothingScreen> {
                   border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 8,
                       offset: Offset(0, -2),
                     ),
@@ -203,7 +202,7 @@ class _AddNonClothingScreenState extends State<AddNonClothingScreen> {
                         foregroundColor: Colors.white,
                         disabledBackgroundColor: Color(
                           0xFF1A1A1A,
-                        ).withOpacity(0.3),
+                        ).withValues(alpha: 0.3),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -335,3 +334,4 @@ class _AddNonClothingScreenState extends State<AddNonClothingScreen> {
     );
   }
 }
+

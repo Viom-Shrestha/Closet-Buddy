@@ -11,11 +11,10 @@ class UploadClothingScreen extends StatefulWidget {
   final bool isShoe;
 
   const UploadClothingScreen({
-    Key? key,
+    super.key,
     required this.storageId,
     this.isShoe = false,
-  })
-    : super(key: key);
+  });
 
   @override
   State<UploadClothingScreen> createState() => _UploadClothingScreenState();
@@ -322,9 +321,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
           Container(
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Color(0xFF3B82F6).withOpacity(0.1),
+              color: Color(0xFF3B82F6).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Color(0xFF3B82F6).withOpacity(0.2)),
+              border: Border.all(color: Color(0xFF3B82F6).withValues(alpha: 0.2)),
             ),
             child: Row(
               children: [
@@ -364,7 +363,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
           border: Border.all(color: Color(0xFFE5E7EB)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: Offset(0, 2),
             ),
@@ -376,7 +375,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: Color(0xFF1A1A1A).withOpacity(0.05),
+                color: Color(0xFF1A1A1A).withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(icon, color: Color(0xFF1A1A1A), size: 28),
@@ -462,7 +461,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
             border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: Offset(0, -2),
               ),
@@ -606,7 +605,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
             border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: Offset(0, -2),
               ),
@@ -693,3 +692,4 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         .toList();
   }
 }
+

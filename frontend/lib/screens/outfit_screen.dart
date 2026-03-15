@@ -1,10 +1,29 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
+import '../services/accessory_service.dart';
 import '../services/clothing_service.dart';
 import '../services/outfit_service.dart';
+import '../widgets/editable_outfit_canvas.dart';
 import '../widgets/outfit_canvas.dart';
 import 'add_item_screen.dart';
+import '../utils/outfit_slot_rules.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Design tokens shared across the page
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _kBg = Color(0xFFF7F5F2);
+const _kWhite = Colors.white;
+const _kInk = Color(0xFF0F0F0F);
+const _kMuted = Color(0xFF9A8F7F);
+const _kBorder = Color(0xFFE8E3DB);
+const _kAccent = Color(0xFFC9A96E);
+const _kTagBg = Color(0xFFF0ECE5);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// OutfitsPage — gallery of saved outfits
+// ═════════════════════════════════════════════════════════════════════════════
 
 class OutfitsPage extends StatefulWidget {
   final bool embedded;
@@ -37,16 +56,12 @@ class _OutfitsPageState extends State<OutfitsPage> {
     });
   }
 
-  Future<void> _openBuilder({Map<String, dynamic>? outfit}) async {
+  Future<void> _openCreateFlow() async {
     final changed = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
-        builder: (_) => OutfitBuilderPage(existingOutfit: outfit),
-      ),
+      MaterialPageRoute(builder: (_) => const OutfitItemSelectionPage()),
     );
-    if (changed == true) {
-      _loadOutfits();
-    }
+    if (changed == true) _loadOutfits();
   }
 
   Future<void> _openDetail(Map<String, dynamic> outfit) async {
@@ -59,94 +74,105 @@ class _OutfitsPageState extends State<OutfitsPage> {
     _loadOutfits();
   }
 
+  Future<void> _openEditFromCard(Map<String, dynamic> outfit) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OutfitBuilderPage(existingOutfit: outfit),
+      ),
+    );
+    if (changed == true) _loadOutfits();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final total = _outfits.length;
+    final favs = _outfits.where((o) => o['is_favourite'] == true).length;
+    final ratings = _outfits
+        .map((o) => int.tryParse(o['rating']?.toString() ?? '') ?? 0)
+        .where((r) => r > 0)
+        .toList();
+    final avgRating = ratings.isEmpty
+        ? null
+        : (ratings.reduce((a, b) => a + b) / ratings.length);
+
     final page = RefreshIndicator(
       onRefresh: _loadOutfits,
-      child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Outfit Studio',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Build outfits, save them, and reuse the same layered display for AI results.',
-                      style: TextStyle(color: Color(0xFF6B7280)),
-                    ),
-                  ],
-                ),
-              ),
-              FilledButton.icon(
-                onPressed: _loading ? null : () => _openBuilder(),
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF111827)),
-                icon: const Icon(Icons.add),
-                label: const Text('Build'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _flowCard(
-            icon: Icons.construction_outlined,
-            title: 'Manual Outfit Builder',
-            subtitle: 'Select topwear, bottomwear, shoes, and silhouette.',
-            actionLabel: 'Open',
-            onTap: () => _openBuilder(),
-          ),
-          const SizedBox(height: 10),
-          _flowCard(
-            icon: Icons.auto_awesome_outlined,
-            title: 'AI Generated Outfit',
-            subtitle: 'Uses the same layered renderer. Hook recommendation engine next.',
-            actionLabel: 'Soon',
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Outfit Gallery',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 10),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_outfits.isEmpty)
-            _emptyState()
-          else
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                final crossAxisCount = width > 900
-                    ? 4
-                    : width > 700
-                        ? 3
-                        : 2;
-                return GridView.builder(
-                  itemCount: _outfits.length,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    childAspectRatio: 0.58,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: _HeaderSection(
+              totalOutfits: total,
+              favoriteOutfits: favs,
+              avgRating: avgRating,
+              loading: _loading,
+              onCreateTap: _openCreateFlow,
+              onGenerateTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Outfit generation will be available soon.'),
                   ),
-                  itemBuilder: (context, index) {
-                    final outfit = _outfits[index];
-                    return _galleryCard(outfit);
-                  },
                 );
               },
             ),
-          const SizedBox(height: 28),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+              child: Text(
+                '$total Saved ${total == 1 ? 'Outfit' : 'Outfits'}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF374151),
+                ),
+              ),
+            ),
+          ),
+          if (_loading)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 56),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            )
+          else if (_outfits.isEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _emptyState(),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              sliver: SliverLayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.crossAxisExtent;
+                  final crossAxisCount = width > 900
+                      ? 4
+                      : width > 700
+                      ? 3
+                      : 2;
+                  return SliverGrid(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _GalleryCard(
+                        outfit: _outfits[index],
+                        onTap: _openDetail,
+                        onLongPress: _openEditFromCard,
+                      ),
+                      childCount: _outfits.length,
+                    ),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      childAspectRatio: 0.55,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -154,57 +180,13 @@ class _OutfitsPageState extends State<OutfitsPage> {
     if (widget.embedded) return page;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: _kBg,
       appBar: AppBar(
         title: const Text('Outfits'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF111827),
+        backgroundColor: _kWhite,
+        foregroundColor: _kInk,
       ),
       body: page,
-    );
-  }
-
-  Widget _flowCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String actionLabel,
-    VoidCallback? onTap,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: const Color(0xFF4B5563)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                Text(
-                  subtitle,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                ),
-              ],
-            ),
-          ),
-          TextButton(onPressed: onTap, child: Text(actionLabel)),
-        ],
-      ),
     );
   }
 
@@ -213,52 +195,224 @@ class _OutfitsPageState extends State<OutfitsPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _kWhite,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: _kBorder),
       ),
       child: const Column(
         children: [
-          Icon(Icons.checkroom_outlined, size: 34, color: Color(0xFF9CA3AF)),
+          Icon(Icons.checkroom_outlined, size: 34, color: _kMuted),
           SizedBox(height: 10),
           Text('No outfits yet'),
           SizedBox(height: 4),
           Text(
             'Build your first look and it will appear here.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+            style: TextStyle(fontSize: 12, color: _kMuted),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _galleryCard(Map<String, dynamic> outfit) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Header section
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HeaderSection extends StatelessWidget {
+  final int totalOutfits;
+  final int favoriteOutfits;
+  final double? avgRating;
+  final bool loading;
+  final VoidCallback onCreateTap;
+  final VoidCallback onGenerateTap;
+
+  const _HeaderSection({
+    required this.totalOutfits,
+    required this.favoriteOutfits,
+    required this.avgRating,
+    required this.loading,
+    required this.onCreateTap,
+    required this.onGenerateTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF111827), Color(0xFF1F2937)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Outfit Studio',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Build and review your saved looks.',
+            style: TextStyle(color: Color(0xFFD1D5DB)),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatPill(Icons.checkroom_outlined, 'Total', '$totalOutfits'),
+              _StatPill(
+                Icons.favorite_border,
+                'Favourites',
+                '$favoriteOutfits',
+              ),
+              _StatPill(
+                Icons.star_border,
+                'Avg rating',
+                avgRating == null ? '-' : avgRating!.toStringAsFixed(1),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: loading ? null : onCreateTap,
+                  icon: const Icon(Icons.add),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: _kInk,
+                  ),
+                  label: const Text('Create Outfit'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: loading ? null : onGenerateTap,
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFF9CA3AF)),
+                  ),
+                  label: const Text('Generate'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _StatPill(this.icon, this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            '$label: $value',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gallery card — compact version of canvas in a grid cell
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _GalleryCard extends StatelessWidget {
+  final Map<String, dynamic> outfit;
+  final void Function(Map<String, dynamic>) onTap;
+  final void Function(Map<String, dynamic>) onLongPress;
+
+  const _GalleryCard({
+    required this.outfit,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final name = (outfit['name'] ?? 'Untitled Outfit').toString();
     final occasion = (outfit['occasion'] ?? 'Any Occasion').toString();
     final rating = outfit['rating']?.toString() ?? '-';
-    final isFavourite = outfit['is_favourite'] == true;
-    final silhouette = (outfit['silhouette'] ?? 'male').toString();
+    final isFav = outfit['is_favourite'] == true;
+    final previewItems = _previewItems(outfit);
+    final previewTransforms = _layoutToTransforms(_previewLayout(outfit));
 
     return GestureDetector(
-      onTap: () => _openDetail(outfit),
+      onTap: () => onTap(outfit),
+      onLongPress: () => onLongPress(outfit),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _kWhite,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          border: Border.all(color: _kBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: OutfitCanvas(
-                topwear: _slot(outfit, 'topwear_item'),
-                bottomwear: _slot(outfit, 'bottomwear_item'),
-                shoes: _slot(outfit, 'shoes_item'),
-                silhouette: silhouette,
-                height: 190,
-                compact: true,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: previewItems.isNotEmpty
+                    ? EditableOutfitCanvas(
+                        items: previewItems,
+                        initialTransforms: previewTransforms,
+                        interactive: false,
+                      )
+                    : OutfitCanvas(
+                        outerwear: _slot(outfit, 'outerwear_item'),
+                        topwear: _slot(outfit, 'topwear_item'),
+                        bottomwear: _slot(outfit, 'bottomwear_item'),
+                        shoes: _slot(outfit, 'shoes_item'),
+                        accessories: _accessoryList(outfit),
+                        compact: true,
+                      ),
               ),
             ),
             Padding(
@@ -270,26 +424,33 @@ class _OutfitsPageState extends State<OutfitsPage> {
                     name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     occasion,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                    style: const TextStyle(fontSize: 11, color: _kMuted),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.star, size: 14, color: Color(0xFFF59E0B)),
-                      const SizedBox(width: 4),
-                      Text(rating, style: const TextStyle(fontSize: 12)),
+                      const Icon(
+                        Icons.star,
+                        size: 13,
+                        color: Color(0xFFF59E0B),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(rating, style: const TextStyle(fontSize: 11)),
                       const Spacer(),
                       Icon(
-                        isFavourite ? Icons.favorite : Icons.favorite_border,
-                        size: 16,
-                        color: isFavourite ? const Color(0xFFDC2626) : const Color(0xFF9CA3AF),
+                        isFav ? Icons.favorite : Icons.favorite_border,
+                        size: 15,
+                        color: isFav ? const Color(0xFFDC2626) : _kMuted,
                       ),
                     ],
                   ),
@@ -308,40 +469,741 @@ class _OutfitsPageState extends State<OutfitsPage> {
     if (raw is Map) return Map<String, dynamic>.from(raw);
     return null;
   }
+
+  List<Map<String, dynamic>> _accessoryList(Map<String, dynamic> outfit) {
+    final raw = outfit['accessory_items'];
+    if (raw is List) {
+      return raw
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+    }
+    return [];
+  }
+
+  Map<String, dynamic> _previewLayout(Map<String, dynamic> outfit) {
+    final raw = outfit['preview_layout'];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return {};
+  }
+
+  List<EditableCanvasItem> _previewItems(Map<String, dynamic> outfit) {
+    final top = _slot(outfit, 'topwear_item');
+    final bottom = _slot(outfit, 'bottomwear_item');
+    final shoes = _slot(outfit, 'shoes_item');
+    final outerwear = _slot(outfit, 'outerwear_item');
+    final accs = _accessoryList(outfit);
+    final items = <EditableCanvasItem>[];
+    if (bottom != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'bottom-${_asInt(bottom['id']) ?? 0}',
+          label: 'Bottomwear',
+          imageUrl: _imageOf(bottom),
+          widthFactor: 0.5,
+          heightFactor: 0.27,
+          defaultOffset: const Offset(0, 0.23),
+        ),
+      );
+    }
+    if (top != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'top-${_asInt(top['id']) ?? 0}',
+          label: 'Topwear',
+          imageUrl: _imageOf(top),
+          widthFactor: 0.62,
+          heightFactor: 0.28,
+          defaultOffset: const Offset(0, -0.03),
+        ),
+      );
+    }
+    if (outerwear != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'outerwear-${_asInt(outerwear['id']) ?? 0}',
+          label: 'Outerwear',
+          imageUrl: _imageOf(outerwear),
+          widthFactor: 0.64,
+          heightFactor: 0.24,
+          defaultOffset: const Offset(0, -0.23),
+        ),
+      );
+    }
+    if (shoes != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'shoes-${_asInt(shoes['id']) ?? 0}',
+          label: 'Shoes',
+          imageUrl: _imageOf(shoes),
+          widthFactor: 0.46,
+          heightFactor: 0.17,
+          defaultOffset: const Offset(0, 0.41),
+        ),
+      );
+    }
+    for (var i = 0; i < accs.length; i++) {
+      final acc = accs[i];
+      final col = i % 4;
+      final row = i ~/ 4;
+      items.add(
+        EditableCanvasItem(
+          id: 'acc-${_asInt(acc['id']) ?? i}',
+          label: 'Accessory',
+          imageUrl: _imageOf(acc),
+          widthFactor: 0.17,
+          heightFactor: 0.11,
+          defaultOffset: Offset(-0.225 + (col * 0.15), 0.5 - (row * 0.09)),
+        ),
+      );
+    }
+    return items.where((item) => item.imageUrl.isNotEmpty).toList();
+  }
+
+  Map<String, EditableCanvasTransform> _layoutToTransforms(
+    Map<String, dynamic> layout,
+  ) {
+    final out = <String, EditableCanvasTransform>{};
+    layout.forEach((key, value) {
+      if (value is! Map) return;
+      final x = (value['offset_x'] is num)
+          ? (value['offset_x'] as num).toDouble()
+          : double.tryParse('${value['offset_x']}');
+      final y = (value['offset_y'] is num)
+          ? (value['offset_y'] as num).toDouble()
+          : double.tryParse('${value['offset_y']}');
+      final s = (value['scale'] is num)
+          ? (value['scale'] as num).toDouble()
+          : double.tryParse('${value['scale']}');
+      if (x == null || y == null || s == null) return;
+      out[key] = EditableCanvasTransform(offset: Offset(x, y), scale: s);
+    });
+    return out;
+  }
+
+  int? _asInt(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '');
+  }
+
+  String _imageOf(Map<String, dynamic> item) {
+    final raw = (item['image'] ?? '').toString().trim();
+    if (raw.isEmpty) return '';
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    if (raw.startsWith('/')) return '${ApiClient.host}$raw';
+    return '${ApiClient.host}/$raw';
+  }
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// OutfitItemSelectionPage — pick initial clothes then continue to builder
+// ═════════════════════════════════════════════════════════════════════════════
+
+class OutfitItemSelectionPage extends StatefulWidget {
+  const OutfitItemSelectionPage({super.key});
+
+  @override
+  State<OutfitItemSelectionPage> createState() =>
+      _OutfitItemSelectionPageState();
+}
+
+class _OutfitItemSelectionPageState extends State<OutfitItemSelectionPage> {
+  final AccessoryService _accessoryService = AccessoryService();
+  final ClothingService _clothingService = ClothingService();
+
+  // Items per slot
+  List<Map<String, dynamic>> _tops = [];
+  List<Map<String, dynamic>> _bottoms = [];
+  List<Map<String, dynamic>> _shoes = [];
+  List<Map<String, dynamic>> _outerwear = [];
+  List<Map<String, dynamic>> _accessories = [];
+
+  // Selected indices (-1 = none)
+  int _topIndex = -1;
+  int _bottomIndex = -1;
+  int _shoesIndex = -1;
+  int _outerwearIndex = -1; // optional
+  final Set<int> _accessoryIndices = {}; // optional, multi-select
+
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClothes();
+  }
+
+  Future<void> _loadClothes() async {
+    setState(() => _loading = true);
+    final results = await Future.wait([
+      _clothingService.getAllClothes(),
+      _accessoryService.getAll(),
+    ]);
+    final items = results[0];
+    final accessoryItems = results[1];
+    if (!mounted) return;
+
+    final tops = <Map<String, dynamic>>[];
+    final bottoms = <Map<String, dynamic>>[];
+    final shoes = <Map<String, dynamic>>[];
+    final outerwear = <Map<String, dynamic>>[];
+    final accessories = <Map<String, dynamic>>[...accessoryItems];
+
+    for (final item in items) {
+      final slot = OutfitSlotRules.slotFor(item);
+      switch (slot) {
+        case 'shoes':
+          shoes.add(item);
+          break;
+        case 'bottomwear':
+          bottoms.add(item);
+          break;
+        case 'outerwear':
+          outerwear.add(item);
+          break;
+        case 'accessories':
+          // Accessories now come from dedicated model/service.
+          break;
+        default:
+          tops.add(item);
+          break;
+      }
+    }
+
+    setState(() {
+      _tops = tops;
+      _bottoms = bottoms;
+      _shoes = shoes;
+      _outerwear = outerwear;
+      _accessories = accessories;
+      _topIndex = tops.isEmpty ? -1 : 0;
+      _bottomIndex = bottoms.isEmpty ? -1 : 0;
+      _shoesIndex = shoes.isEmpty ? -1 : 0;
+      _outerwearIndex = -1; // optional — not pre-selected
+      _accessoryIndices.clear();
+      _loading = false;
+    });
+  }
+
+  Future<void> _openBuilder() async {
+    if (_tops.isEmpty && _bottoms.isEmpty && _shoes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add some clothes first to create an outfit'),
+        ),
+      );
+      return;
+    }
+
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OutfitBuilderPage(
+          initialTopId: _idAt(_tops, _topIndex),
+          initialBottomId: _idAt(_bottoms, _bottomIndex),
+          initialShoesId: _idAt(_shoes, _shoesIndex),
+          initialOuterwearId: _idAt(_outerwear, _outerwearIndex),
+          initialAccessoryIds: _accessoryIndices
+              .map((i) => _idAt(_accessories, i))
+              .whereType<int>()
+              .toList(),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (changed == true) Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _kBg,
+      appBar: AppBar(
+        backgroundColor: _kWhite,
+        foregroundColor: _kInk,
+        title: const Text('Select Clothes'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              children: [
+                // Required slots
+                _SelectorCard(
+                  title: 'Topwear',
+                  items: _tops,
+                  selectedIndex: _topIndex,
+                  onSelect: (i) => setState(() => _topIndex = i),
+                  onAddItem: _openAddAndRefresh,
+                ),
+                const SizedBox(height: 12),
+                _SelectorCard(
+                  title: 'Bottomwear',
+                  items: _bottoms,
+                  selectedIndex: _bottomIndex,
+                  onSelect: (i) => setState(() => _bottomIndex = i),
+                  onAddItem: _openAddAndRefresh,
+                ),
+                const SizedBox(height: 12),
+                _SelectorCard(
+                  title: 'Shoes',
+                  items: _shoes,
+                  selectedIndex: _shoesIndex,
+                  onSelect: (i) => setState(() => _shoesIndex = i),
+                  onAddItem: _openAddAndRefresh,
+                ),
+                const SizedBox(height: 12),
+
+                // Optional slots header
+                _SectionDivider(
+                  label: 'Optional Pieces',
+                  subtitle: 'Add to elevate the look',
+                ),
+                const SizedBox(height: 12),
+
+                // Outerwear — single-select, optional
+                _SelectorCard(
+                  title: 'Outerwear',
+                  subtitle: 'Optional',
+                  items: _outerwear,
+                  selectedIndex: _outerwearIndex,
+                  onSelect: (i) => setState(() {
+                    // Toggle off if tapping same item
+                    _outerwearIndex = _outerwearIndex == i ? -1 : i;
+                  }),
+                  onAddItem: _openAddAndRefresh,
+                  optional: true,
+                ),
+                const SizedBox(height: 12),
+
+                // Accessories — multi-select, optional
+                _MultiSelectorCard(
+                  title: 'Accessories',
+                  subtitle: 'Optional — pick multiple',
+                  items: _accessories,
+                  selectedIndices: _accessoryIndices,
+                  onToggle: (i) => setState(() {
+                    if (_accessoryIndices.contains(i)) {
+                      _accessoryIndices.remove(i);
+                    } else {
+                      _accessoryIndices.add(i);
+                    }
+                  }),
+                  onAddItem: _openAddAndRefresh,
+                ),
+                const SizedBox(height: 20),
+
+                FilledButton.icon(
+                  onPressed: _openBuilder,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _kInk,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: const Icon(Icons.design_services_outlined),
+                  label: const Text('Continue to Builder'),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Future<void> _openAddAndRefresh() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddItemSelectionPage()),
+    );
+    if (!mounted) return;
+    _loadClothes();
+  }
+
+  int? _idAt(List<Map<String, dynamic>> items, int index) {
+    if (index < 0 || index >= items.length) return null;
+    final raw = items[index]['id'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reusable selector cards
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SectionDivider extends StatelessWidget {
+  final String label;
+  final String subtitle;
+
+  const _SectionDivider({required this.label, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: _kBorder)),
+        const SizedBox(width: 12),
+        Column(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _kInk,
+              ),
+            ),
+            Text(
+              subtitle,
+              style: const TextStyle(fontSize: 10, color: _kMuted),
+            ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Divider(color: _kBorder)),
+      ],
+    );
+  }
+}
+
+/// Single-select horizontal scrollable item picker.
+class _SelectorCard extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final List<Map<String, dynamic>> items;
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+  final VoidCallback onAddItem;
+  final bool optional;
+
+  const _SelectorCard({
+    required this.title,
+    this.subtitle,
+    required this.items,
+    required this.selectedIndex,
+    required this.onSelect,
+    required this.onAddItem,
+    this.optional = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: _kWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _kTagBg,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    subtitle!,
+                    style: const TextStyle(fontSize: 10, color: _kMuted),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (items.isEmpty) ...[
+            Text(
+              optional
+                  ? 'No $title items. Add some to your wardrobe.'
+                  : 'No items found.',
+              style: const TextStyle(fontSize: 12, color: _kMuted),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: onAddItem,
+              icon: const Icon(Icons.add),
+              label: Text('Add $title'),
+            ),
+          ] else
+            SizedBox(
+              height: 116,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: items.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) => _ItemTile(
+                  item: items[index],
+                  selected: index == selectedIndex,
+                  onTap: () => onSelect(index),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Multi-select card for accessories.
+class _MultiSelectorCard extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final List<Map<String, dynamic>> items;
+  final Set<int> selectedIndices;
+  final ValueChanged<int> onToggle;
+  final VoidCallback onAddItem;
+
+  const _MultiSelectorCard({
+    required this.title,
+    this.subtitle,
+    required this.items,
+    required this.selectedIndices,
+    required this.onToggle,
+    required this.onAddItem,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: _kWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Accessories',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+              const SizedBox(width: 6),
+              if (subtitle != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _kTagBg,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    subtitle!,
+                    style: const TextStyle(fontSize: 10, color: _kMuted),
+                  ),
+                ),
+              const Spacer(),
+              if (selectedIndices.isNotEmpty)
+                Text(
+                  '${selectedIndices.length} selected',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: _kAccent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (items.isEmpty) ...[
+            const Text(
+              'No accessories found. Add watches, belts, bags, etc.',
+              style: TextStyle(fontSize: 12, color: _kMuted),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: onAddItem,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Accessory'),
+            ),
+          ] else
+            SizedBox(
+              height: 116,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: items.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) => _ItemTile(
+                  item: items[index],
+                  selected: selectedIndices.contains(index),
+                  onTap: () => onToggle(index),
+                  multiSelect: true,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ItemTile extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final bool selected;
+  final VoidCallback onTap;
+  final bool multiSelect;
+
+  const _ItemTile({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+    this.multiSelect = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final image = _resolveImage(item['image']);
+    final label = (item['subcategory'] ?? item['category'] ?? 'Item')
+        .toString();
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFF5F2EE) : _kWhite,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? _kInk : _kBorder,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Center(
+                    child: image.isEmpty
+                        ? const Icon(
+                            Icons.image_not_supported_outlined,
+                            size: 28,
+                            color: _kMuted,
+                          )
+                        : Image.network(image, fit: BoxFit.contain),
+                  ),
+                  if (selected && multiSelect)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        width: 18,
+                        height: 18,
+                        decoration: const BoxDecoration(
+                          color: _kInk,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _resolveImage(dynamic rawUrl) {
+    final url = (rawUrl ?? '').toString().trim();
+    if (url.isEmpty) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('/')) return '${ApiClient.host}$url';
+    return '${ApiClient.host}/$url';
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// OutfitBuilderPage — main builder with live canvas + inline slot switcher
+// ═════════════════════════════════════════════════════════════════════════════
 
 class OutfitBuilderPage extends StatefulWidget {
   final Map<String, dynamic>? existingOutfit;
+  final int? initialTopId;
+  final int? initialBottomId;
+  final int? initialShoesId;
+  final int? initialOuterwearId;
+  final List<int> initialAccessoryIds;
 
-  const OutfitBuilderPage({super.key, this.existingOutfit});
+  const OutfitBuilderPage({
+    super.key,
+    this.existingOutfit,
+    this.initialTopId,
+    this.initialBottomId,
+    this.initialShoesId,
+    this.initialOuterwearId,
+    this.initialAccessoryIds = const [],
+  });
 
   @override
   State<OutfitBuilderPage> createState() => _OutfitBuilderPageState();
 }
 
 class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
+  final AccessoryService _accessoryService = AccessoryService();
   final ClothingService _clothingService = ClothingService();
   final OutfitService _outfitService = OutfitService();
+
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _occasionCtrl = TextEditingController();
   final TextEditingController _ratingCtrl = TextEditingController();
 
-  final PageController _topCtrl = PageController(viewportFraction: 0.38);
-  final PageController _bottomCtrl = PageController(viewportFraction: 0.38);
-  final PageController _shoesCtrl = PageController(viewportFraction: 0.38);
-
+  // All items grouped by slot
   List<Map<String, dynamic>> _tops = [];
   List<Map<String, dynamic>> _bottoms = [];
   List<Map<String, dynamic>> _shoes = [];
+  List<Map<String, dynamic>> _outerwear = [];
+  List<Map<String, dynamic>> _accessories = [];
 
+  // Selected indices
   int _topIndex = -1;
   int _bottomIndex = -1;
   int _shoesIndex = -1;
+  int _outerwearIndex = -1; // -1 = none (optional)
+  final Set<int> _accessoryIndices = {};
+
+  // Builder UI state
   String _silhouette = 'male';
   bool _loading = true;
   bool _saving = false;
+  Map<String, dynamic> _previewLayout = {};
 
   int? get _editingOutfitId => _asInt(widget.existingOutfit?['id']);
+
+  // ── Init ────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -355,39 +1217,61 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
     _nameCtrl.dispose();
     _occasionCtrl.dispose();
     _ratingCtrl.dispose();
-    _topCtrl.dispose();
-    _bottomCtrl.dispose();
-    _shoesCtrl.dispose();
     super.dispose();
   }
 
   void _prefillMetadata() {
-    final existing = widget.existingOutfit;
-    if (existing == null) return;
-    _nameCtrl.text = (existing['name'] ?? '').toString();
-    _occasionCtrl.text = (existing['occasion'] ?? '').toString();
-    final rating = existing['rating'];
+    final e = widget.existingOutfit;
+    if (e == null) return;
+    _nameCtrl.text = (e['name'] ?? '').toString();
+    _occasionCtrl.text = (e['occasion'] ?? '').toString();
+    final rating = e['rating'];
     if (rating != null) _ratingCtrl.text = rating.toString();
-    _silhouette = (existing['silhouette'] ?? 'male').toString().toLowerCase() == 'female'
+    _silhouette =
+        (e['silhouette'] ?? 'male').toString().toLowerCase() == 'female'
         ? 'female'
         : 'male';
+    final rawPreview = e['preview_layout'];
+    if (rawPreview is Map<String, dynamic>) {
+      _previewLayout = rawPreview;
+    } else if (rawPreview is Map) {
+      _previewLayout = Map<String, dynamic>.from(rawPreview);
+    }
   }
 
   Future<void> _loadClothes() async {
-    final items = await _clothingService.getAllClothes();
+    final results = await Future.wait([
+      _clothingService.getAllClothes(),
+      _accessoryService.getAll(),
+    ]);
+    final items = results[0];
+    final accessoryItems = results[1];
     if (!mounted) return;
 
     final tops = <Map<String, dynamic>>[];
     final bottoms = <Map<String, dynamic>>[];
     final shoes = <Map<String, dynamic>>[];
+    final outerwear = <Map<String, dynamic>>[];
+    final accessories = <Map<String, dynamic>>[...accessoryItems];
 
     for (final item in items) {
-      if (OutfitSlotRules.isShoe(item)) {
-        shoes.add(item);
-      } else if (OutfitSlotRules.isBottom(item)) {
-        bottoms.add(item);
-      } else {
-        tops.add(item);
+      switch (OutfitSlotRules.slotFor(item)) {
+        case 'shoes':
+          shoes.add(item);
+          break;
+        case 'bottomwear':
+          bottoms.add(item);
+          break;
+        case 'outerwear':
+          outerwear.add(item);
+          break;
+        case 'accessories':
+          // Accessories now come from dedicated model/service.
+          // Ignore legacy classified clothing accessories here.
+          break;
+        default:
+          tops.add(item);
+          break;
       }
     }
 
@@ -395,52 +1279,90 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
       _tops = tops;
       _bottoms = bottoms;
       _shoes = shoes;
+      _outerwear = outerwear;
+      _accessories = accessories;
       _topIndex = tops.isEmpty ? -1 : 0;
       _bottomIndex = bottoms.isEmpty ? -1 : 0;
       _shoesIndex = shoes.isEmpty ? -1 : 0;
+      _outerwearIndex = -1;
       _loading = false;
     });
 
     _applyExistingSelection();
+    _applyInitialSelection();
   }
 
   void _applyExistingSelection() {
-    final existing = widget.existingOutfit;
-    if (existing == null) return;
+    final e = widget.existingOutfit;
+    if (e == null) return;
 
-    final topId = _asInt(_slot(existing, 'topwear_item')?['id']);
-    final bottomId = _asInt(_slot(existing, 'bottomwear_item')?['id']);
-    final shoesId = _asInt(_slot(existing, 'shoes_item')?['id']);
+    void findAndSet(
+      String slotKey,
+      List<Map<String, dynamic>> list,
+      void Function(int) setter,
+    ) {
+      final id = _asInt(_slotMap(e, slotKey)?['id']);
+      if (id == null) return;
+      final idx = _indexById(list, id);
+      if (idx >= 0) setter(idx);
+    }
 
-    if (topId != null && _tops.isNotEmpty) {
-      final idx = _indexById(_tops, topId);
-      if (idx >= 0) {
-        setState(() => _topIndex = idx);
-        _jumpToPageSafe(_topCtrl, idx);
+    setState(() {
+      findAndSet('topwear_item', _tops, (i) => _topIndex = i);
+      findAndSet('bottomwear_item', _bottoms, (i) => _bottomIndex = i);
+      findAndSet('shoes_item', _shoes, (i) => _shoesIndex = i);
+      findAndSet('outerwear_item', _outerwear, (i) => _outerwearIndex = i);
+
+      // Accessories (list)
+      final rawAccs = e['accessory_items'];
+      if (rawAccs is List) {
+        for (final acc in rawAccs.whereType<Map>()) {
+          final id = _asInt(acc['id']);
+          if (id == null) continue;
+          final idx = _indexById(_accessories, id);
+          if (idx >= 0) _accessoryIndices.add(idx);
+        }
       }
-    }
-    if (bottomId != null && _bottoms.isNotEmpty) {
-      final idx = _indexById(_bottoms, bottomId);
-      if (idx >= 0) {
-        setState(() => _bottomIndex = idx);
-        _jumpToPageSafe(_bottomCtrl, idx);
-      }
-    }
-    if (shoesId != null && _shoes.isNotEmpty) {
-      final idx = _indexById(_shoes, shoesId);
-      if (idx >= 0) {
-        setState(() => _shoesIndex = idx);
-        _jumpToPageSafe(_shoesCtrl, idx);
-      }
-    }
+    });
   }
+
+  void _applyInitialSelection() {
+    if (widget.existingOutfit != null) return;
+
+    void findAndSet(
+      int? id,
+      List<Map<String, dynamic>> list,
+      void Function(int) setter,
+    ) {
+      if (id == null || list.isEmpty) return;
+      final idx = _indexById(list, id);
+      if (idx >= 0) setter(idx);
+    }
+
+    setState(() {
+      findAndSet(widget.initialTopId, _tops, (i) => _topIndex = i);
+      findAndSet(widget.initialBottomId, _bottoms, (i) => _bottomIndex = i);
+      findAndSet(widget.initialShoesId, _shoes, (i) => _shoesIndex = i);
+      findAndSet(
+        widget.initialOuterwearId,
+        _outerwear,
+        (i) => _outerwearIndex = i,
+      );
+      for (final id in widget.initialAccessoryIds) {
+        final idx = _indexById(_accessories, id);
+        if (idx >= 0) _accessoryIndices.add(idx);
+      }
+    });
+  }
+
+  // ── Save ────────────────────────────────────────────────────────────────
 
   Future<void> _saveOutfit() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Outfit name is required')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Outfit name is required')));
       return;
     }
 
@@ -450,7 +1372,7 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
 
     if (top == null && bottom == null && shoes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select at least one item to save outfit')),
+        const SnackBar(content: Text('Select at least one main item to save')),
       );
       return;
     }
@@ -464,271 +1386,678 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
     }
 
     setState(() => _saving = true);
+
     final payload = <String, dynamic>{
       'name': name,
-      'occasion': _occasionCtrl.text.trim().isEmpty ? null : _occasionCtrl.text.trim(),
+      'occasion': _occasionCtrl.text.trim().isEmpty
+          ? null
+          : _occasionCtrl.text.trim(),
       'rating': rating,
       'silhouette': _silhouette,
+      'preview_layout': _layoutForSave(),
+      'outerwear_id': _asInt(_selected(_outerwear, _outerwearIndex)?['id']),
       'topwear_id': _asInt(top?['id']),
       'bottomwear_id': _asInt(bottom?['id']),
       'shoes_id': _asInt(shoes?['id']),
+      'accessory_ids': _accessoryIndices
+          .map((i) => _asInt(_selected(_accessories, i)?['id']))
+          .whereType<int>()
+          .toList(),
     };
 
-    Map<String, dynamic>? result;
     final id = _editingOutfitId;
-    if (id == null) {
-      result = await _outfitService.create(payload);
-    } else {
-      result = await _outfitService.update(id, payload);
-    }
+    final result = id == null
+        ? await _outfitService.create(payload)
+        : await _outfitService.update(id, payload);
 
     if (!mounted) return;
     setState(() => _saving = false);
 
     if (result == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to save outfit')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to save outfit')));
       return;
     }
-
     Navigator.pop(context, true);
   }
 
+  // ── Build ────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final selectedTop = _selected(_tops, _topIndex);
-    final selectedBottom = _selected(_bottoms, _bottomIndex);
-    final selectedShoes = _selected(_shoes, _shoesIndex);
+    final previewItems = _canvasPreviewItems();
+    final previewTransforms = _layoutToTransforms(_previewLayout);
+    final builderCanvasHeight = (MediaQuery.of(context).size.width * 1.7)
+        .clamp(620.0, 820.0)
+        .toDouble();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: _kBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF111827),
-        title: Text(_editingOutfitId == null ? 'Outfit Builder' : 'Edit Outfit'),
+        backgroundColor: _kWhite,
+        foregroundColor: _kInk,
+        title: Text(
+          _editingOutfitId == null ? 'Outfit Builder' : 'Edit Outfit',
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-              children: [
-                OutfitCanvas(
-                  topwear: selectedTop,
-                  bottomwear: selectedBottom,
-                  shoes: selectedShoes,
-                  silhouette: _silhouette,
-                  height: 430,
-                ),
-                const SizedBox(height: 14),
-                _metaForm(),
-                const SizedBox(height: 14),
-                _silhouetteSelector(),
-                const SizedBox(height: 14),
-                _sliderSection(
-                  title: 'Topwear',
-                  items: _tops,
-                  controller: _topCtrl,
-                  selectedIndex: _topIndex,
-                  onChanged: (i) => setState(() => _topIndex = i),
-                ),
-                const SizedBox(height: 12),
-                _sliderSection(
-                  title: 'Bottomwear',
-                  items: _bottoms,
-                  controller: _bottomCtrl,
-                  selectedIndex: _bottomIndex,
-                  onChanged: (i) => setState(() => _bottomIndex = i),
-                ),
-                const SizedBox(height: 12),
-                _sliderSection(
-                  title: 'Shoes',
-                  items: _shoes,
-                  controller: _shoesCtrl,
-                  selectedIndex: _shoesIndex,
-                  onChanged: (i) => setState(() => _shoesIndex = i),
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: _saving ? null : _saveOutfit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF111827),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+          : SafeArea(
+              child: Column(
+                children: [
+                  // ── Live canvas ──────────────────────────────────────
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Editable Outfit Canvas',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _kMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (previewItems.isEmpty)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: _kWhite,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _kBorder),
+                              ),
+                              child: const Text(
+                                'Select items to enable freeform canvas.',
+                                style: TextStyle(fontSize: 12, color: _kMuted),
+                              ),
+                            )
+                          else
+                            EditableOutfitCanvas(
+                              items: previewItems,
+                              initialTransforms: previewTransforms,
+                              showGuide: false,
+                              height: builderCanvasHeight,
+                              onItemLongPress: _handleCanvasItemLongPress,
+                              onChanged: (value) {
+                                setState(() {
+                                  _previewLayout = _transformsToLayout(value);
+                                });
+                              },
+                            ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Long press item to switch slot. Drag to move, pinch to scale.',
+                            style: TextStyle(fontSize: 12, color: _kMuted),
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Static Slot Preview',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _kMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          OutfitCanvas(
+                            outerwear: _selected(_outerwear, _outerwearIndex),
+                            topwear: _selected(_tops, _topIndex),
+                            bottomwear: _selected(_bottoms, _bottomIndex),
+                            shoes: _selected(_shoes, _shoesIndex),
+                            accessories: _selectedAccessories(),
+                            slotScale: 1.15,
+                            onSlotTap: _handleSlotTap,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Tap any slot to change selected items.',
+                            style: TextStyle(fontSize: 12, color: _kMuted),
+                          ),
+                          const SizedBox(height: 10),
+                          _buildInlineDetailsPanel(),
+                        ],
+                      ),
+                    ),
                   ),
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.save_outlined),
-                  label: Text(_editingOutfitId == null ? 'Save Outfit' : 'Update Outfit'),
-                ),
-              ],
+                  // ── Action row ───────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _saving ? null : _saveOutfit,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _kInk,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            icon: _saving
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.save_outlined),
+                            label: Text(
+                              _editingOutfitId == null
+                                  ? 'Save Outfit'
+                                  : 'Update Outfit',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
     );
   }
 
-  Widget _metaForm() {
+  Future<void> _openAddAndRefresh() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddItemSelectionPage()),
+    );
+    if (!mounted) return;
+    _loadClothes();
+  }
+
+  Widget _buildInlineDetailsPanel() {
     return Container(
-      padding: const EdgeInsets.all(14),
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        color: _kWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
       ),
       child: Column(
         children: [
           TextField(
             controller: _nameCtrl,
             decoration: const InputDecoration(
-              labelText: 'Outfit name',
+              labelText: 'Outfit name *',
               border: OutlineInputBorder(),
               isDense: true,
             ),
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _occasionCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Occasion (optional)',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _occasionCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Occasion',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 100,
+                child: TextField(
+                  controller: _ratingCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Rating',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _ratingCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Rating 1-5 (optional)',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _silhouetteSelector() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Silhouette', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           SegmentedButton<String>(
             segments: const [
-              ButtonSegment<String>(value: 'male', label: Text('Male')),
-              ButtonSegment<String>(value: 'female', label: Text('Female')),
+              ButtonSegment(value: 'male', label: Text('Male')),
+              ButtonSegment(value: 'female', label: Text('Female')),
             ],
             selected: {_silhouette},
-            onSelectionChanged: (selection) {
-              final value = selection.first;
-              setState(() => _silhouette = value);
-            },
+            onSelectionChanged: (s) => setState(() => _silhouette = s.first),
           ),
         ],
       ),
     );
   }
 
-  Widget _sliderSection({
+  // ── Utility helpers ──────────────────────────────────────────────────────
+
+  void _handleCanvasItemLongPress(String id) {
+    if (id.startsWith('top-')) {
+      _openSlotPicker('topwear');
+      return;
+    }
+    if (id.startsWith('bottom-')) {
+      _openSlotPicker('bottomwear');
+      return;
+    }
+    if (id.startsWith('shoes-')) {
+      _openSlotPicker('shoes');
+      return;
+    }
+    if (id.startsWith('outerwear-')) {
+      _openSlotPicker('outerwear');
+      return;
+    }
+    if (id.startsWith('acc-')) {
+      _openSlotPicker('accessories');
+    }
+  }
+
+  List<EditableCanvasItem> _canvasPreviewItems() {
+    final top = _selected(_tops, _topIndex);
+    final bottom = _selected(_bottoms, _bottomIndex);
+    final shoes = _selected(_shoes, _shoesIndex);
+    final outerwear = _selected(_outerwear, _outerwearIndex);
+    final accessories = _selectedAccessories();
+    final items = <EditableCanvasItem>[];
+
+    if (bottom != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'bottom-${_asInt(bottom['id']) ?? 0}',
+          label: 'Bottomwear',
+          imageUrl: _imageOf(bottom),
+          widthFactor: 0.5,
+          heightFactor: 0.27,
+          defaultOffset: const Offset(0, 0.23),
+        ),
+      );
+    }
+    if (top != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'top-${_asInt(top['id']) ?? 0}',
+          label: 'Topwear',
+          imageUrl: _imageOf(top),
+          widthFactor: 0.62,
+          heightFactor: 0.28,
+          defaultOffset: const Offset(0, -0.03),
+        ),
+      );
+    }
+    if (outerwear != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'outerwear-${_asInt(outerwear['id']) ?? 0}',
+          label: 'Outerwear',
+          imageUrl: _imageOf(outerwear),
+          widthFactor: 0.64,
+          heightFactor: 0.24,
+          defaultOffset: const Offset(0, -0.23),
+        ),
+      );
+    }
+    if (shoes != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'shoes-${_asInt(shoes['id']) ?? 0}',
+          label: 'Shoes',
+          imageUrl: _imageOf(shoes),
+          widthFactor: 0.46,
+          heightFactor: 0.17,
+          defaultOffset: const Offset(0, 0.41),
+        ),
+      );
+    }
+    for (var i = 0; i < accessories.length; i++) {
+      final acc = accessories[i];
+      final col = i % 4;
+      final row = i ~/ 4;
+      items.add(
+        EditableCanvasItem(
+          id: 'acc-${_asInt(acc['id']) ?? i}',
+          label: 'Accessory',
+          imageUrl: _imageOf(acc),
+          widthFactor: 0.17,
+          heightFactor: 0.11,
+          defaultOffset: Offset(-0.225 + (col * 0.15), 0.5 - (row * 0.09)),
+        ),
+      );
+    }
+
+    return items.where((item) => item.imageUrl.isNotEmpty).toList();
+  }
+
+  Map<String, EditableCanvasTransform> _layoutToTransforms(
+    Map<String, dynamic> layout,
+  ) {
+    final out = <String, EditableCanvasTransform>{};
+    layout.forEach((key, value) {
+      if (value is! Map) return;
+      final x = (value['offset_x'] is num)
+          ? (value['offset_x'] as num).toDouble()
+          : double.tryParse('${value['offset_x']}');
+      final y = (value['offset_y'] is num)
+          ? (value['offset_y'] as num).toDouble()
+          : double.tryParse('${value['offset_y']}');
+      final s = (value['scale'] is num)
+          ? (value['scale'] as num).toDouble()
+          : double.tryParse('${value['scale']}');
+      if (x == null || y == null || s == null) return;
+      out[key] = EditableCanvasTransform(offset: Offset(x, y), scale: s);
+    });
+    return out;
+  }
+
+  Map<String, dynamic> _transformsToLayout(
+    Map<String, EditableCanvasTransform> transforms,
+  ) {
+    final out = <String, dynamic>{};
+    transforms.forEach((key, value) {
+      out[key] = {
+        'offset_x': value.offset.dx,
+        'offset_y': value.offset.dy,
+        'scale': value.scale,
+      };
+    });
+    return out;
+  }
+
+  Map<String, dynamic> _layoutForSave() {
+    final items = _canvasPreviewItems();
+    if (items.isEmpty) return {};
+
+    final existing = _layoutToTransforms(_previewLayout);
+    final effective = <String, EditableCanvasTransform>{};
+    for (final item in items) {
+      effective[item.id] =
+          existing[item.id] ??
+          EditableCanvasTransform(offset: item.defaultOffset, scale: 1.0);
+    }
+    return _transformsToLayout(effective);
+  }
+
+  List<Map<String, dynamic>> _selectedAccessories() {
+    return _accessoryIndices
+        .map((i) => _selected(_accessories, i))
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
+  Future<void> _handleSlotTap(String slot) => _openSlotPicker(slot);
+
+  Future<void> _openSlotPicker(String slot) async {
+    switch (slot) {
+      case 'topwear':
+        await _showSingleSlotPicker(
+          title: 'Select Topwear',
+          items: _tops,
+          selectedIndex: _topIndex,
+          onSelect: (index) => setState(() => _topIndex = index),
+        );
+        break;
+      case 'bottomwear':
+        await _showSingleSlotPicker(
+          title: 'Select Bottomwear',
+          items: _bottoms,
+          selectedIndex: _bottomIndex,
+          onSelect: (index) => setState(() => _bottomIndex = index),
+        );
+        break;
+      case 'shoes':
+        await _showSingleSlotPicker(
+          title: 'Select Shoes',
+          items: _shoes,
+          selectedIndex: _shoesIndex,
+          onSelect: (index) => setState(() => _shoesIndex = index),
+        );
+        break;
+      case 'outerwear':
+        await _showSingleSlotPicker(
+          title: 'Select Outerwear',
+          items: _outerwear,
+          selectedIndex: _outerwearIndex,
+          optionalNone: true,
+          onSelect: (index) => setState(() => _outerwearIndex = index),
+        );
+        break;
+      case 'accessories':
+        await _showAccessoryPicker();
+        break;
+    }
+  }
+
+  Future<void> _showSingleSlotPicker({
     required String title,
     required List<Map<String, dynamic>> items,
-    required PageController controller,
     required int selectedIndex,
-    required ValueChanged<int> onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+    required ValueChanged<int> onSelect,
+    bool optionalNone = false,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _kBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          if (items.isEmpty)
-            Column(
+      builder: (context) {
+        final pickerHeight = (MediaQuery.of(context).size.height * 0.55)
+            .clamp(260.0, 460.0)
+            .toDouble();
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'No items found in this section.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AddItemSelectionPage()),
-                    );
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Item'),
-                ),
-              ],
-            )
-          else
-            SizedBox(
-              height: 130,
-              child: PageView.builder(
-                controller: controller,
-                itemCount: items.length,
-                onPageChanged: onChanged,
-                itemBuilder: (context, i) {
-                  final item = items[i];
-                  final image = _resolveImage(item['image']);
-                  final title = (item['subcategory'] ?? item['category'] ?? 'Item').toString();
-                  final selected = selectedIndex == i;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    margin: EdgeInsets.symmetric(horizontal: 6, vertical: selected ? 0 : 8),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: selected ? const Color(0xFF111827) : const Color(0xFFE5E7EB),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: image.isEmpty
-                              ? const Icon(Icons.image_not_supported_outlined)
-                              : Image.network(
-                                  image,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.broken_image_outlined),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _openAddAndRefresh();
+                      },
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add Item'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 20),
+                    child: Text(
+                      'No items found in this category yet.',
+                      style: TextStyle(color: _kMuted),
+                    ),
+                  )
+                else
+                  SizedBox(
+                    height: pickerHeight,
+                    child: GridView.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            childAspectRatio: 0.74,
+                          ),
+                      itemCount: items.length + (optionalNone ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (optionalNone && index == 0) {
+                          final isSelected = selectedIndex == -1;
+                          return GestureDetector(
+                            onTap: () {
+                              onSelect(-1);
+                              Navigator.pop(context);
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              decoration: BoxDecoration(
+                                color: isSelected ? _kTagBg : _kWhite,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected ? _kInk : _kBorder,
+                                  width: isSelected ? 1.5 : 1,
                                 ),
+                              ),
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.block, size: 20, color: _kMuted),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'None',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        final itemIndex = optionalNone ? index - 1 : index;
+                        return _ItemTile(
+                          item: items[itemIndex],
+                          selected: selectedIndex == itemIndex,
+                          onTap: () {
+                            onSelect(itemIndex);
+                            Navigator.pop(context);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showAccessoryPicker() async {
+    final working = Set<int>.from(_accessoryIndices);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _kBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final pickerHeight = (MediaQuery.of(context).size.height * 0.55)
+                .clamp(260.0, 460.0)
+                .toDouble();
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Select Accessories',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11),
+                        TextButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _openAddAndRefresh();
+                          },
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('Add Item'),
                         ),
                       ],
                     ),
-                  );
-                },
+                    const SizedBox(height: 10),
+                    if (_accessories.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 20),
+                        child: Text(
+                          'No accessories found yet.',
+                          style: TextStyle(color: _kMuted),
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        height: pickerHeight,
+                        child: GridView.builder(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 4,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                                childAspectRatio: 0.74,
+                              ),
+                          itemCount: _accessories.length,
+                          itemBuilder: (context, index) => _ItemTile(
+                            item: _accessories[index],
+                            selected: working.contains(index),
+                            multiSelect: true,
+                            onTap: () {
+                              setModalState(() {
+                                if (working.contains(index)) {
+                                  working.remove(index);
+                                } else {
+                                  working.add(index);
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () {
+                          setState(() {
+                            _accessoryIndices
+                              ..clear()
+                              ..addAll(working);
+                          });
+                          Navigator.pop(context);
+                        },
+                        style: FilledButton.styleFrom(backgroundColor: _kInk),
+                        child: const Text('Apply'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-        ],
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -737,7 +2066,7 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
     return items[index];
   }
 
-  Map<String, dynamic>? _slot(Map<String, dynamic> outfit, String key) {
+  Map<String, dynamic>? _slotMap(Map<String, dynamic> outfit, String key) {
     final raw = outfit[key];
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) return Map<String, dynamic>.from(raw);
@@ -746,8 +2075,7 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
 
   int _indexById(List<Map<String, dynamic>> items, int id) {
     for (int i = 0; i < items.length; i++) {
-      final itemId = _asInt(items[i]['id']);
-      if (itemId == id) return i;
+      if (_asInt(items[i]['id']) == id) return i;
     }
     return -1;
   }
@@ -758,23 +2086,18 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
     return int.tryParse(raw?.toString() ?? '');
   }
 
-  void _jumpToPageSafe(PageController controller, int page) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !controller.hasClients) return;
-      controller.jumpToPage(page);
-    });
-  }
-
-  String _resolveImage(dynamic rawUrl) {
-    final url = (rawUrl ?? '').toString().trim();
-    if (url.isEmpty) return '';
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    if (url.startsWith('/')) {
-      return '${ApiClient.host}$url';
-    }
-    return '${ApiClient.host}/$url';
+  String _imageOf(Map<String, dynamic> item) {
+    final raw = (item['image'] ?? '').toString().trim();
+    if (raw.isEmpty) return '';
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    if (raw.startsWith('/')) return '${ApiClient.host}$raw';
+    return '${ApiClient.host}/$raw';
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inline strip components for the builder panel
+// ─────────────────────────────────────────────────────────────────────────────
 
 class OutfitDetailPage extends StatefulWidget {
   final Map<String, dynamic> initialOutfit;
@@ -807,7 +2130,6 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
       setState(() => _loading = false);
       return;
     }
-
     final latest = await _outfitService.getById(id);
     if (!mounted) return;
     setState(() {
@@ -819,153 +2141,96 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
   Future<void> _toggleFavourite() async {
     final id = _outfitId;
     if (id == null || _updatingFav) return;
-
     setState(() => _updatingFav = true);
     final result = await _outfitService.toggleFavourite(id);
     if (!mounted) return;
     setState(() {
-      if (result != null) {
-        _outfit = result;
-      }
+      if (result != null) _outfit = result;
       _updatingFav = false;
     });
-  }
-
-  Future<void> _editOutfit() async {
-    if (_outfit == null) return;
-    final changed = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => OutfitBuilderPage(existingOutfit: _outfit),
-      ),
-    );
-
-    if (changed == true) {
-      await _loadDetail();
-      if (!mounted) return;
-      Navigator.pop(context, true);
-    }
-  }
-
-  Future<void> _deleteOutfit() async {
-    final id = _outfitId;
-    if (id == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete outfit?'),
-        content: const Text('This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-    final ok = await _outfitService.delete(id);
-    if (!mounted) return;
-    if (ok) {
-      Navigator.pop(context, true);
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Failed to delete outfit')),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final outfit = _outfit;
-    final silhouette = (outfit?['silhouette'] ?? 'male').toString();
     final name = (outfit?['name'] ?? 'Outfit').toString();
     final occasion = (outfit?['occasion'] ?? 'Any Occasion').toString();
     final rating = outfit?['rating']?.toString() ?? '-';
-    final isFavourite = outfit?['is_favourite'] == true;
+    final isFav = outfit?['is_favourite'] == true;
     final createdAt = (outfit?['created_at'] ?? '').toString();
+    final previewItems = outfit == null
+        ? const <EditableCanvasItem>[]
+        : _previewItems(outfit);
+    final previewTransforms = outfit == null
+        ? const <String, EditableCanvasTransform>{}
+        : _layoutToTransforms(_previewLayout(outfit));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: _kBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF111827),
+        backgroundColor: _kWhite,
+        foregroundColor: _kInk,
         title: const Text('Outfit Detail'),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : outfit == null
-              ? const Center(child: Text('Outfit not found'))
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  children: [
-                    OutfitCanvas(
-                      topwear: _slot(outfit, 'topwear_item'),
-                      bottomwear: _slot(outfit, 'bottomwear_item'),
-                      shoes: _slot(outfit, 'shoes_item'),
-                      silhouette: silhouette,
-                      height: 430,
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
+          ? const Center(child: Text('Outfit not found'))
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              children: [
+                previewItems.isNotEmpty
+                    ? EditableOutfitCanvas(
+                        items: previewItems,
+                        initialTransforms: previewTransforms,
+                        interactive: false,
+                      )
+                    : OutfitCanvas(
+                        outerwear: _slot(outfit, 'outerwear_item'),
+                        topwear: _slot(outfit, 'topwear_item'),
+                        bottomwear: _slot(outfit, 'bottomwear_item'),
+                        shoes: _slot(outfit, 'shoes_item'),
+                        accessories: _accessoryList(outfit),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 8),
-                          Text('Occasion: $occasion'),
-                          const SizedBox(height: 4),
-                          Text('Rating: $rating'),
-                          const SizedBox(height: 4),
-                          Text('Created: ${createdAt.isEmpty ? '-' : createdAt}'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _editOutfit,
-                            icon: const Icon(Icons.edit_outlined),
-                            label: const Text('Edit'),
-                          ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: _kWhite,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _kBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _updatingFav ? null : _toggleFavourite,
-                            icon: Icon(isFavourite ? Icons.favorite : Icons.favorite_border),
-                            label: Text(isFavourite ? 'Unfavourite' : 'Favourite'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _deleteOutfit,
-                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Delete Outfit'),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      _InfoRow('Occasion', occasion),
+                      _InfoRow('Rating', rating),
+                      _InfoRow('Created', createdAt.isEmpty ? '-' : createdAt),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _updatingFav ? null : _toggleFavourite,
+                    icon: Icon(
+                      isFav ? Icons.favorite : Icons.favorite_border,
+                      color: isFav ? const Color(0xFFDC2626) : null,
+                    ),
+                    label: Text(isFav ? 'Unfavourite' : 'Favourite'),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
@@ -976,6 +2241,126 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
     return null;
   }
 
+  List<Map<String, dynamic>> _accessoryList(Map<String, dynamic> outfit) {
+    final raw = outfit['accessory_items'];
+    if (raw is List) {
+      return raw
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+    }
+    return [];
+  }
+
+  Map<String, dynamic> _previewLayout(Map<String, dynamic> outfit) {
+    final raw = outfit['preview_layout'];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return {};
+  }
+
+  List<EditableCanvasItem> _previewItems(Map<String, dynamic> outfit) {
+    final top = _slot(outfit, 'topwear_item');
+    final bottom = _slot(outfit, 'bottomwear_item');
+    final shoes = _slot(outfit, 'shoes_item');
+    final outerwear = _slot(outfit, 'outerwear_item');
+    final accs = _accessoryList(outfit);
+    final items = <EditableCanvasItem>[];
+    if (bottom != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'bottom-${_asInt(bottom['id']) ?? 0}',
+          label: 'Bottomwear',
+          imageUrl: _imageOf(bottom),
+          widthFactor: 0.5,
+          heightFactor: 0.27,
+          defaultOffset: const Offset(0, 0.23),
+        ),
+      );
+    }
+    if (top != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'top-${_asInt(top['id']) ?? 0}',
+          label: 'Topwear',
+          imageUrl: _imageOf(top),
+          widthFactor: 0.62,
+          heightFactor: 0.28,
+          defaultOffset: const Offset(0, -0.03),
+        ),
+      );
+    }
+    if (outerwear != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'outerwear-${_asInt(outerwear['id']) ?? 0}',
+          label: 'Outerwear',
+          imageUrl: _imageOf(outerwear),
+          widthFactor: 0.64,
+          heightFactor: 0.24,
+          defaultOffset: const Offset(0, -0.23),
+        ),
+      );
+    }
+    if (shoes != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'shoes-${_asInt(shoes['id']) ?? 0}',
+          label: 'Shoes',
+          imageUrl: _imageOf(shoes),
+          widthFactor: 0.46,
+          heightFactor: 0.17,
+          defaultOffset: const Offset(0, 0.41),
+        ),
+      );
+    }
+    for (var i = 0; i < accs.length; i++) {
+      final acc = accs[i];
+      final col = i % 4;
+      final row = i ~/ 4;
+      items.add(
+        EditableCanvasItem(
+          id: 'acc-${_asInt(acc['id']) ?? i}',
+          label: 'Accessory',
+          imageUrl: _imageOf(acc),
+          widthFactor: 0.17,
+          heightFactor: 0.11,
+          defaultOffset: Offset(-0.225 + (col * 0.15), 0.5 - (row * 0.09)),
+        ),
+      );
+    }
+    return items.where((item) => item.imageUrl.isNotEmpty).toList();
+  }
+
+  Map<String, EditableCanvasTransform> _layoutToTransforms(
+    Map<String, dynamic> layout,
+  ) {
+    final out = <String, EditableCanvasTransform>{};
+    layout.forEach((key, value) {
+      if (value is! Map) return;
+      final x = (value['offset_x'] is num)
+          ? (value['offset_x'] as num).toDouble()
+          : double.tryParse('${value['offset_x']}');
+      final y = (value['offset_y'] is num)
+          ? (value['offset_y'] as num).toDouble()
+          : double.tryParse('${value['offset_y']}');
+      final s = (value['scale'] is num)
+          ? (value['scale'] as num).toDouble()
+          : double.tryParse('${value['scale']}');
+      if (x == null || y == null || s == null) return;
+      out[key] = EditableCanvasTransform(offset: Offset(x, y), scale: s);
+    });
+    return out;
+  }
+
+  String _imageOf(Map<String, dynamic> item) {
+    final raw = (item['image'] ?? '').toString().trim();
+    if (raw.isEmpty) return '';
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    if (raw.startsWith('/')) return '${ApiClient.host}$raw';
+    return '${ApiClient.host}/$raw';
+  }
+
   int? _asInt(dynamic raw) {
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
@@ -983,32 +2368,30 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
   }
 }
 
-class OutfitSlotRules {
-  static bool isShoe(Map<String, dynamic> item) {
-    final text = _normalized(item);
-    const keys = ['shoe', 'sneaker', 'boot', 'heel', 'footwear', 'slipper', 'sandal', 'loafer'];
-    return keys.any(text.contains);
-  }
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
 
-  static bool isBottom(Map<String, dynamic> item) {
-    final text = _normalized(item);
-    const keys = [
-      'pant',
-      'trouser',
-      'jean',
-      'short',
-      'skirt',
-      'bottom',
-      'jogger',
-      'legging',
-      'cargo',
-    ];
-    return keys.any(text.contains);
-  }
+  const _InfoRow(this.label, this.value);
 
-  static String _normalized(Map<String, dynamic> item) {
-    final c = (item['category'] ?? '').toString().toLowerCase();
-    final s = (item['subcategory'] ?? '').toString().toLowerCase();
-    return '$c $s';
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Text(
+            '$label: ',
+            style: const TextStyle(color: _kMuted, fontSize: 13),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

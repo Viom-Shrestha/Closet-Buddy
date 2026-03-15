@@ -223,10 +223,11 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
       );
     }
 
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
         Navigator.pop(context, hasChanges);
-        return false;
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
@@ -245,7 +246,7 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -264,7 +265,7 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -322,7 +323,7 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -719,3 +720,4 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen> {
     );
   }
 }
+

@@ -181,9 +181,11 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     if (clean.isEmpty) return clean;
     return clean
         .split(RegExp(r'\s+'))
-        .map((word) => word.isEmpty
-            ? word
-            : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+        .map(
+          (word) => word.isEmpty
+              ? word
+              : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}',
+        )
         .join(' ');
   }
 
@@ -256,9 +258,12 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
           children: [
             for (int i = 0; i < entries.length; i++)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: colors[i % colors.length].withOpacity(0.12),
+                  color: colors[i % colors.length].withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -354,7 +359,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
               child: ListView.builder(
                 shrinkWrap: true,
                 itemCount: storages.length,
-                itemBuilder: (_, i) {
+                itemBuilder: (context, i) {
                   final s = storages[i];
                   final id = _asInt(s['id']);
                   final currentId = _asInt(item['storage_unit']?['id']);
@@ -838,47 +843,91 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
       ),
       builder: (_) => StatefulBuilder(
         builder: (context, setModalState) {
-          Widget dd(String label, String value, List<String> options, ValueChanged<String?> onChanged) {
+          Widget dd(
+            String label,
+            String value,
+            List<String> options,
+            ValueChanged<String?> onChanged,
+          ) {
             return DropdownButtonFormField<String>(
-              value: options.contains(value) ? value : 'All',
+              initialValue: options.contains(value) ? value : 'All',
               decoration: InputDecoration(
                 labelText: label,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              items: options.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+              items: options
+                  .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+                  .toList(),
               onChanged: onChanged,
             );
           }
 
           return SafeArea(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Search Filters', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    const Text(
+                      'Search Filters',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    dd('Subcategory', subcategory, _storageOptionsFor(clothes, 'subcategory'), (v) {
-                      setModalState(() => subcategory = v ?? 'All');
-                    }),
+                    dd(
+                      'Subcategory',
+                      subcategory,
+                      _storageOptionsFor(clothes, 'subcategory'),
+                      (v) {
+                        setModalState(() => subcategory = v ?? 'All');
+                      },
+                    ),
                     const SizedBox(height: 10),
-                    dd('Occasion', occasion, _storageOptionsFor(clothes, 'occasion'), (v) {
-                      setModalState(() => occasion = v ?? 'All');
-                    }),
+                    dd(
+                      'Occasion',
+                      occasion,
+                      _storageOptionsFor(clothes, 'occasion'),
+                      (v) {
+                        setModalState(() => occasion = v ?? 'All');
+                      },
+                    ),
                     const SizedBox(height: 10),
-                    dd('Color', color, _storageOptionsFor(clothes, 'dominant_color'), (v) {
-                      setModalState(() => color = v ?? 'All');
-                    }),
+                    dd(
+                      'Color',
+                      color,
+                      _storageOptionsFor(clothes, 'dominant_color'),
+                      (v) {
+                        setModalState(() => color = v ?? 'All');
+                      },
+                    ),
                     const SizedBox(height: 10),
                     dd('Tag', tag, _storageTagOptions(clothes), (v) {
                       setModalState(() => tag = v ?? 'All');
                     }),
                     const SizedBox(height: 10),
-                    dd('Sort', sortBy, const ['Category (A-Z)', 'Subcategory (A-Z)', 'Favorites first'], (v) {
-                      setModalState(() => sortBy = v ?? 'Category (A-Z)');
-                    }),
+                    dd(
+                      'Sort',
+                      sortBy,
+                      const [
+                        'Category (A-Z)',
+                        'Subcategory (A-Z)',
+                        'Favorites first',
+                      ],
+                      (v) {
+                        setModalState(() => sortBy = v ?? 'Category (A-Z)');
+                      },
+                    ),
                     const SizedBox(height: 8),
                     SwitchListTile(
                       title: const Text('Favorites only'),
@@ -994,10 +1043,11 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     final categoryDist = _categoryDistribution(clothes);
     final itemDist = _itemDistribution(clothes, nonClothes);
 
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
         Navigator.pop(context, hasChanges);
-        return false;
       },
       child: Scaffold(
         appBar: AppBar(
@@ -1125,7 +1175,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                             child: ListView.builder(
                               scrollDirection: Axis.horizontal,
                               itemCount: subStorages.length,
-                              itemBuilder: (_, i) {
+                              itemBuilder: (context, i) {
                                 final s =
                                     subStorages[i] as Map<String, dynamic>;
                                 return GestureDetector(
@@ -1240,9 +1290,11 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                           children: [
                             Expanded(
                               child: TextField(
-                                onChanged: (v) => setState(() => _searchQuery = v),
+                                onChanged: (v) =>
+                                    setState(() => _searchQuery = v),
                                 decoration: InputDecoration(
-                                  hintText: 'Smart search: "black casual shirt", "winter jacket"',
+                                  hintText:
+                                      'Smart search: "black casual shirt", "winter jacket"',
                                   prefixIcon: const Icon(Icons.search),
                                   filled: true,
                                   fillColor: Colors.grey.shade100,
@@ -1260,11 +1312,15 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                               borderRadius: BorderRadius.circular(10),
                               child: Container(
                                 height: 46,
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.grey.shade100,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.grey.shade300),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
@@ -1272,10 +1328,15 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                     if (_storageActiveFilterCount() > 0) ...[
                                       const SizedBox(width: 5),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFF111827),
-                                          borderRadius: BorderRadius.circular(999),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
                                         ),
                                         child: Text(
                                           '${_storageActiveFilterCount()}',
@@ -1314,9 +1375,8 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                   childAspectRatio: 0.74,
                                 ),
                             itemCount: filteredClothes.length,
-                            itemBuilder: (_, i) {
-                              final item =
-                                  filteredClothes[i] as Map<String, dynamic>;
+                            itemBuilder: (context, i) {
+                              final item = filteredClothes[i];
                               final itemId = _asInt(item['id']);
                               final isSelected = _selectedClothingIds.contains(
                                 itemId,
@@ -1361,7 +1421,12 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                               : Image.network(
                                                   _img(item['image']),
                                                   fit: BoxFit.contain,
-                                                  errorBuilder: (_, __, ___) =>
+                                                  errorBuilder:
+                                                      (
+                                                        context,
+                                                        error,
+                                                        stackTrace,
+                                                      ) =>
                                                       const Icon(
                                                         Icons
                                                             .image_not_supported,
@@ -1410,12 +1475,16 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                                   padding: EdgeInsets.zero,
                                                   iconSize: 16,
                                                   onPressed: () =>
-                                                      _toggleStorageFavourite(item),
+                                                      _toggleStorageFavourite(
+                                                        item,
+                                                      ),
                                                   icon: Icon(
                                                     item['is_favourite'] == true
                                                         ? Icons.favorite
                                                         : Icons.favorite_border,
-                                                    color: item['is_favourite'] == true
+                                                    color:
+                                                        item['is_favourite'] ==
+                                                            true
                                                         ? Colors.red
                                                         : Colors.grey,
                                                   ),
@@ -1563,3 +1632,4 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     );
   }
 }
+

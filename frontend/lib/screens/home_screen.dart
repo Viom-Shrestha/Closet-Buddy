@@ -8,6 +8,8 @@ import '../services/clothing_service.dart';
 import '../services/storage_service.dart';
 import '../services/outfit_service.dart';
 import '../services/api_client.dart';
+import '../widgets/editable_outfit_canvas.dart';
+import '../widgets/outfit_canvas.dart';
 
 import 'profile_screen.dart';
 import 'clothing_detail_screen.dart';
@@ -19,7 +21,7 @@ import 'wardrobe_screen.dart';
 import 'outfit_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -327,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
           border: Border.all(color: Color(0xFFE5E7EB)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: Offset(0, 2),
             ),
@@ -369,15 +371,15 @@ class _HomeScreenState extends State<HomeScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            weatherColor.withOpacity(0.1),
-            weatherColor.withOpacity(0.05),
+            weatherColor.withValues(alpha: 0.1),
+            weatherColor.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: weatherColor.withOpacity(0.2)),
+        border: Border.all(color: weatherColor.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -389,7 +391,7 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: weatherColor.withOpacity(0.15),
+              color: weatherColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(weatherIcon, size: 32, color: weatherColor),
@@ -480,7 +482,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -533,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: todayOutfit == null
@@ -575,9 +577,9 @@ class _HomeScreenState extends State<HomeScreen> {
             height: 140,
             margin: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -594,7 +596,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         Container(
                           width: 1,
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                         ),
                         Flexible(
                           child: _buildOutfitItem(
@@ -605,7 +607,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         Container(
                           width: 1,
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                         ),
                         Flexible(
                           child: _buildOutfitItem(
@@ -704,7 +706,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildOutfitItem(String label, IconData icon, String value) {
     return Container(
-      color: Colors.white.withOpacity(0.03),
+      color: Colors.white.withValues(alpha: 0.03),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -712,16 +714,16 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: Colors.white.withOpacity(0.5), size: 28),
+            child: Icon(icon, color: Colors.white.withValues(alpha: 0.5), size: 28),
           ),
           const SizedBox(height: 12),
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
@@ -730,7 +732,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             value,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -790,7 +792,7 @@ class _HomeScreenState extends State<HomeScreen> {
             border: Border.all(color: const Color(0xFFE5E7EB)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -876,7 +878,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 itemCount: previewStorages.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
                 itemBuilder: (context, index) =>
                     _storageCard(previewStorages[index], cardWidth),
               ),
@@ -916,7 +918,7 @@ class _HomeScreenState extends State<HomeScreen> {
           border: Border.all(color: const Color(0xFFE5E7EB)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -1040,11 +1042,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Color(0xFF9CA3AF),
                       ),
                     )
-                  : Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
+                  : Container(
+                      color: const Color(0xFFF9FAFB),
+                      padding: const EdgeInsets.all(8),
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                        height: double.infinity,
+                      ),
                     ),
 
               /// ❤️ Favourite toggle
@@ -1086,12 +1092,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         shape: BoxShape
                             .circle, // Circular usually looks better for action buttons
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -1142,7 +1148,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 16),
         hasOutfits
             ? SizedBox(
-                height: 180,
+                height: 220,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: outfits.length,
@@ -1159,9 +1165,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOutfitCard(int index) {
+    final outfit = outfits[index];
+    final name = (outfit['name'] ?? 'Outfit').toString();
+    final dynamic ratingRaw = outfit['rating'];
+    final rating = ratingRaw == null ? '-' : ratingRaw.toString();
+    final previewItems = _previewItems(outfit);
+    final previewTransforms = _layoutToTransforms(_previewLayout(outfit));
+
     return HoverClickable(
-      onTap: () {
-        // Open outfit detail page
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OutfitDetailPage(initialOutfit: outfit),
+          ),
+        );
+        fetchHomeData();
       },
       child: Container(
         width: 160,
@@ -1172,7 +1191,7 @@ class _HomeScreenState extends State<HomeScreen> {
           border: Border.all(color: Color(0xFFE5E7EB), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: Offset(0, 2),
             ),
@@ -1182,21 +1201,22 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Flexible(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.checkroom_outlined,
-                    size: 48,
-                    color: Color(0xFF9CA3AF),
-                  ),
-                ),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: previewItems.isNotEmpty
+                    ? EditableOutfitCanvas(
+                        items: previewItems,
+                        initialTransforms: previewTransforms,
+                        interactive: false,
+                      )
+                    : OutfitCanvas(
+                        outerwear: _slot(outfit, 'outerwear_item'),
+                        topwear: _slot(outfit, 'topwear_item'),
+                        bottomwear: _slot(outfit, 'bottomwear_item'),
+                        shoes: _slot(outfit, 'shoes_item'),
+                        accessories: _accessoryList(outfit),
+                        compact: true,
+                      ),
               ),
             ),
             Padding(
@@ -1205,7 +1225,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Outfit ${index + 1}',
+                    name,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -1218,7 +1238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Icon(Icons.star, size: 14, color: Color(0xFFFBBF24)),
                       SizedBox(width: 4),
                       Text(
-                        '4.0',
+                        rating,
                         style: TextStyle(
                           fontSize: 12,
                           color: Color(0xFF6B7280),
@@ -1233,6 +1253,140 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Map<String, dynamic>? _slot(Map<String, dynamic> outfit, String key) {
+    final raw = outfit[key];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
+  }
+
+  List<Map<String, dynamic>> _accessoryList(Map<String, dynamic> outfit) {
+    final raw = outfit['accessory_items'];
+    if (raw is List) {
+      return raw
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+    }
+    return [];
+  }
+
+  Map<String, dynamic> _previewLayout(Map<String, dynamic> outfit) {
+    final raw = outfit['preview_layout'];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return {};
+  }
+
+  List<EditableCanvasItem> _previewItems(Map<String, dynamic> outfit) {
+    final top = _slot(outfit, 'topwear_item');
+    final bottom = _slot(outfit, 'bottomwear_item');
+    final shoes = _slot(outfit, 'shoes_item');
+    final outerwear = _slot(outfit, 'outerwear_item');
+    final accs = _accessoryList(outfit);
+    final items = <EditableCanvasItem>[];
+
+    if (bottom != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'bottom-${_asInt(bottom['id']) ?? 0}',
+          label: 'Bottomwear',
+          imageUrl: _imageOf(bottom),
+          widthFactor: 0.5,
+          heightFactor: 0.27,
+          defaultOffset: const Offset(0, 0.23),
+        ),
+      );
+    }
+    if (top != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'top-${_asInt(top['id']) ?? 0}',
+          label: 'Topwear',
+          imageUrl: _imageOf(top),
+          widthFactor: 0.62,
+          heightFactor: 0.28,
+          defaultOffset: const Offset(0, -0.03),
+        ),
+      );
+    }
+    if (outerwear != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'outerwear-${_asInt(outerwear['id']) ?? 0}',
+          label: 'Outerwear',
+          imageUrl: _imageOf(outerwear),
+          widthFactor: 0.64,
+          heightFactor: 0.24,
+          defaultOffset: const Offset(0, -0.23),
+        ),
+      );
+    }
+    if (shoes != null) {
+      items.add(
+        EditableCanvasItem(
+          id: 'shoes-${_asInt(shoes['id']) ?? 0}',
+          label: 'Shoes',
+          imageUrl: _imageOf(shoes),
+          widthFactor: 0.46,
+          heightFactor: 0.17,
+          defaultOffset: const Offset(0, 0.41),
+        ),
+      );
+    }
+    for (var i = 0; i < accs.length; i++) {
+      final acc = accs[i];
+      final col = i % 4;
+      final row = i ~/ 4;
+      items.add(
+        EditableCanvasItem(
+          id: 'acc-${_asInt(acc['id']) ?? i}',
+          label: 'Accessory',
+          imageUrl: _imageOf(acc),
+          widthFactor: 0.17,
+          heightFactor: 0.11,
+          defaultOffset: Offset(-0.225 + (col * 0.15), 0.5 - (row * 0.09)),
+        ),
+      );
+    }
+    return items.where((item) => item.imageUrl.isNotEmpty).toList();
+  }
+
+  Map<String, EditableCanvasTransform> _layoutToTransforms(
+    Map<String, dynamic> layout,
+  ) {
+    final out = <String, EditableCanvasTransform>{};
+    layout.forEach((key, value) {
+      if (value is! Map) return;
+      final x = (value['offset_x'] is num)
+          ? (value['offset_x'] as num).toDouble()
+          : double.tryParse('${value['offset_x']}');
+      final y = (value['offset_y'] is num)
+          ? (value['offset_y'] as num).toDouble()
+          : double.tryParse('${value['offset_y']}');
+      final s = (value['scale'] is num)
+          ? (value['scale'] as num).toDouble()
+          : double.tryParse('${value['scale']}');
+      if (x == null || y == null || s == null) return;
+      out[key] = EditableCanvasTransform(offset: Offset(x, y), scale: s);
+    });
+    return out;
+  }
+
+  String _imageOf(Map<String, dynamic> item) {
+    final raw = (item['image'] ?? '').toString().trim();
+    if (raw.isEmpty) return '';
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    if (raw.startsWith('/')) return '${ApiClient.host}$raw';
+    return '${ApiClient.host}/$raw';
+  }
+
+  int? _asInt(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '');
   }
 
   Widget _buildEmptyState(String title, String subtitle, IconData icon) {
@@ -1350,3 +1504,5 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+
