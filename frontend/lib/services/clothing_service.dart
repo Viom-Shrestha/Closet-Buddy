@@ -43,7 +43,7 @@ class ClothingService {
   }
 
   Future<bool> deleteSegmented(String url) async {
-    final res = await client.post('/delete-segmented/', {'url': url});
+    final res = await client.post('/clothing/segmented/delete/', {'url': url});
     return res.statusCode == 200;
   }
 

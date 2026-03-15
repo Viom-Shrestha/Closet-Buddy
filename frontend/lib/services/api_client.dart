@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
   static const host = 'http://127.0.0.1:8000';
-  static const baseUrl = '$host/api/auth';
+  static const baseUrl = '$host/api';
 
   Future<String?> _accessToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -23,7 +23,7 @@ class ApiClient {
     if (refresh == null) return false;
 
     final res = await http.post(
-      Uri.parse('$baseUrl/refresh/'),
+      Uri.parse('$baseUrl/auth/refresh/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'refresh': refresh}),
     );

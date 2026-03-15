@@ -13,7 +13,7 @@ class AuthService {
     String lastName,
   ) async {
     final res = await http.post(
-      Uri.parse('${ApiClient.baseUrl}/register/'),
+      Uri.parse('${ApiClient.baseUrl}/auth/register/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'username': username,
@@ -29,7 +29,7 @@ class AuthService {
 
   Future<bool> login(String username, String password) async {
     final res = await http.post(
-      Uri.parse('${ApiClient.baseUrl}/login/'),
+      Uri.parse('${ApiClient.baseUrl}/auth/login/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
     );
@@ -43,6 +43,6 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    await client.post('/logout/', {});
+    await client.post('/auth/logout/', {});
   }
 }
