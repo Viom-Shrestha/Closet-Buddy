@@ -1,13 +1,25 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Count, Q
+from django.contrib.auth.forms import PasswordResetForm
+from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from ..models import AccessoryItem, ClothingItem, NonClothingItem, Outfit, StorageUnit
+from ..models import (
+    AccessoryItem,
+    BetaAllowlist,
+    BetaFeedback,
+    ClothingItem,
+    NonClothingItem,
+    Outfit,
+    StorageUnit,
+    UserActivityDaily,
+)
+from ..serializer import ClothingItemSerializer, OutfitReadSerializer
 
 
 def _as_bool(value):
@@ -34,11 +46,48 @@ def _serialize_user_row(user):
         "is_staff": user.is_staff,
         "is_active": user.is_active,
         "date_joined": user.date_joined,
+        "last_active_at": user.last_login,
         "clothing_count": getattr(user, "clothing_count", 0),
         "outfit_count": getattr(user, "outfit_count", 0),
         "storage_count": getattr(user, "storage_count", 0),
         "accessory_count": getattr(user, "accessory_count", 0),
     }
+
+
+def _parse_limit_offset(request, default_limit=50, max_limit=200):
+    limit_raw = request.GET.get("limit") or str(default_limit)
+    offset_raw = request.GET.get("offset") or "0"
+    try:
+        limit = max(1, min(int(limit_raw), max_limit))
+    except ValueError:
+        limit = default_limit
+    try:
+        offset = max(0, int(offset_raw))
+    except ValueError:
+        offset = 0
+    return limit, offset
+
+
+def _slot_text(category: str, subcategory: str) -> str:
+    return f"{category} {subcategory}".lower()
+
+
+def _is_shoe_label(category: str, subcategory: str) -> bool:
+    text = _slot_text(category, subcategory)
+    keys = ["shoe", "sneaker", "boot", "heel", "footwear", "slipper", "sandal", "loafer"]
+    return any(key in text for key in keys)
+
+
+def _is_bottom_label(category: str, subcategory: str) -> bool:
+    text = _slot_text(category, subcategory)
+    keys = ["pant", "trouser", "jean", "short", "skirt", "bottom", "jogger", "legging", "cargo"]
+    return any(key in text for key in keys)
+
+
+def _is_outerwear_label(category: str, subcategory: str) -> bool:
+    text = _slot_text(category, subcategory)
+    keys = ["jacket", "coat", "blazer", "cardigan", "hoodie", "outerwear", "parka", "trench"]
+    return any(key in text for key in keys)
 
 
 @api_view(["GET"])
@@ -48,7 +97,10 @@ def admin_dashboard(request):
     if denied:
         return denied
 
-    since = timezone.now() - timedelta(days=7)
+    now = timezone.now()
+    since = now - timedelta(days=7)
+    today = now.date()
+    week_start = today - timedelta(days=6)
 
     top_categories = list(
         ClothingItem.objects.values("category")
@@ -78,19 +130,71 @@ def admin_dashboard(request):
     for user in recent_users_qs:
         row = _serialize_user_row(user)
         row["date_joined"] = user.date_joined.isoformat()
+        row["last_active_at"] = user.last_login.isoformat() if user.last_login else None
         recent_users.append(row)
+
+    total_users = User.objects.count()
+    total_clothing = ClothingItem.objects.count()
+    total_outfits = Outfit.objects.count()
+    favourite_outfits = Outfit.objects.filter(is_favourite=True).count()
+
+    daily_activity = UserActivityDaily.objects.filter(date=today)
+    weekly_activity = UserActivityDaily.objects.filter(date__gte=week_start)
+    dau = daily_activity.values("user_id").distinct().count()
+    wau = weekly_activity.values("user_id").distinct().count()
+    total_sessions = weekly_activity.aggregate(total=Sum("session_count"))["total"] or 0
+    total_seconds = weekly_activity.aggregate(total=Sum("total_session_seconds"))["total"] or 0
+    average_session_seconds = int(total_seconds / total_sessions) if total_sessions else 0
+    sessions_per_user = round(total_sessions / wau, 2) if wau else 0
+
+    avg_rating = Outfit.objects.filter(rating__isnull=False).aggregate(avg=Avg("rating"))["avg"]
+    favourite_rate = round((favourite_outfits / total_outfits) * 100, 2) if total_outfits else 0.0
+    avg_wardrobe = round(total_clothing / total_users, 2) if total_users else 0.0
+
+    top_outfit_items = list(
+        ClothingItem.objects.filter(outfits__isnull=False)
+        .values("id", "category", "subcategory")
+        .annotate(total=Count("outfits"))
+        .order_by("-total")[:6]
+    )
+
+    def slot_user_count(keys):
+        query = Q()
+        for key in keys:
+            query |= Q(category__icontains=key) | Q(subcategory__icontains=key)
+        return ClothingItem.objects.filter(query).values("user_id").distinct().count()
+
+    topwear_users = slot_user_count(["top", "shirt", "tee", "blouse", "sweater", "tank", "polo"])
+    bottom_users = slot_user_count(["pant", "trouser", "jean", "short", "skirt", "bottom", "jogger", "legging", "cargo"])
+    shoe_users = slot_user_count(["shoe", "sneaker", "boot", "heel", "footwear", "slipper", "sandal", "loafer"])
+    outerwear_users = slot_user_count(["jacket", "coat", "blazer", "cardigan", "hoodie", "outerwear", "parka", "trench"])
+    accessory_users = AccessoryItem.objects.values("user_id").distinct().count()
+
+    def percent(count):
+        return round((count / total_users) * 100, 2) if total_users else 0.0
+
+    outfits_per_day = []
+    for i in range(7):
+        day = today - timedelta(days=i)
+        outfits_per_day.append(
+            {
+                "date": day.isoformat(),
+                "count": Outfit.objects.filter(created_at__date=day).count(),
+            }
+        )
+    outfits_per_day.reverse()
 
     return Response(
         {
             "overview": {
-                "total_users": User.objects.count(),
+                "total_users": total_users,
                 "active_users": User.objects.filter(is_active=True).count(),
                 "admin_users": User.objects.filter(is_staff=True).count(),
                 "total_storages": StorageUnit.objects.count(),
-                "total_clothing_items": ClothingItem.objects.count(),
+                "total_clothing_items": total_clothing,
                 "total_accessories": AccessoryItem.objects.count(),
                 "total_non_clothing": NonClothingItem.objects.count(),
-                "total_outfits": Outfit.objects.count(),
+                "total_outfits": total_outfits,
             },
             "last_7_days": {
                 "new_users": User.objects.filter(date_joined__gte=since).count(),
@@ -99,6 +203,28 @@ def admin_dashboard(request):
                 "new_accessories": AccessoryItem.objects.filter(created_at__gte=since).count(),
                 "new_non_clothing": NonClothingItem.objects.filter(created_at__gte=since).count(),
                 "new_outfits": Outfit.objects.filter(created_at__gte=since).count(),
+            },
+            "engagement": {
+                "dau": dau,
+                "wau": wau,
+                "sessions_per_user": sessions_per_user,
+                "average_session_seconds": average_session_seconds,
+            },
+            "wardrobe_stats": {
+                "average_wardrobe_size": avg_wardrobe,
+            },
+            "outfit_stats": {
+                "average_rating": round(avg_rating, 2) if avg_rating is not None else None,
+                "favourite_rate": favourite_rate,
+                "outfits_per_day": outfits_per_day,
+                "most_used_items": top_outfit_items,
+            },
+            "slot_coverage": {
+                "topwear_percent": percent(topwear_users),
+                "bottomwear_percent": percent(bottom_users),
+                "shoes_percent": percent(shoe_users),
+                "outerwear_percent": percent(outerwear_users),
+                "accessories_percent": percent(accessory_users),
             },
             "top_categories": top_categories,
             "top_colors": top_colors,
@@ -142,6 +268,7 @@ def admin_users(request):
     for user in users:
         row = _serialize_user_row(user)
         row["date_joined"] = user.date_joined.isoformat()
+        row["last_active_at"] = user.last_login.isoformat() if user.last_login else None
         row["can_edit"] = user.id != request.user.id
         results.append(row)
 
@@ -267,3 +394,389 @@ def admin_set_user_staff(request, user_id):
     target.save(update_fields=["is_staff"])
 
     return Response({"id": target.id, "is_staff": target.is_staff})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_user_summary(request, user_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"detail": "User not found."}, status=404)
+
+    clothing = ClothingItem.objects.filter(user=user)
+    accessories = AccessoryItem.objects.filter(user=user)
+    outfits = Outfit.objects.filter(user=user)
+
+    category_counts = list(
+        clothing.values("category")
+        .annotate(total=Count("id"))
+        .order_by("-total")
+    )
+
+    return Response(
+        {
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "date_joined": user.date_joined.isoformat(),
+                "last_active_at": user.last_login.isoformat() if user.last_login else None,
+                "is_active": user.is_active,
+                "is_staff": user.is_staff,
+            },
+            "counts": {
+                "clothing": clothing.count(),
+                "accessories": accessories.count(),
+                "outfits": outfits.count(),
+            },
+            "category_counts": category_counts,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_user_clothing(request, user_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"detail": "User not found."}, status=404)
+
+    limit, offset = _parse_limit_offset(request)
+    qs = ClothingItem.objects.filter(user=user).order_by("-created_at")
+    total = qs.count()
+    items = qs[offset : offset + limit]
+    serializer = ClothingItemSerializer(items, many=True, context={"request": request})
+    return Response({"results": serializer.data, "total": total, "limit": limit, "offset": offset})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_user_outfits(request, user_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"detail": "User not found."}, status=404)
+
+    limit, offset = _parse_limit_offset(request)
+    qs = Outfit.objects.filter(user=user).order_by("-created_at")
+    total = qs.count()
+    items = qs[offset : offset + limit]
+    serializer = OutfitReadSerializer(items, many=True, context={"request": request})
+    return Response({"results": serializer.data, "total": total, "limit": limit, "offset": offset})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def admin_send_password_reset(request, user_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"detail": "User not found."}, status=404)
+
+    form = PasswordResetForm({"email": user.email})
+    if not form.is_valid():
+        return Response({"detail": "Invalid email for password reset."}, status=400)
+
+    form.save(
+        request=request,
+        use_https=request.is_secure(),
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        email_template_name="registration/password_reset_email.html",
+        subject_template_name="registration/password_reset_subject.txt",
+    )
+    return Response({"detail": "Password reset email sent."})
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def admin_invites(request):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    if request.method == "GET":
+        entries = BetaAllowlist.objects.order_by("-created_at")
+        data = [
+            {
+                "id": entry.id,
+                "email": entry.email,
+                "is_active": entry.is_active,
+                "created_at": entry.created_at.isoformat(),
+            }
+            for entry in entries
+        ]
+        return Response({"results": data})
+
+    email = (request.data.get("email") or "").strip().lower()
+    if not email:
+        return Response({"detail": "Email is required."}, status=400)
+
+    entry, created = BetaAllowlist.objects.get_or_create(
+        email=email,
+        defaults={"created_by": request.user},
+    )
+    if not created and not entry.is_active:
+        entry.is_active = True
+        entry.created_by = request.user
+        entry.save(update_fields=["is_active", "created_by"])
+
+    return Response(
+        {
+            "id": entry.id,
+            "email": entry.email,
+            "is_active": entry.is_active,
+        },
+        status=201 if created else 200,
+    )
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def admin_invite_detail(request, invite_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        entry = BetaAllowlist.objects.get(id=invite_id)
+    except BetaAllowlist.DoesNotExist:
+        return Response({"detail": "Invite not found."}, status=404)
+
+    entry.delete()
+    return Response(status=204)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_clothing_list(request):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    limit, offset = _parse_limit_offset(request, default_limit=40)
+    qs = ClothingItem.objects.select_related("user", "storage_unit").order_by("-created_at")
+
+    user_id = request.GET.get("user_id")
+    if user_id:
+        qs = qs.filter(user_id=user_id)
+
+    category = (request.GET.get("category") or "").strip()
+    if category:
+        qs = qs.filter(category__icontains=category)
+
+    subcategory = (request.GET.get("subcategory") or "").strip()
+    if subcategory:
+        qs = qs.filter(subcategory__icontains=subcategory)
+
+    color = (request.GET.get("dominant_color") or "").strip()
+    if color:
+        qs = qs.filter(dominant_color__icontains=color)
+
+    query = (request.GET.get("q") or "").strip()
+    if query:
+        qs = qs.filter(
+            Q(category__icontains=query)
+            | Q(subcategory__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(user__email__icontains=query)
+        )
+
+    total = qs.count()
+    items = qs[offset : offset + limit]
+    data = []
+    for item in items:
+        payload = ClothingItemSerializer(item, context={"request": request}).data
+        payload["user"] = {
+            "id": item.user_id,
+            "username": item.user.username,
+            "email": item.user.email,
+        }
+        data.append(payload)
+
+    return Response({"results": data, "total": total, "limit": limit, "offset": offset})
+
+
+@api_view(["GET", "DELETE"])
+@permission_classes([IsAuthenticated])
+def admin_clothing_detail(request, item_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        item = ClothingItem.objects.select_related("user", "storage_unit").get(id=item_id)
+    except ClothingItem.DoesNotExist:
+        return Response({"detail": "Item not found."}, status=404)
+
+    if request.method == "DELETE":
+        item.image.delete(save=False)
+        item.delete()
+        return Response(status=204)
+
+    payload = ClothingItemSerializer(item, context={"request": request}).data
+    payload["user"] = {
+        "id": item.user_id,
+        "username": item.user.username,
+        "email": item.user.email,
+    }
+    return Response(payload)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def admin_clothing_reclassify(request):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    ids = request.data.get("ids") or []
+    if not isinstance(ids, list) or not ids:
+        return Response({"detail": "ids must be a non-empty list."}, status=400)
+
+    category = (request.data.get("category") or "").strip()
+    subcategory = (request.data.get("subcategory") or "").strip()
+
+    if not category and not subcategory:
+        return Response({"detail": "category or subcategory required."}, status=400)
+
+    updates = {}
+    if category:
+        updates["category"] = category
+    if subcategory:
+        updates["subcategory"] = subcategory
+
+    updated = ClothingItem.objects.filter(id__in=ids).update(**updates)
+    return Response({"updated": updated})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_outfits_list(request):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    limit, offset = _parse_limit_offset(request, default_limit=40)
+    qs = Outfit.objects.select_related("user").order_by("-created_at")
+
+    user_id = request.GET.get("user_id")
+    if user_id:
+        qs = qs.filter(user_id=user_id)
+
+    occasion = (request.GET.get("occasion") or "").strip()
+    if occasion:
+        qs = qs.filter(occasion__icontains=occasion)
+
+    favourite = request.GET.get("is_favourite")
+    if favourite is not None:
+        qs = qs.filter(is_favourite=_as_bool(favourite))
+
+    rating = request.GET.get("rating")
+    if rating:
+        try:
+            qs = qs.filter(rating=int(rating))
+        except ValueError:
+            pass
+
+    total = qs.count()
+    items = qs[offset : offset + limit]
+    data = []
+    for outfit in items:
+        payload = OutfitReadSerializer(outfit, context={"request": request}).data
+        payload["user"] = {
+            "id": outfit.user_id,
+            "username": outfit.user.username,
+            "email": outfit.user.email,
+        }
+        data.append(payload)
+
+    return Response({"results": data, "total": total, "limit": limit, "offset": offset})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_outfit_detail(request, outfit_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        outfit = Outfit.objects.select_related("user").get(id=outfit_id)
+    except Outfit.DoesNotExist:
+        return Response({"detail": "Outfit not found."}, status=404)
+
+    payload = OutfitReadSerializer(outfit, context={"request": request}).data
+    payload["user"] = {
+        "id": outfit.user_id,
+        "username": outfit.user.username,
+        "email": outfit.user.email,
+    }
+    return Response(payload)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_feedback_list(request):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    limit, offset = _parse_limit_offset(request, default_limit=50)
+    qs = BetaFeedback.objects.select_related("user").order_by("-created_at")
+    total = qs.count()
+    items = qs[offset : offset + limit]
+    results = []
+    for item in items:
+        results.append(
+            {
+                "id": item.id,
+                "message": item.message,
+                "rating": item.rating,
+                "is_read": item.is_read,
+                "created_at": item.created_at.isoformat(),
+                "user": {
+                    "id": item.user_id,
+                    "username": item.user.username,
+                    "email": item.user.email,
+                },
+            }
+        )
+    return Response({"results": results, "total": total, "limit": limit, "offset": offset})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def admin_feedback_mark_read(request, feedback_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        feedback = BetaFeedback.objects.get(id=feedback_id)
+    except BetaFeedback.DoesNotExist:
+        return Response({"detail": "Feedback not found."}, status=404)
+
+    feedback.is_read = _as_bool(request.data.get("is_read", True))
+    feedback.save(update_fields=["is_read"])
+    return Response({"id": feedback.id, "is_read": feedback.is_read})
+

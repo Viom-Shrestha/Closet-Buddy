@@ -22,6 +22,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('auth/', include('django.contrib.auth.urls')),
     path("api/", include("api.urls")),
 
     # 2. Add Swagger/Docs Routes

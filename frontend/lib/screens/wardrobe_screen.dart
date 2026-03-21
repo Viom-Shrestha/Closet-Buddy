@@ -8,8 +8,13 @@ import 'clothing_detail_screen.dart';
 
 class WardrobeScreen extends StatefulWidget {
   final bool embedded;
+  final ValueChanged<bool>? onSelectionChanged;
 
-  const WardrobeScreen({super.key, this.embedded = false});
+  const WardrobeScreen({
+    super.key,
+    this.embedded = false,
+    this.onSelectionChanged,
+  });
 
   @override
   State<WardrobeScreen> createState() => _WardrobeScreenState();
@@ -22,6 +27,8 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
   List<Map<String, dynamic>> _allItems = [];
   List<Map<String, dynamic>> _filteredItems = [];
   bool _loading = true;
+  bool _selectMode = false;
+  final Set<int> _selectedIds = {};
 
   String _search = '';
   String _selectedCategory = 'All';
@@ -104,6 +111,58 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
       sortBy: _sortBy,
     );
     setState(() => _filteredItems = list);
+  }
+
+  void _toggleSelectMode() {
+    setState(() {
+      _selectMode = !_selectMode;
+      _selectedIds.clear();
+    });
+    widget.onSelectionChanged?.call(_selectMode);
+  }
+
+  void _toggleSelected(int? id) {
+    if (id == null) return;
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    if (_selectedIds.isEmpty) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete selected items?'),
+        content: Text('This will delete ${_selectedIds.length} item(s).'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final ids = _selectedIds.toList();
+    await Future.wait(ids.map(_clothingService.deleteClothing));
+    if (!mounted) return;
+    setState(() {
+      _selectMode = false;
+      _selectedIds.clear();
+    });
+    widget.onSelectionChanged?.call(false);
+    _loadWardrobe();
   }
 
   String _resolveImage(dynamic rawUrl) {
@@ -904,9 +963,15 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
         delegate: SliverChildBuilderDelegate((context, i) {
           final item = _filteredItems[i];
           final image = _resolveImage(item['image']);
+          final id = _itemId(item);
+          final selected = id != null && _selectedIds.contains(id);
 
           return GestureDetector(
             onTap: () async {
+              if (_selectMode) {
+                _toggleSelected(id);
+                return;
+              }
               final itemId = _itemId(item);
               if (itemId == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -924,10 +989,20 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                 _loadWardrobe();
               }
             },
+            onLongPress: () {
+              if (!_selectMode) {
+                _toggleSelectMode();
+              }
+              _toggleSelected(id);
+            },
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: selected ? const Color(0xFF111827) : Colors.transparent,
+                  width: selected ? 2 : 1,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.06),
@@ -1010,6 +1085,42 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                             ),
                           ),
                         ),
+                        if (_selectMode)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: selected
+                                    ? const Color(0xFF111827)
+                                    : Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.12),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                                border: Border.all(
+                                  color: selected
+                                      ? const Color(0xFF111827)
+                                      : const Color(0xFFE5E7EB),
+                                ),
+                              ),
+                              child: Icon(
+                                selected
+                                    ? Icons.check
+                                    : Icons.radio_button_unchecked,
+                                size: 16,
+                                color: selected
+                                    ? Colors.white
+                                    : const Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -1174,6 +1285,26 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
               ),
             ),
           ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _toggleSelectMode,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _selectMode ? const Color(0xFF111827) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _selectMode
+                      ? const Color(0xFF111827)
+                      : const Color(0xFFE5E7EB),
+                ),
+              ),
+              child: Icon(
+                _selectMode ? Icons.close : Icons.checklist_rtl,
+                color: _selectMode ? Colors.white : const Color(0xFF111827),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1214,8 +1345,63 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final bottomClearance =
+        (widget.embedded ? kBottomNavigationBarHeight : 0) +
+        bottomInset +
+        12;
+
+    final page = Stack(
+      children: [
+        _content(),
+        if (_selectMode)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, bottomClearance),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111827),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      '${_selectedIds.length} selected',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: _toggleSelectMode,
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _selectedIds.isEmpty ? null : _deleteSelected,
+                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+
     if (widget.embedded) {
-      return _content();
+      return page;
     }
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
@@ -1227,8 +1413,15 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.white,
+        actions: [
+          IconButton(
+            onPressed: _toggleSelectMode,
+            icon: Icon(_selectMode ? Icons.close : Icons.checklist_rtl),
+            tooltip: _selectMode ? 'Exit selection' : 'Select items',
+          ),
+        ],
       ),
-      body: _content(),
+      body: page,
     );
   }
 }

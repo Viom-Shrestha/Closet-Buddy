@@ -19,6 +19,7 @@ import 'add_item_screen.dart';
 import 'storage_detail_screen.dart';
 import 'wardrobe_screen.dart';
 import 'outfit_screen.dart';
+import 'recommendation_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String role = "user";
   int _selectedIndex = 0;
+  bool _wardrobeSelecting = false;
 
   Map<String, dynamic>? weatherData;
   bool isLoadingWeather = true;
@@ -135,6 +137,25 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${ApiClient.host}/$url';
   }
 
+  Future<void> _openRecommendation() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RecommendationScreen(weatherData: weatherData),
+      ),
+    );
+  }
+
+  Future<void> _openOutfitsPage() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const OutfitsPage()),
+    );
+    if (mounted) {
+      fetchHomeData();
+    }
+  }
+
   // ---------------- UI ----------------
 
   @override
@@ -175,10 +196,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       )
                     : showWardrobeTab
-                    ? const Padding(
+                    ? Padding(
                         key: ValueKey('wardrobe_tab'),
                         padding: EdgeInsets.symmetric(horizontal: 12),
-                        child: WardrobeScreen(embedded: true),
+                        child: WardrobeScreen(
+                          embedded: true,
+                          onSelectionChanged: (value) {
+                            setState(() => _wardrobeSelecting = value);
+                          },
+                        ),
                       )
                     : showOutfitTab
                     ? const OutfitsPage(
@@ -191,7 +217,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: showOutfitTab ? null : _buildFAB(),
+      floatingActionButton:
+          (showOutfitTab || _wardrobeSelecting) ? null : _buildFAB(),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
@@ -473,8 +500,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final double? rating = rawRating is num
         ? rawRating.toDouble()
         : double.tryParse(rawRating?.toString() ?? '');
-    final dynamic clothingItems = todayOutfit?['clothing_items'];
-    final int pieceCount = clothingItems is List ? clothingItems.length : 0;
+    final int wearCount = _asInt(todayOutfit?['wear_count']) ?? 0;
+    final bool alreadyWornToday = _isWornToday(todayOutfit);
 
     return Container(
       decoration: BoxDecoration(
@@ -566,6 +593,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
+                            const SizedBox(width: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                wearCount == 0 ? 'Not worn yet' : '$wearCount wears',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                 ),
@@ -574,7 +617,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
           Container(
-            height: 140,
+            height: 340,
             margin: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.05),
@@ -585,39 +628,7 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(16),
               child: todayOutfit == null
                   ? _buildOutfitEmptyPreview()
-                  : Row(
-                      children: [
-                        Flexible(
-                          child: _buildOutfitItem(
-                            'Top',
-                            Icons.checkroom,
-                            pieceCount > 0 ? 'Selected' : 'Not set',
-                          ),
-                        ),
-                        Container(
-                          width: 1,
-                          color: Colors.white.withValues(alpha: 0.1),
-                        ),
-                        Flexible(
-                          child: _buildOutfitItem(
-                            'Bottom',
-                            Icons.straighten,
-                            pieceCount > 1 ? 'Selected' : 'Not set',
-                          ),
-                        ),
-                        Container(
-                          width: 1,
-                          color: Colors.white.withValues(alpha: 0.1),
-                        ),
-                        Flexible(
-                          child: _buildOutfitItem(
-                            'Shoes',
-                            Icons.hiking,
-                            pieceCount > 2 ? 'Selected' : 'Not set',
-                          ),
-                        ),
-                      ],
-                    ),
+                  : _buildTodayOutfitPreview(todayOutfit),
             ),
           ),
 
@@ -627,7 +638,75 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Flexible(
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: todayOutfit == null
+                        ? _openRecommendation
+                        : () async {
+                            if (alreadyWornToday) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'This outfit is already marked worn today',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => OutfitDetailPage(
+                                    initialOutfit: todayOutfit,
+                                  ),
+                                ),
+                              );
+                              fetchHomeData();
+                              return;
+                            }
+
+                            Map<String, dynamic>? updated;
+                            final id = _asInt(todayOutfit['id']);
+                            final prevCount = wearCount;
+                            if (id != null) {
+                              updated = await outfitService.markWorn(id);
+                              if (updated != null && mounted) {
+                                setState(() {
+                                  final idx = outfits.indexWhere(
+                                    (o) => _asInt(o['id']) == id,
+                                  );
+                                  if (idx != -1) outfits[idx] = updated!;
+                                });
+                                final newCount =
+                                    _asInt(updated['wear_count']) ?? prevCount;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      newCount == prevCount
+                                          ? 'Already marked today'
+                                          : 'Wear count updated',
+                                    ),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              } else if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Failed to update wear count',
+                                    ),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => OutfitDetailPage(
+                                  initialOutfit: updated ?? todayOutfit,
+                                ),
+                              ),
+                            );
+                            fetchHomeData();
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: const Color(0xFF1A1A1A),
@@ -637,19 +716,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      "Wear Today",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
+                  child: Text(
+                    todayOutfit == null
+                        ? "Wear Today"
+                        : (alreadyWornToday ? "Worn Today" : "Wear Today"),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
                     ),
                   ),
+                ),
                 ),
                 const SizedBox(width: 12),
                 Flexible(
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: _openRecommendation,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white),
@@ -694,13 +775,37 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(height: 4),
             Text(
-              'Use AI Stylist to generate one in seconds.',
+              'Use Outfit Generation to create one in seconds.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTodayOutfitPreview(Map<String, dynamic> outfit) {
+    final previewItems = _previewItems(outfit);
+    final previewTransforms = _layoutToTransforms(_previewLayout(outfit));
+
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: previewItems.isNotEmpty
+          ? EditableOutfitCanvas(
+              items: previewItems,
+              initialTransforms: previewTransforms,
+              interactive: false,
+            )
+          : OutfitCanvas(
+              outerwear: _slot(outfit, 'outerwear_item'),
+              topwear: _slot(outfit, 'topwear_item'),
+              bottomwear: _slot(outfit, 'bottomwear_item'),
+              shoes: _slot(outfit, 'shoes_item'),
+              accessories: _accessoryList(outfit),
+              compact: false,
+              slotScale: 0.75,
+            ),
     );
   }
 
@@ -751,15 +856,15 @@ class _HomeScreenState extends State<HomeScreen> {
         Row(
           children: [
             _actionButton("Add Item", Icons.add_circle_outline, () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AddItemSelectionPage()),
-              );
-
+              final result = await showAddItemSheet(context);
               _handleAddItemResult(result);
             }),
             const SizedBox(width: 12),
-            _actionButton("AI Stylist", Icons.auto_awesome_outlined, () {}),
+            _actionButton(
+              "Outfit Generation",
+              Icons.auto_awesome_outlined,
+              _openRecommendation,
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -773,7 +878,11 @@ class _HomeScreenState extends State<HomeScreen> {
               if (result == true) fetchHomeData();
             }),
             const SizedBox(width: 12),
-            _actionButton("Saved Outfits", Icons.favorite_outline, () {}),
+            _actionButton(
+              "Saved Outfits",
+              Icons.favorite_outline,
+              _openOutfitsPage,
+            ),
           ],
         ),
       ],
@@ -1147,13 +1256,20 @@ class _HomeScreenState extends State<HomeScreen> {
         Text('Recent Outfits', style: sectionTitle),
         const SizedBox(height: 16),
         hasOutfits
-            ? SizedBox(
-                height: 220,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: outfits.length,
-                  itemBuilder: (context, i) => _buildOutfitCard(i),
-                ),
+            ? LayoutBuilder(
+                builder: (context, constraints) {
+                  final cardWidth =
+                      (constraints.maxWidth * 0.45).clamp(160.0, 190.0);
+                  return SizedBox(
+                    height: 400,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: outfits.length,
+                      itemBuilder: (context, i) =>
+                          _buildOutfitCard(i, cardWidth),
+                    ),
+                  );
+                },
               )
             : _buildEmptyState(
                 'No outfits yet',
@@ -1164,11 +1280,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildOutfitCard(int index) {
+  Widget _buildOutfitCard(int index, double width) {
     final outfit = outfits[index];
     final name = (outfit['name'] ?? 'Outfit').toString();
     final dynamic ratingRaw = outfit['rating'];
     final rating = ratingRaw == null ? '-' : ratingRaw.toString();
+    final wearCount = _asInt(outfit['wear_count']) ?? 0;
     final previewItems = _previewItems(outfit);
     final previewTransforms = _layoutToTransforms(_previewLayout(outfit));
 
@@ -1183,7 +1300,7 @@ class _HomeScreenState extends State<HomeScreen> {
         fetchHomeData();
       },
       child: Container(
-        width: 160,
+        width: width,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1200,7 +1317,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Flexible(
+            AspectRatio(
+              aspectRatio: 0.58,
               child: Padding(
                 padding: const EdgeInsets.all(8),
                 child: previewItems.isNotEmpty
@@ -1242,6 +1360,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           color: Color(0xFF6B7280),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          wearCount == 0 ? 'New' : '${wearCount}x',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF6B7280),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -1389,6 +1523,18 @@ class _HomeScreenState extends State<HomeScreen> {
     return int.tryParse(raw?.toString() ?? '');
   }
 
+  bool _isWornToday(Map<String, dynamic>? outfit) {
+    final raw = outfit?['last_worn_at'];
+    if (raw == null) return false;
+    final parsed = DateTime.tryParse(raw.toString());
+    if (parsed == null) return false;
+    final local = parsed.toLocal();
+    final now = DateTime.now();
+    return local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+  }
+
   Widget _buildEmptyState(String title, String subtitle, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(40),
@@ -1432,11 +1578,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildFAB() {
     return FloatingActionButton.extended(
       onPressed: () async {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AddItemSelectionPage()),
-        );
-
+        final result = await showAddItemSheet(context);
         _handleAddItemResult(result);
       },
 
@@ -1487,7 +1629,12 @@ class _HomeScreenState extends State<HomeScreen> {
           return;
         }
 
-        setState(() => _selectedIndex = index);
+        setState(() {
+          _selectedIndex = index;
+          if (index != 1) {
+            _wardrobeSelecting = false;
+          }
+        });
       },
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),

@@ -1,5 +1,12 @@
 from rest_framework import serializers
-from .models import AccessoryItem, ClothingItem, NonClothingItem, Outfit, StorageUnit
+from .models import (
+    AccessoryItem,
+    BetaAllowlist,
+    ClothingItem,
+    NonClothingItem,
+    Outfit,
+    StorageUnit,
+)
 from django.contrib.auth.models import User
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -8,6 +15,14 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('username', 'email', 'password', 'first_name', 'last_name')
+
+    def validate_email(self, value):
+        email = (value or "").strip().lower()
+        if not BetaAllowlist.objects.filter(email__iexact=email, is_active=True).exists():
+            raise serializers.ValidationError(
+                "This email is not approved for the beta yet."
+            )
+        return email
     def create(self, validated_data):
         user = User.objects.create_user(
             username=validated_data['username'],
@@ -39,6 +54,8 @@ class ClothingItemSerializer(serializers.ModelSerializer):
             "dominant_color",
             "secondary_color",
             "attributes",
+            "detected_temp",
+            "detected_weather",
             "fit_scale",
             "fit_offset_x",
             "fit_offset_y",
@@ -64,6 +81,8 @@ class ClothingItemUpdateSerializer(serializers.ModelSerializer):
             "secondary_color",
             "occasion",
             "attributes",
+            "detected_temp",
+            "detected_weather",
             "fit_scale",
             "fit_offset_x",
             "fit_offset_y",
@@ -291,6 +310,8 @@ class OutfitReadSerializer(serializers.ModelSerializer):
             "name",
             "occasion",
             "rating",
+            "wear_count",
+            "last_worn_at",
             "is_favourite",
             "silhouette",
             "created_at",
