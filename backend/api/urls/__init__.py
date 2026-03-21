@@ -7,6 +7,8 @@ urlpatterns = [
     path("clothing/", include("api.urls.clothing")),
     path("accessories/", include("api.urls.accessories")),
     path("outfits/", include("api.urls.outfits")),
+    path("recommendations/", include("api.urls.recommendations")),
     path("storage/", include("api.urls.storage")),
     path("non-clothing/", include("api.urls.non_clothing")),
+    path("feedback/", include("api.urls.feedback")),
 ]

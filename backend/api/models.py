@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models.functions import Lower
 
 class StorageUnit(models.Model):
     STORAGE_TYPE_CHOICES = [
@@ -81,6 +82,8 @@ class ClothingItem(models.Model):
     dominant_color = models.CharField(max_length=30)
     secondary_color = models.CharField(max_length=30, null=True, blank=True)
     attributes = models.JSONField(default=list, blank=True)
+    detected_temp = models.CharField(max_length=30, null=True, blank=True)
+    detected_weather = models.CharField(max_length=30, null=True, blank=True)
     # Per-item render tuning used by outfit overlays.
     fit_scale = models.FloatField(
         default=1.0,
@@ -168,6 +171,8 @@ class Outfit(models.Model):
     )
     occasion = models.CharField(max_length=50, null=True, blank=True)
     rating = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
+    wear_count = models.IntegerField(default=0)
+    last_worn_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_favourite = models.BooleanField(default=False)
     silhouette = models.CharField(max_length=10, choices=SILHOUETTE_CHOICES, default="male")
@@ -208,3 +213,70 @@ class Outfit(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.user.username})"
+
+
+class BetaAllowlist(models.Model):
+    email = models.EmailField(unique=False)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="beta_allowlist_entries",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                Lower("email"),
+                name="unique_beta_allowlist_email",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.email:
+            self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.email} (active={self.is_active})"
+
+
+class UserActivityDaily(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="daily_activity",
+    )
+    date = models.DateField()
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    session_count = models.IntegerField(default=0)
+    total_session_seconds = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = ("user", "date")
+
+    def __str__(self):
+        return f"{self.user.username} {self.date}"
+
+
+class BetaFeedback(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="beta_feedback",
+    )
+    message = models.TextField()
+    rating = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Feedback {self.id} by {self.user.username}"
+

@@ -4,6 +4,7 @@ import '../services/profile_service.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../services/outfit_service.dart';
+import '../services/feedback_service.dart';
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -19,10 +20,13 @@ class _ProfileScreenState extends State<ProfileScreen>
   final AuthService authService = AuthService();
   final StorageService storageService = StorageService();
   final OutfitService outfitService = OutfitService();
+  final FeedbackService feedbackService = FeedbackService();
 
   bool _isEditing = false;
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
+  late TextEditingController _feedbackController;
+  int? _feedbackRating;
   late Future<Map<String, dynamic>?> _profileBundleFuture;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -32,6 +36,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.initState();
     _firstNameController = TextEditingController();
     _lastNameController = TextEditingController();
+    _feedbackController = TextEditingController();
     _profileBundleFuture = _loadProfileBundle();
 
     _animationController = AnimationController(
@@ -49,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _feedbackController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -175,6 +181,58 @@ class _ProfileScreenState extends State<ProfileScreen>
               Text('Failed to update profile'),
             ],
           ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _submitFeedback(BuildContext context) async {
+    final message = _feedbackController.text.trim();
+    if (message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter feedback first'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final ok = await feedbackService.submit(
+      message,
+      rating: _feedbackRating,
+    );
+
+    if (!context.mounted) return;
+
+    if (ok) {
+      _feedbackController.clear();
+      setState(() {
+        _feedbackRating = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Thanks for the feedback!'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to submit feedback'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -867,6 +925,107 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   profile['last_name'] ?? '',
                                   _lastNameController,
                                   Icons.person_outline,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // Beta Feedback
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF3C7),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.feedback_outlined,
+                                        color: Color(0xFFB45309),
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Beta Feedback',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF111827),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: _feedbackController,
+                                  maxLines: 4,
+                                  decoration: InputDecoration(
+                                    hintText: 'Tell us what is working or broken...',
+                                    filled: true,
+                                    fillColor: const Color(0xFFF9FAFB),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFE5E7EB),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Optional rating',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  children: List.generate(
+                                    5,
+                                    (index) {
+                                      final value = index + 1;
+                                      final selected = _feedbackRating == value;
+                                      return ChoiceChip(
+                                        label: Text('$value'),
+                                        selected: selected,
+                                        onSelected: (next) {
+                                          setState(() {
+                                            _feedbackRating = next ? value : null;
+                                          });
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton(
+                                    onPressed: () => _submitFeedback(context),
+                                    child: const Text('Send feedback'),
+                                  ),
                                 ),
                               ],
                             ),
