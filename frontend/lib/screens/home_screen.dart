@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import '../widgets/hover_clickable.dart';
@@ -21,6 +23,10 @@ import 'wardrobe_screen.dart';
 import 'outfit_screen.dart';
 import 'recommendation_screen.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  HomeScreen — Warm Editorial Light
+// ─────────────────────────────────────────────────────────────────────────────
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -28,7 +34,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final ProfileService profileService = ProfileService();
   final StorageService storageService = StorageService();
   final ClothingService clothingService = ClothingService();
@@ -39,53 +45,107 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> outfits = [];
   bool loadingHome = true;
 
-  String role = "user";
+  String role = 'user';
   int _selectedIndex = 0;
   bool _wardrobeSelecting = false;
 
   Map<String, dynamic>? weatherData;
   bool isLoadingWeather = true;
+  Map<String, dynamic>? _todayOutfit;
+  final Random _rng = Random();
 
-  final TextStyle sectionTitle = const TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.w600,
-    color: Color(0xFF1A1A1A),
-  );
+  late AnimationController _enterCtrl;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
 
-  void _handleAddItemResult(dynamic result) {
-    if (result == true) {
-      fetchHomeData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Item added successfully'),
-          backgroundColor: Color(0xFF10B981),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(milliseconds: 900),
-        ),
-      );
-    }
-  }
+  // ── Design tokens (matching Profile warm editorial palette) ────────────────
+  static const _cream = Color(0xFFFAF7F2);
+  static const _parchment = Color(0xFFF2EDE4);
+  static const _card = Color(0xFFFFFFFF);
+  static const _ink = Color(0xFF1A1714);
+  static const _inkSub = Color(0xFF4A4540);
+  static const _inkMuted = Color(0xFF9E9890);
+  static const _rule = Color(0xFFE8E2D9);
+  static const _accent = Color(0xFFB85C2E); // terracotta
+  static const _accentBg = Color(0xFFFAEFE8);
+  static const _accentDeep = Color(0xFF8C3E18);
+  static const _gold = Color(0xFFD4922A);
+  static const _goldBg = Color(0xFFFFF8EC);
+  static const _sage = Color(0xFF5A7A5E);
+  static const _sageBg = Color(0xFFEEF4EE);
+  static const _sky = Color(0xFF3D6FA0);
+  static const _skyBg = Color(0xFFECF2F9);
 
   @override
   void initState() {
     super.initState();
+    _enterCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeAnim = CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.03),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOutCubic));
+
     fetchUserRole();
     fetchWeather();
     fetchHomeData();
   }
 
-  // ---------------- BACKEND ----------------
+  @override
+  void dispose() {
+    _enterCtrl.dispose();
+    super.dispose();
+  }
 
-  void fetchUserRole() async {
-    final profileData = await profileService.fetchProfile();
-    if (profileData != null) {
-      setState(() {
-        role = profileData['role']; // user / admin
-      });
+  void _handleAddItemResult(dynamic result) {
+    if (result == true) {
+      fetchHomeData();
+      _toast('Item added successfully');
     }
   }
 
-  // ---------------- WEATHER ----------------
+  void _toast(String msg, {bool err = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              err ? Icons.warning_amber_rounded : Icons.check_rounded,
+              size: 16,
+              color: err ? _accent : _sage,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              msg,
+              style: const TextStyle(
+                color: _ink,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: _card,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: _rule),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // ── Data ───────────────────────────────────────────────────────────────────
+
+  void fetchUserRole() async {
+    final p = await profileService.fetchProfile();
+    if (p != null && mounted) setState(() => role = p['role'] ?? 'user');
+  }
 
   Future<void> fetchWeather() async {
     try {
@@ -94,25 +154,27 @@ class _HomeScreenState extends State<HomeScreen> {
       final url = Uri.parse(
         'https://api.weatherapi.com/v1/current.json?key=$apiKey&q=$city&aqi=no',
       );
-
       final response = await http.get(url);
-
       if (response.statusCode == 200) {
-        final decodedData = json.decode(response.body);
+        final d = json.decode(response.body);
+        if (!mounted) return;
         setState(() {
           weatherData = {
-            'temp': decodedData['current']['temp_c'],
-            'main': decodedData['current']['condition']['text'],
-            'description': decodedData['current']['condition']['text'],
+            'temp': d['current']['temp_c'],
+            'main': d['current']['condition']['text'],
+            'description': d['current']['condition']['text'],
           };
           isLoadingWeather = false;
         });
+        _refreshTodayOutfit();
       }
-    } catch (e) {
+    } catch (_) {
+      if (!mounted) return;
       setState(() {
         isLoadingWeather = false;
         weatherData = {'temp': 22, 'main': 'Clear', 'description': 'clear sky'};
       });
+      _refreshTodayOutfit();
     }
   }
 
@@ -120,13 +182,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final storageData = await storageService.getAll();
     final clothingData = await clothingService.getRecentClothes();
     final outfitData = await outfitService.getAll();
-
-    setState(() {
-      storages = storageData;
-      recentClothes = clothingData;
-      outfits = outfitData;
-      loadingHome = false;
-    });
+    if (mounted) {
+      setState(() {
+        storages = storageData;
+        recentClothes = clothingData;
+        outfits = outfitData;
+        loadingHome = false;
+      });
+      _refreshTodayOutfit();
+      _enterCtrl.forward(from: 0);
+    }
   }
 
   String _resolveImageUrl(dynamic rawUrl) {
@@ -151,318 +216,518 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => const OutfitsPage()),
     );
-    if (mounted) {
-      fetchHomeData();
-    }
+    if (mounted) fetchHomeData();
   }
 
-  // ---------------- UI ----------------
+  void _refreshTodayOutfit({bool force = false, int? excludeId}) {
+    if (!mounted) return;
+    if (outfits.isEmpty) {
+      if (_todayOutfit != null) {
+        setState(() => _todayOutfit = null);
+      }
+      return;
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    final bool showHomeTab = _selectedIndex == 0;
-    final bool showWardrobeTab = _selectedIndex == 1;
-    final bool showOutfitTab = _selectedIndex == 2;
+    final current = _todayOutfit;
+    if (!force && current != null) {
+      final currentId = _asInt(current['id']);
+      if (currentId != null) {
+        final latest = outfits
+            .where((o) => _asInt(o['id']) == currentId)
+            .cast<Map<String, dynamic>?>()
+            .firstWhere((o) => o != null, orElse: () => null);
+        if (latest != null) {
+          if (!_outfitMatchesWeather(latest)) {
+            setState(() => _todayOutfit = _pickTodayOutfit());
+          } else {
+            setState(() => _todayOutfit = latest);
+          }
+          return;
+        }
+      }
+    }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: showHomeTab
-                    ? ListView(
-                        key: const ValueKey('home_tab'),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        children: [
-                          const SizedBox(height: 24),
-                          _buildWelcomeSection(),
-                          const SizedBox(height: 20),
-                          _buildWeatherCard(),
-                          const SizedBox(height: 20),
-                          _buildTodayOutfitCard(),
-                          const SizedBox(height: 32),
-                          _buildQuickActions(),
-                          const SizedBox(height: 32),
-                          _buildStorageOverview(),
-                          const SizedBox(height: 32),
-                          _buildRecentClothing(),
-                          const SizedBox(height: 32),
-                          _buildRecentOutfits(),
-                          const SizedBox(height: 120),
-                        ],
-                      )
-                    : showWardrobeTab
-                    ? Padding(
-                        key: ValueKey('wardrobe_tab'),
-                        padding: EdgeInsets.symmetric(horizontal: 12),
-                        child: WardrobeScreen(
-                          embedded: true,
-                          onSelectionChanged: (value) {
-                            setState(() => _wardrobeSelecting = value);
-                          },
-                        ),
-                      )
-                    : showOutfitTab
-                    ? const OutfitsPage(
-                        key: ValueKey('outfit_tab'),
-                        embedded: true,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton:
-          (showOutfitTab || _wardrobeSelecting) ? null : _buildFAB(),
-      bottomNavigationBar: _buildBottomNav(),
+    setState(
+      () => _todayOutfit = _pickTodayOutfit(excludeId: excludeId),
     );
   }
 
-  // ---------------- TOP BAR ----------------
+  Map<String, dynamic>? _pickTodayOutfit({int? excludeId}) {
+    final candidates = _matchingOutfitsForWeather();
+    if (candidates.isEmpty) return null;
+    final usable = candidates
+        .where((o) => _asInt(o['id']) != excludeId)
+        .toList();
+    final poolBase = usable.isEmpty ? candidates : usable;
+    poolBase.sort((a, b) => _outfitWearCount(a).compareTo(_outfitWearCount(b)));
+    final poolSize = (poolBase.length * 0.35).ceil().clamp(1, poolBase.length);
+    final pool = poolBase.take(poolSize).toList();
+    return pool[_rng.nextInt(pool.length)];
+  }
+
+  List<Map<String, dynamic>> _matchingOutfitsForWeather() {
+    if (outfits.isEmpty) return [];
+    final matches = outfits.where(_outfitMatchesWeather).toList();
+    return matches.isEmpty ? outfits : matches;
+  }
+
+  bool _outfitMatchesWeather(Map<String, dynamic> outfit) {
+    final tags = _weatherTags();
+    if (tags.isEmpty) return true;
+    final outfitOccasion = (outfit['occasion'] ?? '').toString();
+    final outfitName = (outfit['name'] ?? '').toString();
+    if (_stringMatchesWeather(outfitOccasion, tags) ||
+        _stringMatchesWeather(outfitName, tags)) {
+      return true;
+    }
+
+    final items = <Map<String, dynamic>>[];
+    final outerwear = _slot(outfit, 'outerwear_item');
+    final topwear = _slot(outfit, 'topwear_item');
+    final bottomwear = _slot(outfit, 'bottomwear_item');
+    final shoes = _slot(outfit, 'shoes_item');
+    if (outerwear != null) items.add(outerwear);
+    if (topwear != null) items.add(topwear);
+    if (bottomwear != null) items.add(bottomwear);
+    if (shoes != null) items.add(shoes);
+    items.addAll(_accessoryList(outfit));
+
+    return items.any((item) => _itemMatchesWeather(item, tags));
+  }
+
+  bool _itemMatchesWeather(Map<String, dynamic> item, Set<String> tags) {
+    final weather = (item['detected_weather'] ?? '').toString();
+    final temp = (item['detected_temp'] ?? '').toString();
+    final occasion = (item['occasion'] ?? '').toString();
+    if (_stringMatchesWeather(weather, tags) ||
+        _stringMatchesWeather(temp, tags) ||
+        _stringMatchesWeather(occasion, tags)) {
+      return true;
+    }
+    final attrs = item['attributes'];
+    if (attrs is List) {
+      for (final entry in attrs) {
+        if (_stringMatchesWeather(entry.toString(), tags)) return true;
+      }
+    }
+    return false;
+  }
+
+  bool _stringMatchesWeather(String raw, Set<String> tags) {
+    final value = raw.toLowerCase().trim();
+    if (value.isEmpty) return false;
+    if (tags.contains('rain') &&
+        (value.contains('rain') ||
+            value.contains('drizzle') ||
+            value.contains('storm'))) return true;
+    if (tags.contains('snow') &&
+        (value.contains('snow') || value.contains('sleet'))) return true;
+    if (tags.contains('cloud') &&
+        (value.contains('cloud') || value.contains('overcast'))) return true;
+    if (tags.contains('clear') &&
+        (value.contains('clear') || value.contains('sun'))) return true;
+    if (tags.contains('wind') && value.contains('wind')) return true;
+    if (tags.contains('fog') &&
+        (value.contains('fog') ||
+            value.contains('mist') ||
+            value.contains('haze'))) return true;
+    if (tags.contains('cold') &&
+        (value.contains('cold') ||
+            value.contains('winter') ||
+            value.contains('cool'))) return true;
+    if (tags.contains('hot') &&
+        (value.contains('hot') ||
+            value.contains('warm') ||
+            value.contains('summer'))) return true;
+    if (tags.contains('mild') &&
+        (value.contains('mild') ||
+            value.contains('spring') ||
+            value.contains('fall') ||
+            value.contains('autumn'))) return true;
+    return false;
+  }
+
+  Set<String> _weatherTags() {
+    final main = (weatherData?['main'] ?? '').toString().toLowerCase();
+    final desc = (weatherData?['description'] ?? '').toString().toLowerCase();
+    final blob = '$main $desc';
+    final tags = <String>{};
+    if (blob.contains('rain') || blob.contains('drizzle')) tags.add('rain');
+    if (blob.contains('snow') || blob.contains('sleet')) tags.add('snow');
+    if (blob.contains('cloud') || blob.contains('overcast')) tags.add('cloud');
+    if (blob.contains('storm') || blob.contains('thunder')) tags.add('storm');
+    if (blob.contains('wind')) tags.add('wind');
+    if (blob.contains('fog') || blob.contains('mist') || blob.contains('haze')) {
+      tags.add('fog');
+    }
+    if (blob.contains('clear') || blob.contains('sun')) tags.add('clear');
+
+    final tempRaw = weatherData?['temp'];
+    final temp = tempRaw is num
+        ? tempRaw.toDouble()
+        : double.tryParse(tempRaw?.toString() ?? '');
+    if (temp != null) {
+      if (temp <= 10) {
+        tags.add('cold');
+      } else if (temp >= 26) {
+        tags.add('hot');
+      } else {
+        tags.add('mild');
+      }
+    }
+    return tags;
+  }
+
+  int _outfitWearCount(Map<String, dynamic> outfit) {
+    return _asInt(outfit['wear_count']) ?? 0;
+  }
+
+  Map<String, dynamic>? _resolveTodayOutfit() {
+    final currentId = _asInt(_todayOutfit?['id']);
+    if (currentId != null) {
+      final latest = outfits
+          .where((o) => _asInt(o['id']) == currentId)
+          .cast<Map<String, dynamic>?>()
+          .firstWhere((o) => o != null, orElse: () => null);
+      return latest ?? _todayOutfit;
+    }
+    return _todayOutfit ?? (outfits.isNotEmpty ? outfits.first : null);
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final showHome = _selectedIndex == 0;
+    final showWardrobe = _selectedIndex == 1;
+    final showOutfit = _selectedIndex == 2;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: _cream,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildAppBar(),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: showHome
+                      ? FadeTransition(
+                          key: const ValueKey('home_tab'),
+                          opacity: _fadeAnim,
+                          child: SlideTransition(
+                            position: _slideAnim,
+                            child: ListView(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              children: [
+                                const SizedBox(height: 24),
+                                _buildWelcomeSection(),
+                                const SizedBox(height: 20),
+                                _buildWeatherCard(),
+                                const SizedBox(height: 24),
+                                _buildTodayOutfitCard(),
+                                const SizedBox(height: 32),
+                                _buildQuickActions(),
+                                const SizedBox(height: 32),
+                                _buildStorageOverview(),
+                                const SizedBox(height: 32),
+                                _buildRecentClothing(),
+                                const SizedBox(height: 32),
+                                _buildRecentOutfits(),
+                                const SizedBox(height: 120),
+                              ],
+                            ),
+                          ),
+                        )
+                      : showWardrobe
+                      ? Padding(
+                          key: const ValueKey('wardrobe_tab'),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: WardrobeScreen(
+                            embedded: true,
+                            onSelectionChanged: (v) =>
+                                setState(() => _wardrobeSelecting = v),
+                          ),
+                        )
+                      : showOutfit
+                      ? const OutfitsPage(
+                          key: ValueKey('outfit_tab'),
+                          embedded: true,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        floatingActionButton: (showOutfit || _wardrobeSelecting)
+            ? null
+            : _buildFAB(),
+        bottomNavigationBar: _buildBottomNav(),
+      ),
+    );
+  }
+
+  // ── App bar ────────────────────────────────────────────────────────────────
 
   Widget _buildAppBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
       decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+        color: _card,
+        border: Border(bottom: BorderSide(color: _rule)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          HoverClickable(
-            onTap: () {
-              setState(() => _selectedIndex = 0);
-            },
+          GestureDetector(
+            onTap: () => setState(() => _selectedIndex = 0),
             child: Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(12),
+                    color: _ink,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
                     Icons.checkroom_rounded,
                     color: Colors.white,
-                    size: 20,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 const Text(
-                  "Closet Buddy",
+                  'Closet Buddy',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A1A),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: _ink,
+                    letterSpacing: -0.5,
                   ),
                 ),
               ],
             ),
           ),
-          Row(
-            children: [
-              if (role == "admin")
-                IconButton(
-                  icon: const Icon(Icons.admin_panel_settings),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AdminScreen()),
-                    );
-                  },
-                ),
-              HoverClickable(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                  );
-                },
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.person_outline,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
+          const Spacer(),
+          if (role == 'admin')
+            _AppBarBtn(
+              icon: Icons.admin_panel_settings_outlined,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminScreen()),
               ),
-            ],
+            ),
+          const SizedBox(width: 8),
+          _AppBarBtn(
+            icon: Icons.person_outline_rounded,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ---------------- SECTIONS ----------------
+  // ── Welcome ────────────────────────────────────────────────────────────────
 
   Widget _buildWelcomeSection() {
     final hour = DateTime.now().hour;
-    String greeting = 'Good morning';
-    String emoji = '🌅';
+    String greeting;
+    IconData greetIcon;
 
-    if (hour >= 12 && hour < 17) {
+    if (hour >= 5 && hour < 12) {
+      greeting = 'Good morning';
+      greetIcon = Icons.wb_sunny_outlined;
+    } else if (hour >= 12 && hour < 17) {
       greeting = 'Good afternoon';
-      emoji = '☀️';
+      greetIcon = Icons.light_mode_outlined;
     } else if (hour >= 17 && hour < 21) {
       greeting = 'Good evening';
-      emoji = '🌆';
-    } else if (hour >= 21 || hour < 5) {
+      greetIcon = Icons.wb_twilight_outlined;
+    } else {
       greeting = 'Good night';
-      emoji = '🌙';
+      greetIcon = Icons.nightlight_outlined;
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Text(
-          '$greeting $emoji',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1A1A1A),
-            letterSpacing: -0.5,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(greetIcon, size: 15, color: _gold),
+                  const SizedBox(width: 6),
+                  Text(
+                    greeting.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: _gold,
+                      letterSpacing: 1.8,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                "What are you\nwearing today?",
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: _ink,
+                  letterSpacing: -0.8,
+                  height: 1.15,
+                ),
+              ),
+            ],
           ),
         ),
-        SizedBox(height: 6),
-        Text(
-          'Let AI style your perfect outfit today',
-          style: TextStyle(fontSize: 15, color: Color(0xFF6B7280)),
+        GestureDetector(
+          onTap: _openRecommendation,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: _accent,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: _accent.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded, size: 15, color: Colors.white),
+                SizedBox(width: 6),
+                Text(
+                  'Style Me',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 
+  // ── Weather ────────────────────────────────────────────────────────────────
+
   Widget _buildWeatherCard() {
     if (isLoadingWeather) {
       return Container(
-        height: 100,
-        padding: const EdgeInsets.all(20),
+        height: 80,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Color(0xFFE5E7EB)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
+          border: Border.all(color: _rule),
         ),
-        child: Center(
+        child: const Center(
           child: SizedBox(
-            width: 20,
-            height: 20,
+            width: 18,
+            height: 18,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1A1A1A)),
+              color: _accent,
+              strokeCap: StrokeCap.round,
             ),
           ),
         ),
       );
     }
+
     final temp = (weatherData?['temp'] ?? 22).round();
     final condition = weatherData?['main'] ?? 'Clear';
-    final description = weatherData?['description'] ?? 'clear sky';
+    final desc = (weatherData?['description'] ?? 'clear sky').toString();
 
-    IconData weatherIcon = Icons.wb_sunny;
-    Color weatherColor = Color(0xFFFBBF24);
-    if (condition.contains('Rain')) {
-      weatherIcon = Icons.beach_access;
-      weatherColor = Color(0xFF3B82F6);
-    } else if (condition.contains('Cloud')) {
-      weatherIcon = Icons.cloud;
-      weatherColor = Color(0xFF6B7280);
-    } else if (condition.contains('Snow')) {
-      weatherIcon = Icons.ac_unit;
-      weatherColor = Color(0xFF10B981);
+    IconData weatherIcon;
+    Color weatherColor;
+    String tip;
+
+    if (condition.toLowerCase().contains('rain')) {
+      weatherIcon = Icons.umbrella_rounded;
+      weatherColor = _sky;
+      tip = 'Bring a waterproof layer';
+    } else if (condition.toLowerCase().contains('cloud')) {
+      weatherIcon = Icons.cloud_outlined;
+      weatherColor = const Color(0xFF7B8FA0);
+      tip = 'Layer up, it may cool down';
+    } else if (condition.toLowerCase().contains('snow')) {
+      weatherIcon = Icons.ac_unit_rounded;
+      weatherColor = const Color(0xFF5A8FA0);
+      tip = 'Wrap up warm today';
+    } else {
+      weatherIcon = Icons.wb_sunny_rounded;
+      weatherColor = _gold;
+      tip = 'Great day for light layers';
     }
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            weatherColor.withValues(alpha: 0.1),
-            weatherColor.withValues(alpha: 0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: weatherColor.withValues(alpha: 0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
+        color: _card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _rule),
       ),
       child: Row(
         children: [
           Container(
-            width: 60,
-            height: 60,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: weatherColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(16),
+              color: weatherColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(weatherIcon, size: 32, color: weatherColor),
+            child: Icon(weatherIcon, size: 26, color: weatherColor),
           ),
-          SizedBox(width: 16),
-          Flexible(
+          const SizedBox(width: 16),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
-                      '$temp°',
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1A1A),
-                        letterSpacing: -1,
+                      '$temp°C',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: _ink,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                    SizedBox(width: 8),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        condition,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1A1A1A),
-                        ),
+                    const SizedBox(width: 8),
+                    Text(
+                      condition,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _inkSub,
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
-                  description.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF6B7280),
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.5,
-                  ),
+                  tip,
+                  style: const TextStyle(fontSize: 12, color: _inkMuted),
                 ),
               ],
             ),
@@ -470,14 +735,18 @@ class _HomeScreenState extends State<HomeScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Icon(Icons.location_on, size: 16, color: Color(0xFF6B7280)),
-              SizedBox(height: 4),
-              Text(
+              const Icon(
+                Icons.location_on_outlined,
+                size: 13,
+                color: _inkMuted,
+              ),
+              const SizedBox(height: 2),
+              const Text(
                 'Kathmandu',
                 style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF6B7280),
-                  fontWeight: FontWeight.w500,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _inkMuted,
                 ),
               ),
             ],
@@ -487,300 +756,309 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ── TODAY'S OUTFIT — the star of the show ─────────────────────────────────
+
   Widget _buildTodayOutfitCard() {
-    final Map<String, dynamic>? todayOutfit = outfits.isNotEmpty
-        ? outfits.first
-        : null;
+    final Map<String, dynamic>? todayOutfit = _resolveTodayOutfit();
+
     final String outfitName =
-        (todayOutfit?['name'] ?? todayOutfit?['title'] ?? "Today's Outfit")
+        (todayOutfit?['name'] ?? todayOutfit?['title'] ?? "Today's Look")
             .toString();
     final String occasion = (todayOutfit?['occasion'] ?? 'Any Occasion')
         .toString();
-    final dynamic rawRating = todayOutfit?['rating'];
-    final double? rating = rawRating is num
-        ? rawRating.toDouble()
-        : double.tryParse(rawRating?.toString() ?? '');
+    final dynamic ratingRaw = todayOutfit?['rating'];
+    final double? rating = ratingRaw is num
+        ? ratingRaw.toDouble()
+        : double.tryParse(ratingRaw?.toString() ?? '');
     final int wearCount = _asInt(todayOutfit?['wear_count']) ?? 0;
-    final bool alreadyWornToday = _isWornToday(todayOutfit);
+    final bool wornToday = _isWornToday(todayOutfit);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section header
+        Row(
+          children: [
+            Container(
+              width: 3,
+              height: 14,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: _accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Text(
+              "TODAY'S OUTFIT",
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: _inkMuted,
+                letterSpacing: 1.8,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Main card
+        Container(
+          decoration: BoxDecoration(
+            color: _card,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _rule),
+            boxShadow: [
+              BoxShadow(
+                color: _ink.withOpacity(0.06),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Column(
+            children: [
+              // ── Top metadata strip ─────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                child: Row(
                   children: [
-                    const Icon(
-                      Icons.auto_awesome,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      todayOutfit == null
-                          ? "Today's Outfit"
-                          : "AI Generated Outfit",
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (todayOutfit != null) ...[
+                            Text(
+                              outfitName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: _ink,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                _MetaChip(
+                                  icon: Icons.theater_comedy_outlined,
+                                  label: occasion,
+                                  color: _accentBg,
+                                  textColor: _accent,
+                                ),
+                                if (rating != null)
+                                  _MetaChip(
+                                    icon: Icons.auto_awesome_rounded,
+                                    label:
+                                        '${rating.toStringAsFixed(1)} rating',
+                                    color: _goldBg,
+                                    textColor: _gold,
+                                  ),
+                                _MetaChip(
+                                  icon: wornToday
+                                      ? Icons.check_circle_outline_rounded
+                                      : Icons.checkroom_rounded,
+                                  label: wornToday
+                                      ? 'Worn today'
+                                      : wearCount == 0
+                                      ? 'Never worn'
+                                      : '$wearCount wears',
+                                  color: wornToday ? _sageBg : _parchment,
+                                  textColor: wornToday ? _sage : _inkSub,
+                                ),
+                              ],
+                            ),
+                          ] else ...[
+                            const Text(
+                              'No outfit yet',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: _ink,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Let AI build your look from your wardrobe',
+                              style: TextStyle(fontSize: 13, color: _inkMuted),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  todayOutfit == null ? 'No outfit generated yet' : outfitName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: todayOutfit == null
-                      ? const Text(
-                          "Generate from your wardrobe",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        )
-                      : Row(
+
+                    // Worn status badge (right side)
+                    if (wornToday)
+                      Container(
+                        margin: const EdgeInsets.only(left: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _sageBg,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _sage.withOpacity(0.3)),
+                        ),
+                        child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.star,
-                              color: Color(0xFFFBBF24),
-                              size: 16,
+                            Icon(
+                              Icons.done_all_rounded,
+                              size: 13,
+                              color: _sage,
                             ),
-                            const SizedBox(width: 4),
+                            SizedBox(width: 4),
                             Text(
-                              rating == null
-                                  ? occasion
-                                  : '${rating.toStringAsFixed(1)} AI Rating',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                wearCount == 0 ? 'Not worn yet' : '$wearCount wears',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              'On',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: _sage,
                               ),
                             ),
                           ],
                         ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
 
-          Container(
-            height: 340,
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: todayOutfit == null
-                  ? _buildOutfitEmptyPreview()
-                  : _buildTodayOutfitPreview(todayOutfit),
-            ),
-          ),
+              // ── Outfit canvas ──────────────────────────────────────────
+              Container(
+                height: 380,
+                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                decoration: BoxDecoration(
+                  color: _parchment,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: _rule),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: todayOutfit == null
+                      ? _buildOutfitEmptyPreview()
+                      : _buildTodayOutfitPreview(todayOutfit),
+                ),
+              ),
 
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Flexible(
-                  child: ElevatedButton(
-                    onPressed: todayOutfit == null
-                        ? _openRecommendation
-                        : () async {
-                            if (alreadyWornToday) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'This outfit is already marked worn today',
-                                  ),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => OutfitDetailPage(
-                                    initialOutfit: todayOutfit,
-                                  ),
-                                ),
-                              );
-                              fetchHomeData();
-                              return;
-                            }
-
-                            Map<String, dynamic>? updated;
-                            final id = _asInt(todayOutfit['id']);
-                            final prevCount = wearCount;
-                            if (id != null) {
-                              updated = await outfitService.markWorn(id);
-                              if (updated != null && mounted) {
-                                setState(() {
-                                  final idx = outfits.indexWhere(
-                                    (o) => _asInt(o['id']) == id,
-                                  );
-                                  if (idx != -1) outfits[idx] = updated!;
-                                });
-                                final newCount =
-                                    _asInt(updated['wear_count']) ?? prevCount;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      newCount == prevCount
-                                          ? 'Already marked today'
-                                          : 'Wear count updated',
+              // ── Action buttons ─────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: _OutfitActionButton(
+                        label: todayOutfit == null
+                            ? 'Generate Outfit'
+                            : wornToday
+                            ? 'View Details'
+                            : 'Wear Today',
+                        icon: todayOutfit == null
+                            ? Icons.auto_awesome_rounded
+                            : wornToday
+                            ? Icons.open_in_new_rounded
+                            : Icons.checkroom_rounded,
+                        isPrimary: true,
+                        onTap: todayOutfit == null
+                            ? _openRecommendation
+                            : () async {
+                                if (!wornToday) {
+                                  final id = _asInt(todayOutfit['id']);
+                                  if (id != null) {
+                                    final updated = await outfitService
+                                        .markWorn(id);
+                                    if (updated != null && mounted) {
+                                      setState(() {
+                                        final idx = outfits.indexWhere(
+                                          (o) => _asInt(o['id']) == id,
+                                        );
+                                        if (idx != -1) outfits[idx] = updated;
+                                        if (_asInt(_todayOutfit?['id']) ==
+                                            id) {
+                                          _todayOutfit = updated;
+                                        }
+                                      });
+                                    }
+                                  }
+                                }
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => OutfitDetailPage(
+                                      initialOutfit: todayOutfit,
                                     ),
-                                    behavior: SnackBarBehavior.floating,
                                   ),
                                 );
-                              } else if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Failed to update wear count',
-                                    ),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            }
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => OutfitDetailPage(
-                                  initialOutfit: updated ?? todayOutfit,
+                                fetchHomeData();
+                              },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: _OutfitActionButton(
+                        label: todayOutfit == null ? 'Browse' : 'Re-pick',
+                        icon: todayOutfit == null
+                            ? Icons.style_outlined
+                            : Icons.refresh_rounded,
+                        isPrimary: false,
+                        onTap: todayOutfit == null
+                            ? _openOutfitsPage
+                            : () => _refreshTodayOutfit(
+                                  force: true,
+                                  excludeId: _asInt(todayOutfit['id']),
                                 ),
-                              ),
-                            );
-                            fetchHomeData();
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF1A1A1A),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                  child: Text(
-                    todayOutfit == null
-                        ? "Wear Today"
-                        : (alreadyWornToday ? "Worn Today" : "Wear Today"),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: OutlinedButton(
-                    onPressed: _openRecommendation,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(
-                      todayOutfit == null ? "Create Outfit" : "Regenerate",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildOutfitEmptyPreview() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.auto_awesome_outlined, color: Colors.white70, size: 28),
-            SizedBox(height: 8),
-            Text(
-              'No saved outfit yet',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: _accentBg,
+              borderRadius: BorderRadius.circular(16),
             ),
-            SizedBox(height: 4),
-            Text(
-              'Use Outfit Generation to create one in seconds.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70, fontSize: 12),
+            child: const Icon(
+              Icons.auto_awesome_outlined,
+              size: 28,
+              color: _accent,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'No outfit generated yet',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: _inkSub,
+            ),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'Tap "Generate" to build a look\nfrom your wardrobe.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: _inkMuted, height: 1.5),
+          ),
+        ],
       ),
     );
   }
@@ -790,7 +1068,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final previewTransforms = _layoutToTransforms(_previewLayout(outfit));
 
     return Padding(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(6),
       child: previewItems.isNotEmpty
           ? EditableOutfitCanvas(
               items: previewItems,
@@ -804,84 +1082,74 @@ class _HomeScreenState extends State<HomeScreen> {
               shoes: _slot(outfit, 'shoes_item'),
               accessories: _accessoryList(outfit),
               compact: false,
-              slotScale: 0.75,
+              slotScale: 1.0,
             ),
     );
   }
 
-  Widget _buildOutfitItem(String label, IconData icon, String value) {
-    return Container(
-      color: Colors.white.withValues(alpha: 0.03),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: Colors.white.withValues(alpha: 0.5), size: 28),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // ── Quick actions ──────────────────────────────────────────────────────────
 
   Widget _buildQuickActions() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Quick Access", style: sectionTitle),
-        const SizedBox(height: 16),
+        _SectionHeader(title: 'Quick Access'),
+        const SizedBox(height: 14),
         Row(
           children: [
-            _actionButton("Add Item", Icons.add_circle_outline, () async {
-              final result = await showAddItemSheet(context);
-              _handleAddItemResult(result);
-            }),
+            Expanded(
+              child: _QuickActionTile(
+                label: 'Add Item',
+                icon: Icons.add_circle_outline_rounded,
+                iconColor: _accent,
+                iconBg: _accentBg,
+                onTap: () async {
+                  final result = await showAddItemSheet(context);
+                  _handleAddItemResult(result);
+                },
+              ),
+            ),
             const SizedBox(width: 12),
-            _actionButton(
-              "Outfit Generation",
-              Icons.auto_awesome_outlined,
-              _openRecommendation,
+            Expanded(
+              child: _QuickActionTile(
+                label: 'Style Me',
+                icon: Icons.auto_awesome_outlined,
+                iconColor: _gold,
+                iconBg: _goldBg,
+                onTap: _openRecommendation,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            _actionButton("My Storage", Icons.inventory_2_outlined, () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const StorageListScreen()),
-              );
-              if (result == true) fetchHomeData();
-            }),
+            Expanded(
+              child: _QuickActionTile(
+                label: 'My Storage',
+                icon: Icons.inventory_2_outlined,
+                iconColor: _sky,
+                iconBg: _skyBg,
+                onTap: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const StorageListScreen(),
+                    ),
+                  );
+                  if (result == true) fetchHomeData();
+                },
+              ),
+            ),
             const SizedBox(width: 12),
-            _actionButton(
-              "Saved Outfits",
-              Icons.favorite_outline,
-              _openOutfitsPage,
+            Expanded(
+              child: _QuickActionTile(
+                label: 'Saved Looks',
+                icon: Icons.favorite_border_rounded,
+                iconColor: const Color(0xFFA84F5F),
+                iconBg: const Color(0xFFFAEEF0),
+                onTap: _openOutfitsPage,
+              ),
             ),
           ],
         ),
@@ -889,51 +1157,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _actionButton(String label, IconData icon, VoidCallback onTap) {
-    return Flexible(
-      child: HoverClickable(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Icon(icon),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // ── Storage ────────────────────────────────────────────────────────────────
 
   Widget _buildStorageOverview() {
-    final topLevelStorages = storages
+    final topLevel = storages
         .where((s) => s['parent_storage'] == null)
         .toList();
-    final previewStorages = topLevelStorages.take(8).toList();
+    final previewed = topLevel.take(8).toList();
 
-    if (topLevelStorages.isEmpty) {
+    if (topLevel.isEmpty) {
       return _buildEmptyState(
         'No storage yet',
         'Create your first closet or drawer',
@@ -945,51 +1177,49 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Your Storage", style: sectionTitle),
-            Row(
-              children: [
-                Text(
-                  '${previewStorages.length}/${topLevelStorages.length} shown',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B7280),
-                    fontWeight: FontWeight.w500,
+            Expanded(child: _SectionHeader(title: 'Your Storage')),
+            GestureDetector(
+              onTap: () async {
+                final r = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const StorageListScreen()),
+                );
+                if (r == true) fetchHomeData();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: _parchment,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'View all',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _inkSub,
                   ),
                 ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const StorageListScreen(),
-                      ),
-                    );
-
-                    if (result == true) fetchHomeData();
-                  },
-                  child: const Text('View all'),
-                ),
-              ],
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         LayoutBuilder(
           builder: (context, constraints) {
-            final cardWidth = (constraints.maxWidth * 0.58).clamp(165.0, 230.0);
-
+            final cardWidth = (constraints.maxWidth * 0.56).clamp(160.0, 220.0);
             return SizedBox(
-              height: 126,
+              height: 120,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
-                itemCount: previewStorages.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 12),
-                itemBuilder: (context, index) =>
-                    _storageCard(previewStorages[index], cardWidth),
+                itemCount: previewed.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (_, i) => _storageCard(previewed[i], cardWidth),
               ),
             );
           },
@@ -999,11 +1229,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _storageCard(Map<String, dynamic> storage, double width) {
-    final String name = (storage['name'] ?? 'Storage').toString();
-    final int count = storage['item_count'] is num
+    final name = (storage['name'] ?? 'Storage').toString();
+    final count = storage['item_count'] is num
         ? (storage['item_count'] as num).toInt()
         : int.tryParse(storage['item_count']?.toString() ?? '0') ?? 0;
-    final String type = (storage['type'] ?? 'storage').toString();
+    final type = (storage['type'] ?? 'storage').toString();
+    final label = type.isNotEmpty
+        ? '${type[0].toUpperCase()}${type.substring(1)}'
+        : type;
 
     return HoverClickable(
       onTap: () async {
@@ -1013,25 +1246,15 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (_) => StorageDetailScreen(storageId: storage['id']),
           ),
         );
-
-        // refresh home when coming back
         fetchHomeData();
       },
-
       child: Container(
         width: width,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: _card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _rule),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1040,43 +1263,47 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const Icon(
                   Icons.inventory_2_outlined,
-                  color: Color(0xFF1A1A1A),
-                  size: 22,
+                  size: 18,
+                  color: _inkSub,
                 ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                    horizontal: 7,
+                    vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(999),
+                    color: _parchment,
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     '$count',
                     style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF374151),
-                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: _inkSub,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const Spacer(),
             Text(
               name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: _ink,
+              ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
-              '${type[0].toUpperCase()}${type.substring(1)} - $count items',
+              '$label · $count items',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13),
+              style: const TextStyle(color: _inkMuted, fontSize: 12),
             ),
           ],
         ),
@@ -1084,35 +1311,31 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRecentClothing() {
-    final hasClothes = recentClothes.isNotEmpty;
+  // ── Recent clothing ────────────────────────────────────────────────────────
 
+  Widget _buildRecentClothing() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [Text('Recent Items', style: sectionTitle)],
-        ),
-        const SizedBox(height: 16),
-        hasClothes
+        _SectionHeader(title: 'Recent Items'),
+        const SizedBox(height: 14),
+        recentClothes.isNotEmpty
             ? GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
                   childAspectRatio: 0.75,
                 ),
                 itemCount: recentClothes.length,
-                itemBuilder: (context, index) =>
-                    _buildClothingCard(recentClothes[index]),
+                itemBuilder: (_, i) => _buildClothingCard(recentClothes[i]),
               )
             : _buildEmptyState(
                 'No items yet',
                 'Add your first clothing item',
-                Icons.add_circle_outline,
+                Icons.add_circle_outline_rounded,
               ),
       ],
     );
@@ -1120,6 +1343,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildClothingCard(Map<String, dynamic> item) {
     final imageUrl = _resolveImageUrl(item['image']);
+    final isFav = item['is_favourite'] ?? false;
 
     return HoverClickable(
       onTap: () async {
@@ -1129,30 +1353,29 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (_) => ClothingDetailScreen(clothingId: item['id']),
           ),
         );
-
         if (result == true) fetchHomeData();
       },
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          color: _card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _rule),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           child: Stack(
             children: [
               imageUrl.isEmpty
                   ? Container(
-                      color: const Color(0xFFF3F4F6),
+                      color: _parchment,
                       alignment: Alignment.center,
                       child: const Icon(
                         Icons.image_not_supported_outlined,
-                        color: Color(0xFF9CA3AF),
+                        color: _inkMuted,
                       ),
                     )
                   : Container(
-                      color: const Color(0xFFF9FAFB),
+                      color: _parchment,
                       padding: const EdgeInsets.all(8),
                       child: Image.network(
                         imageUrl,
@@ -1162,80 +1385,40 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
 
-              /// ❤️ Favourite toggle
+              // Favourite button
               Positioned(
                 top: 8,
                 right: 8,
                 child: GestureDetector(
                   onTap: () async {
-                    // 1. Optimistic Update (update UI immediately for responsiveness)
-                    final oldStatus = item['is_favourite'] ?? false;
-                    setState(() => item['is_favourite'] = !oldStatus);
-
-                    final success = await clothingService.toggleFavourite(
+                    HapticFeedback.lightImpact();
+                    final old = item['is_favourite'] ?? false;
+                    setState(() => item['is_favourite'] = !old);
+                    final ok = await clothingService.toggleFavourite(
                       item['id'],
                     );
-
-                    if (!success) {
-                      // Rollback if server fails
-                      setState(() => item['is_favourite'] = oldStatus);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Failed to update favourite"),
-                        ),
-                      );
-                    }
+                    if (!ok) setState(() => item['is_favourite'] = old);
                   },
-                  child: TweenAnimationBuilder<double>(
-                    // Trigger the "pop" when isFavourite changes
-                    tween: Tween(
-                      begin: 1.0,
-                      end: (item['is_favourite'] ?? false) ? 1.2 : 1.0,
-                    ),
-                    duration: const Duration(milliseconds: 150),
-                    curve: Curves.easeOutBack, // Gives it that bouncy "pop"
-                    builder: (context, scale, child) {
-                      return Transform.scale(scale: scale, child: child);
-                    },
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        shape: BoxShape
-                            .circle, // Circular usually looks better for action buttons
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        // Use a custom transition for the icon specifically
-                        transitionBuilder:
-                            (Widget child, Animation<double> animation) {
-                              return ScaleTransition(
-                                scale: animation,
-                                child: FadeTransition(
-                                  opacity: animation,
-                                  child: child,
-                                ),
-                              );
-                            },
-                        child: Icon(
-                          (item['is_favourite'] ?? false)
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          key: ValueKey(item['is_favourite'] ?? false),
-                          size: 18,
-                          color: (item['is_favourite'] ?? false)
-                              ? Colors.red
-                              : Colors.grey[600],
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.92),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
-                      ),
+                      ],
+                    ),
+                    child: Icon(
+                      isFav
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      size: 15,
+                      color: isFav ? _accent : _inkMuted,
                     ),
                   ),
                 ),
@@ -1247,33 +1430,60 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRecentOutfits() {
-    final hasOutfits = outfits.isNotEmpty;
+  // ── Recent outfits ─────────────────────────────────────────────────────────
 
+  Widget _buildRecentOutfits() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Recent Outfits', style: sectionTitle),
-        const SizedBox(height: 16),
-        hasOutfits
+        Row(
+          children: [
+            Expanded(child: _SectionHeader(title: 'Recent Outfits')),
+            GestureDetector(
+              onTap: _openOutfitsPage,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: _parchment,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'See all',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _inkSub,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        outfits.isNotEmpty
             ? LayoutBuilder(
                 builder: (context, constraints) {
-                  final cardWidth =
-                      (constraints.maxWidth * 0.45).clamp(160.0, 190.0);
+                  final cardWidth = (constraints.maxWidth * 0.45).clamp(
+                    155.0,
+                    185.0,
+                  );
                   return SizedBox(
-                    height: 400,
+                    height: 380,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
                       itemCount: outfits.length,
-                      itemBuilder: (context, i) =>
-                          _buildOutfitCard(i, cardWidth),
+                      itemBuilder: (_, i) => _buildOutfitCard(i, cardWidth),
                     ),
                   );
                 },
               )
             : _buildEmptyState(
                 'No outfits yet',
-                'Create your first outfit',
+                'Generate your first look',
                 Icons.auto_awesome_outlined,
               ),
       ],
@@ -1283,8 +1493,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildOutfitCard(int index, double width) {
     final outfit = outfits[index];
     final name = (outfit['name'] ?? 'Outfit').toString();
-    final dynamic ratingRaw = outfit['rating'];
-    final rating = ratingRaw == null ? '-' : ratingRaw.toString();
+    final ratingRaw = outfit['rating'];
+    final rating = ratingRaw == null ? '—' : ratingRaw.toString();
     final wearCount = _asInt(outfit['wear_count']) ?? 0;
     final previewItems = _previewItems(outfit);
     final previewTransforms = _layoutToTransforms(_previewLayout(outfit));
@@ -1301,80 +1511,95 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Container(
         width: width,
-        margin: const EdgeInsets.only(right: 12),
+        margin: const EdgeInsets.only(right: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Color(0xFFE5E7EB), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
+          color: _card,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _rule),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 0.58,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: previewItems.isNotEmpty
-                    ? EditableOutfitCanvas(
-                        items: previewItems,
-                        initialTransforms: previewTransforms,
-                        interactive: false,
-                      )
-                    : OutfitCanvas(
-                        outerwear: _slot(outfit, 'outerwear_item'),
-                        topwear: _slot(outfit, 'topwear_item'),
-                        bottomwear: _slot(outfit, 'bottomwear_item'),
-                        shoes: _slot(outfit, 'shoes_item'),
-                        accessories: _accessoryList(outfit),
-                        compact: true,
-                      ),
+            // Canvas
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _parchment,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: previewItems.isNotEmpty
+                        ? EditableOutfitCanvas(
+                            items: previewItems,
+                            initialTransforms: previewTransforms,
+                            interactive: false,
+                          )
+                        : OutfitCanvas(
+                            outerwear: _slot(outfit, 'outerwear_item'),
+                            topwear: _slot(outfit, 'topwear_item'),
+                            bottomwear: _slot(outfit, 'bottomwear_item'),
+                            shoes: _slot(outfit, 'shoes_item'),
+                            accessories: _accessoryList(outfit),
+                            compact: true,
+                          ),
+                  ),
+                ),
               ),
             ),
+
+            // Metadata
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     name,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: _ink,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(Icons.star, size: 14, color: Color(0xFFFBBF24)),
-                      SizedBox(width: 4),
+                      const Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 12,
+                        color: _gold,
+                      ),
+                      const SizedBox(width: 3),
                       Text(
                         rating,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF6B7280),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _inkSub,
                         ),
                       ),
-                      SizedBox(width: 8),
+                      const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(999),
+                          color: _parchment,
+                          borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          wearCount == 0 ? 'New' : '${wearCount}x',
+                          wearCount == 0 ? 'New' : '${wearCount}×',
                           style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF6B7280),
-                            fontWeight: FontWeight.w600,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: _inkSub,
                           ),
                         ),
                       ),
@@ -1389,6 +1614,132 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ── FAB + nav ──────────────────────────────────────────────────────────────
+
+  Widget _buildFAB() {
+    return FloatingActionButton.extended(
+      onPressed: () async {
+        final result = await showAddItemSheet(context);
+        _handleAddItemResult(result);
+      },
+      backgroundColor: _ink,
+      elevation: 4,
+      icon: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+      label: const Text(
+        'Add Item',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    final width = MediaQuery.of(context).size.width;
+    final isCompact = width < 380;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: _card,
+        border: Border(top: BorderSide(color: _rule)),
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        selectedItemColor: _accent,
+        unselectedItemColor: _inkMuted,
+        type: BottomNavigationBarType.fixed,
+        selectedFontSize: isCompact ? 10 : 11,
+        unselectedFontSize: isCompact ? 10 : 11,
+        iconSize: isCompact ? 22 : 24,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
+        onTap: (index) {
+          if (index == 3) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            ).then((_) {
+              if (mounted) setState(() => _selectedIndex = 0);
+            });
+            return;
+          }
+          setState(() {
+            _selectedIndex = index;
+            if (index != 1) _wardrobeSelecting = false;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inventory_2_outlined),
+            activeIcon: Icon(Icons.inventory_2_rounded),
+            label: 'Wardrobe',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.auto_awesome_outlined),
+            activeIcon: Icon(Icons.auto_awesome_rounded),
+            label: 'Outfits',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline_rounded),
+            activeIcon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Empty state ────────────────────────────────────────────────────────────
+
+  Widget _buildEmptyState(String title, String sub, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(36),
+      decoration: BoxDecoration(
+        color: _parchment,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _rule),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: _card,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, size: 26, color: _inkMuted),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: _ink,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            sub,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, color: _inkMuted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
   Map<String, dynamic>? _slot(Map<String, dynamic> outfit, String key) {
     final raw = outfit[key];
     if (raw is Map<String, dynamic>) return raw;
@@ -1398,12 +1749,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Map<String, dynamic>> _accessoryList(Map<String, dynamic> outfit) {
     final raw = outfit['accessory_items'];
-    if (raw is List) {
+    if (raw is List)
       return raw
           .whereType<Map>()
           .map((m) => Map<String, dynamic>.from(m))
           .toList();
-    }
     return [];
   }
 
@@ -1422,7 +1772,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final accs = _accessoryList(outfit);
     final items = <EditableCanvasItem>[];
 
-    if (bottom != null) {
+    if (bottom != null)
       items.add(
         EditableCanvasItem(
           id: 'bottom-${_asInt(bottom['id']) ?? 0}',
@@ -1433,8 +1783,7 @@ class _HomeScreenState extends State<HomeScreen> {
           defaultOffset: const Offset(0, 0.23),
         ),
       );
-    }
-    if (top != null) {
+    if (top != null)
       items.add(
         EditableCanvasItem(
           id: 'top-${_asInt(top['id']) ?? 0}',
@@ -1445,8 +1794,7 @@ class _HomeScreenState extends State<HomeScreen> {
           defaultOffset: const Offset(0, -0.03),
         ),
       );
-    }
-    if (outerwear != null) {
+    if (outerwear != null)
       items.add(
         EditableCanvasItem(
           id: 'outerwear-${_asInt(outerwear['id']) ?? 0}',
@@ -1457,8 +1805,7 @@ class _HomeScreenState extends State<HomeScreen> {
           defaultOffset: const Offset(0, -0.23),
         ),
       );
-    }
-    if (shoes != null) {
+    if (shoes != null)
       items.add(
         EditableCanvasItem(
           id: 'shoes-${_asInt(shoes['id']) ?? 0}',
@@ -1469,7 +1816,6 @@ class _HomeScreenState extends State<HomeScreen> {
           defaultOffset: const Offset(0, 0.41),
         ),
       );
-    }
     for (var i = 0; i < accs.length; i++) {
       final acc = accs[i];
       final col = i % 4;
@@ -1494,13 +1840,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final out = <String, EditableCanvasTransform>{};
     layout.forEach((key, value) {
       if (value is! Map) return;
-      final x = (value['offset_x'] is num)
+      final x = value['offset_x'] is num
           ? (value['offset_x'] as num).toDouble()
           : double.tryParse('${value['offset_x']}');
-      final y = (value['offset_y'] is num)
+      final y = value['offset_y'] is num
           ? (value['offset_y'] as num).toDouble()
           : double.tryParse('${value['offset_y']}');
-      final s = (value['scale'] is num)
+      final s = value['scale'] is num
           ? (value['scale'] as num).toDouble()
           : double.tryParse('${value['scale']}');
       if (x == null || y == null || s == null) return;
@@ -1534,122 +1880,213 @@ class _HomeScreenState extends State<HomeScreen> {
         local.month == now.month &&
         local.day == now.day;
   }
+}
 
-  Widget _buildEmptyState(String title, String subtitle, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(40),
+// ─────────────────────────────────────────────────────────────────────────────
+//  Reusable sub-widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AppBarBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _AppBarBtn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
-        color: Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Color(0xFFE5E7EB), width: 1),
+        color: _HomeScreenState._parchment,
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: Column(
+      child: Icon(icon, size: 18, color: _HomeScreenState._inkSub),
+    ),
+  );
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 3,
+        height: 14,
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: _HomeScreenState._accent,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+      Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: _HomeScreenState._inkMuted,
+          letterSpacing: 1.8,
+        ),
+      ),
+    ],
+  );
+}
+
+class _MetaChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color textColor;
+
+  const _MetaChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: textColor),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: textColor,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _OutfitActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isPrimary;
+  final VoidCallback onTap;
+
+  const _OutfitActionButton({
+    required this.label,
+    required this.icon,
+    required this.isPrimary,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      height: 48,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isPrimary
+            ? _HomeScreenState._accent
+            : _HomeScreenState._parchment,
+        borderRadius: BorderRadius.circular(14),
+        border: isPrimary ? null : Border.all(color: _HomeScreenState._rule),
+        boxShadow: isPrimary
+            ? [
+                BoxShadow(
+                  color: _HomeScreenState._accent.withOpacity(0.28),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, size: 32, color: Color(0xFF9CA3AF)),
+          Icon(
+            icon,
+            size: 16,
+            color: isPrimary ? Colors.white : _HomeScreenState._inkSub,
           ),
-          SizedBox(height: 16),
+          const SizedBox(width: 7),
           Text(
-            title,
+            label,
             style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A1A),
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: isPrimary ? Colors.white : _HomeScreenState._inkSub,
+              letterSpacing: 0.1,
             ),
-          ),
-          SizedBox(height: 6),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
           ),
         ],
       ),
-    );
-  }
-  // ---------------- FAB + NAV ----------------
-
-  Widget _buildFAB() {
-    return FloatingActionButton.extended(
-      onPressed: () async {
-        final result = await showAddItemSheet(context);
-        _handleAddItemResult(result);
-      },
-
-      backgroundColor: Color(0xFF1A1A1A),
-      elevation: 4,
-      icon: Icon(Icons.add, color: Colors.white, size: 24),
-      label: Text(
-        'Add Item',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    final width = MediaQuery.of(context).size.width;
-    final isCompact = width < 380;
-    final isMedium = width >= 380 && width < 450;
-
-    return BottomNavigationBar(
-      currentIndex: _selectedIndex,
-      selectedItemColor: const Color(0xFF1A1A1A),
-      unselectedItemColor: const Color(0xFF9CA3AF),
-      type: BottomNavigationBarType.fixed,
-      selectedFontSize: isCompact
-          ? 10
-          : isMedium
-          ? 11
-          : 12,
-      unselectedFontSize: isCompact
-          ? 10
-          : isMedium
-          ? 11
-          : 12,
-      iconSize: isCompact ? 22 : 24,
-      showUnselectedLabels: !isCompact,
-      onTap: (index) {
-        if (index == 3) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ProfileScreen()),
-          ).then((_) {
-            if (mounted) setState(() => _selectedIndex = 0);
-          });
-          return;
-        }
-
-        setState(() {
-          _selectedIndex = index;
-          if (index != 1) {
-            _wardrobeSelecting = false;
-          }
-        });
-      },
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.inventory_2),
-          label: "Wardrobe",
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.auto_awesome),
-          label: "Outfits",
-        ),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-      ],
-    );
-  }
+    ),
+  );
 }
 
+class _QuickActionTile extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final VoidCallback onTap;
 
+  const _QuickActionTile({
+    required this.label,
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => HoverClickable(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _HomeScreenState._card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _HomeScreenState._rule),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, size: 17, color: iconColor),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _HomeScreenState._ink,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 12,
+            color: _HomeScreenState._inkMuted,
+          ),
+        ],
+      ),
+    ),
+  );
+}

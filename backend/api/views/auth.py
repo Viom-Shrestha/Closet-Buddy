@@ -1,11 +1,14 @@
 from django.contrib.auth.models import User
 from rest_framework import generics
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import parser_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..serializer import RegisterSerializer
+from ..models import UserProfile
 
 # ------------------- AUTH -------------------
 
@@ -15,8 +18,10 @@ class RegisterView(generics.CreateAPIView):
 
 @api_view(['GET', 'PUT']) # Added PUT here
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def profile(request):
     user = request.user
+    profile_obj, _ = UserProfile.objects.get_or_create(user=user)
     
     if request.method == 'GET':
         role = "admin" if user.is_staff else "user"
@@ -26,6 +31,7 @@ def profile(request):
             "first_name": user.first_name,
             "last_name": user.last_name,
             "role": role,
+            "avatar": profile_obj.avatar.url if profile_obj.avatar else None,
         })
 
     elif request.method == 'PUT':
@@ -33,27 +39,32 @@ def profile(request):
         first_name = request.data.get('first_name')
         last_name = request.data.get('last_name')
 
-        if not first_name or not last_name:
-            return Response(
-                {"error": "First name and last name cannot be empty"}, 
-            )
-        
-        # Check for name length (optional but good)
-        if len(first_name) > 30 or len(last_name) > 30:
-            return Response(
-                {"error": "Name is too long"}, 
-            )
-            
-        # Update fields if they were provided
-        user.first_name = first_name
-        user.last_name = last_name
-        
+        if first_name is not None:
+            if not first_name:
+                return Response({"error": "First name cannot be empty"})
+            if len(first_name) > 30:
+                return Response({"error": "First name is too long"})
+            user.first_name = first_name
+
+        if last_name is not None:
+            if not last_name:
+                return Response({"error": "Last name cannot be empty"})
+            if len(last_name) > 30:
+                return Response({"error": "Last name is too long"})
+            user.last_name = last_name
+
+        avatar = request.FILES.get('avatar')
+        if avatar:
+            profile_obj.avatar = avatar
+
         user.save()
+        profile_obj.save()
 
         return Response({
             "message": "Profile updated successfully",
             "first_name": user.first_name,
             "last_name": user.last_name,
+            "avatar": profile_obj.avatar.url if profile_obj.avatar else None,
         }, status=200)
 
 @api_view(['POST'])
