@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../services/api_client.dart';
 import '../services/accessory_service.dart';
@@ -72,9 +71,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const RecommendationScreen(
-          title: 'Outfit Generation',
-        ),
+        builder: (_) => const RecommendationScreen(title: 'Outfit Generation'),
       ),
     );
   }
@@ -87,16 +84,6 @@ class _OutfitsPageState extends State<OutfitsPage> {
       ),
     );
     _loadOutfits();
-  }
-
-  Future<void> _openEditFromCard(Map<String, dynamic> outfit) async {
-    final changed = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => OutfitBuilderPage(existingOutfit: outfit),
-      ),
-    );
-    if (changed == true) _loadOutfits();
   }
 
   void _toggleSelectMode() {
@@ -219,34 +206,32 @@ class _OutfitsPageState extends State<OutfitsPage> {
                           ? 3
                           : 2;
                       return SliverGrid(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final outfit = _outfits[index];
-                            final id = outfit['id'] is int
-                                ? outfit['id'] as int
-                                : int.tryParse('${outfit['id']}');
-                            final selected = id != null && _selectedIds.contains(id);
-                            return _GalleryCard(
-                              outfit: outfit,
-                              onTap: (data) {
-                                if (_selectMode) {
-                                  _toggleSelected(id);
-                                } else {
-                                  _openDetail(data);
-                                }
-                              },
-                              onLongPress: (data) {
-                                if (!_selectMode) {
-                                  _toggleSelectMode();
-                                }
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final outfit = _outfits[index];
+                          final id = outfit['id'] is int
+                              ? outfit['id'] as int
+                              : int.tryParse('${outfit['id']}');
+                          final selected =
+                              id != null && _selectedIds.contains(id);
+                          return _GalleryCard(
+                            outfit: outfit,
+                            onTap: (data) {
+                              if (_selectMode) {
                                 _toggleSelected(id);
-                              },
-                              selectionMode: _selectMode,
-                              selected: selected,
-                            );
-                          },
-                          childCount: _outfits.length,
-                        ),
+                              } else {
+                                _openDetail(data);
+                              }
+                            },
+                            onLongPress: (data) {
+                              if (!_selectMode) {
+                                _toggleSelectMode();
+                              }
+                              _toggleSelected(id);
+                            },
+                            selectionMode: _selectMode,
+                            selected: selected,
+                          );
+                        }, childCount: _outfits.length),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
                           childAspectRatio: 0.45,
@@ -266,7 +251,10 @@ class _OutfitsPageState extends State<OutfitsPage> {
             child: SafeArea(
               minimum: const EdgeInsets.all(16),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: _kInk,
                   borderRadius: BorderRadius.circular(16),
@@ -295,7 +283,9 @@ class _OutfitsPageState extends State<OutfitsPage> {
                     const SizedBox(width: 8),
                     FilledButton(
                       onPressed: _selectedIds.isEmpty ? null : _deleteSelected,
-                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.red,
+                      ),
                       child: const Text('Delete'),
                     ),
                   ],
@@ -610,7 +600,10 @@ class _GalleryCard extends StatelessWidget {
                       Text(rating, style: const TextStyle(fontSize: 11)),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF0ECE5),
                           borderRadius: BorderRadius.circular(999),
@@ -1778,32 +1771,32 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
                 ),
               ),
               const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                      color: Colors.white,
-                    ),
-                    child: Row(
-                      children: [
-                        const Text(
-                          'Rating',
-                          style: TextStyle(fontSize: 12, color: _kMuted),
-                        ),
-                        const SizedBox(width: 10),
-                        _StarRatingBar(
-                          rating: _ratingValue,
-                          onSelected: (value) {
-                            setState(() => _ratingValue = value);
-                          },
-                          size: 20,
-                        ),
-                      ],
-                    ),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    color: Colors.white,
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Rating',
+                        style: TextStyle(fontSize: 12, color: _kMuted),
+                      ),
+                      const SizedBox(width: 10),
+                      _StarRatingBar(
+                        rating: _ratingValue,
+                        onSelected: (value) {
+                          setState(() => _ratingValue = value);
+                        },
+                        size: 20,
+                      ),
+                    ],
                   ),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -2437,9 +2430,9 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
     if (ok) {
       Navigator.pop(context, true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to delete outfit')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to delete outfit')));
     }
   }
 
@@ -2460,65 +2453,134 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
         ? const <String, EditableCanvasTransform>{}
         : _layoutToTransforms(_previewLayout(outfit));
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.dark,
-      child: Scaffold(
-        backgroundColor: _kBg,
-        appBar: AppBar(
-          backgroundColor: _kWhite,
-          foregroundColor: _kInk,
-          title: const Text('Outfit Detail'),
-        ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : outfit == null
-            ? const Center(child: Text('Outfit not found'))
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                children: [
-                  _PreviewCard(
-                    child: previewItems.isNotEmpty
-                        ? EditableOutfitCanvas(
-                            items: previewItems,
-                            initialTransforms: previewTransforms,
-                          interactive: false,
-                        )
-                      : OutfitCanvas(
-                          outerwear: _slot(outfit, 'outerwear_item'),
-                          topwear: _slot(outfit, 'topwear_item'),
-                          bottomwear: _slot(outfit, 'bottomwear_item'),
-                          shoes: _slot(outfit, 'shoes_item'),
-                          accessories: _accessoryList(outfit),
+    return Scaffold(
+      backgroundColor: _kBg,
+      appBar: AppBar(
+        backgroundColor: _kWhite,
+        foregroundColor: _kInk,
+        title: const Text('Outfit Detail'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : outfit == null
+          ? const Center(child: Text('Outfit not found'))
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              children: [
+                previewItems.isNotEmpty
+                    ? EditableOutfitCanvas(
+                        items: previewItems,
+                        initialTransforms: previewTransforms,
+                        interactive: false,
+                      )
+                    : OutfitCanvas(
+                        outerwear: _slot(outfit, 'outerwear_item'),
+                        topwear: _slot(outfit, 'topwear_item'),
+                        bottomwear: _slot(outfit, 'bottomwear_item'),
+                        shoes: _slot(outfit, 'shoes_item'),
+                        accessories: _accessoryList(outfit),
+                      ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: _kWhite,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _kBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
                         ),
-                  occasion: occasion,
-                  wearCount: wearCount,
-                  isFav: isFav,
+                      ),
+                      const SizedBox(height: 8),
+                      _InfoRow('Occasion', occasion),
+                      _InfoRow(
+                        'Worn',
+                        wearCount == 0 ? 'Not yet' : '${wearCount} times',
+                      ),
+                      _InfoRow('Created', createdAt),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Text(
+                            'Rating: ',
+                            style: TextStyle(color: _kMuted, fontSize: 13),
+                          ),
+                          _StarRatingBar(
+                            rating: ratingValue,
+                            onSelected: _setRating,
+                          ),
+                          if (_savingRating) ...[
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Saving...',
+                              style: TextStyle(fontSize: 12, color: _kMuted),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                _DetailsCard(
-                  name: name,
-                  occasion: occasion,
-                  wearCount: wearCount,
-                  createdAt: createdAt,
-                  rating: ratingValue,
-                  savingRating: _savingRating,
-                  onRatingSelected: _setRating,
-                  isFav: isFav,
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: (_markingWorn || alreadyWornToday)
+                        ? null
+                        : _markWorn,
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: Text(
+                      _markingWorn
+                          ? 'Updating...'
+                          : (alreadyWornToday ? 'Worn today' : 'Mark as worn'),
+                    ),
+                    style: FilledButton.styleFrom(backgroundColor: _kInk),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                _ActionsCard(
-                  markingWorn: _markingWorn,
-                  alreadyWornToday: alreadyWornToday,
-                  onMarkWorn: _markWorn,
-                  updatingFav: _updatingFav,
-                  isFav: isFav,
-                  onToggleFavourite: _toggleFavourite,
-                  onEdit: _editOutfit,
-                  onDelete: _deleteOutfit,
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _updatingFav ? null : _toggleFavourite,
+                    icon: Icon(
+                      isFav ? Icons.favorite : Icons.favorite_border,
+                      color: isFav ? const Color(0xFFDC2626) : null,
+                    ),
+                    label: Text(isFav ? 'Unfavourite' : 'Favourite'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _editOutfit,
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Edit'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _deleteOutfit,
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Delete'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-      ),
     );
   }
 
@@ -2682,418 +2744,26 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
   String _two(int value) => value < 10 ? '0$value' : '$value';
 }
 
-class _SectionCard extends StatelessWidget {
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-
-  const _SectionCard({
-    required this.child,
-    this.padding = const EdgeInsets.all(16),
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: _kWhite,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _kBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
-
-class _SoftPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color? color;
-  final Color? bgColor;
-
-  const _SoftPill({
-    required this.icon,
-    required this.label,
-    this.color,
-    this.bgColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final displayLabel = label.trim().isEmpty ? '-' : label;
-    final iconColor = color ?? _kInk;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bgColor ?? _kTagBg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _kBorder),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: iconColor),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              displayLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: iconColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PreviewCard extends StatelessWidget {
-  final Widget child;
-  final String occasion;
-  final int wearCount;
-  final bool isFav;
-
-  const _PreviewCard({
-    required this.child,
-    required this.occasion,
-    required this.wearCount,
-    required this.isFav,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final occasionLabel =
-        occasion.trim().isEmpty ? 'Any occasion' : occasion;
-    final wearLabel = wearCount == 0 ? 'Not worn yet' : '$wearCount wears';
-
-    return _SectionCard(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'Preview',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: _kInk,
-                ),
-              ),
-              const Spacer(),
-              if (isFav)
-                const _SoftPill(
-                  icon: Icons.favorite,
-                  label: 'Favourite',
-                  color: Color(0xFFDC2626),
-                  bgColor: Color(0xFFFDECEC),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              _SoftPill(icon: Icons.event_outlined, label: occasionLabel),
-              _SoftPill(icon: Icons.repeat, label: wearLabel),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              color: _kTagBg,
-              padding: const EdgeInsets.all(10),
-              child: child,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailsCard extends StatelessWidget {
-  final String name;
-  final String occasion;
-  final int wearCount;
-  final String createdAt;
-  final int rating;
-  final bool savingRating;
-  final ValueChanged<int> onRatingSelected;
-  final bool isFav;
-
-  const _DetailsCard({
-    required this.name,
-    required this.occasion,
-    required this.wearCount,
-    required this.createdAt,
-    required this.rating,
-    required this.savingRating,
-    required this.onRatingSelected,
-    required this.isFav,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final wearLabel = wearCount == 0 ? 'Not yet' : '$wearCount times';
-    final occasionLabel =
-        occasion.trim().isEmpty ? 'Any occasion' : occasion;
-
-    return _SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              if (isFav)
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFDECEC),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _kBorder),
-                  ),
-                  child: const Icon(
-                    Icons.favorite,
-                    color: Color(0xFFDC2626),
-                    size: 18,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              _SoftPill(icon: Icons.event_outlined, label: occasionLabel),
-              _SoftPill(icon: Icons.repeat, label: wearLabel),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _MetricTile(
-                  icon: Icons.calendar_today_outlined,
-                  label: 'Created',
-                  value: createdAt,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _MetricTile(
-                  icon: Icons.checkroom_outlined,
-                  label: 'Worn',
-                  value: wearLabel,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Text(
-                'Rating',
-                style: TextStyle(
-                  color: _kMuted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 8),
-              _StarRatingBar(
-                rating: rating,
-                onSelected: onRatingSelected,
-                size: 20,
-              ),
-              if (savingRating) ...[
-                const SizedBox(width: 8),
-                const Text(
-                  'Saving...',
-                  style: TextStyle(fontSize: 12, color: _kMuted),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  final IconData icon;
+class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _MetricTile({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
+  const _InfoRow(this.label, this.value);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _kTagBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorder),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: _kWhite,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _kBorder),
-            ),
-            child: Icon(icon, size: 16, color: _kMuted),
+          Text(
+            '$label: ',
+            style: const TextStyle(color: _kMuted, fontSize: 13),
           ),
-          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: _kMuted,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  value,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionsCard extends StatelessWidget {
-  final bool markingWorn;
-  final bool alreadyWornToday;
-  final VoidCallback onMarkWorn;
-  final bool updatingFav;
-  final bool isFav;
-  final VoidCallback onToggleFavourite;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const _ActionsCard({
-    required this.markingWorn,
-    required this.alreadyWornToday,
-    required this.onMarkWorn,
-    required this.updatingFav,
-    required this.isFav,
-    required this.onToggleFavourite,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Actions',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: _kInk,
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: (markingWorn || alreadyWornToday) ? null : onMarkWorn,
-              icon: const Icon(Icons.check_circle_outline),
-              label: Text(
-                markingWorn
-                    ? 'Updating...'
-                    : (alreadyWornToday ? 'Worn today' : 'Mark as worn'),
-              ),
-              style: FilledButton.styleFrom(backgroundColor: _kInk),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: updatingFav ? null : onToggleFavourite,
-                  icon: Icon(
-                    isFav ? Icons.favorite : Icons.favorite_border,
-                    color: isFav ? const Color(0xFFDC2626) : null,
-                  ),
-                  label: Text(isFav ? 'Unfavourite' : 'Favourite'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: onDelete,
-              icon: const Icon(Icons.delete_outline),
-              label: const Text('Delete outfit'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFDC2626),
-              ),
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
             ),
           ),
         ],
