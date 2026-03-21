@@ -1,10 +1,11 @@
 ﻿library admin_screen;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/admin_service.dart';
 import '../services/profile_service.dart';
+import '../services/api_client.dart';
 import '../widgets/admin/admin_theme.dart';
-import '../widgets/outfit_canvas.dart';
 import 'admin_user_detail_screen.dart';
 
 part '../widgets/admin/admin_screen_components.dart';
@@ -17,7 +18,7 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final ProfileService _profileService = ProfileService();
   final AdminService _adminService = AdminService();
 
@@ -51,28 +52,36 @@ class _AdminScreenState extends State<AdminScreen>
   List<Map<String, dynamic>> _feedback = [];
   List<Map<String, dynamic>> _invites = [];
 
-  // Navigation
+  // Tab navigation
   late final TabController _tabCtrl;
+  late final AnimationController _enterCtrl;
+  late final Animation<double> _fadeAnim;
 
   static const _tabs = [
-    AdminTabMeta(Icons.dashboard_rounded, 'Overview'),
-    AdminTabMeta(Icons.group_rounded, 'Users'),
-    AdminTabMeta(Icons.checkroom_rounded, 'Catalog'),
-    AdminTabMeta(Icons.style_rounded, 'Outfits'),
-    AdminTabMeta(Icons.forum_rounded, 'Feedback'),
-    AdminTabMeta(Icons.alternate_email_rounded, 'Invites'),
+    _AdminTabMeta(Icons.dashboard_rounded, 'Overview'),
+    _AdminTabMeta(Icons.group_rounded, 'Users'),
+    _AdminTabMeta(Icons.checkroom_rounded, 'Catalog'),
+    _AdminTabMeta(Icons.style_rounded, 'Outfits'),
+    _AdminTabMeta(Icons.forum_rounded, 'Feedback'),
+    _AdminTabMeta(Icons.alternate_email_rounded, 'Invites'),
   ];
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: _tabs.length, vsync: this);
+    _enterCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _fadeAnim = CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOut);
     _bootstrap();
   }
 
   @override
   void dispose() {
     _tabCtrl.dispose();
+    _enterCtrl.dispose();
     _searchCtrl.dispose();
     _catalogSearchCtrl.dispose();
     _catalogCategoryCtrl.dispose();
@@ -83,7 +92,7 @@ class _AdminScreenState extends State<AdminScreen>
     super.dispose();
   }
 
-  // ------------------------------
+  // ── Data ────────────────────────────────────────────────────────────────────
 
   Future<void> _bootstrap() async {
     final profile = await _profileService.fetchProfile();
@@ -95,6 +104,7 @@ class _AdminScreenState extends State<AdminScreen>
     });
     if (!isAdmin) return;
     await _refreshAll();
+    _enterCtrl.forward();
   }
 
   Future<void> _refreshAll() => Future.wait([
@@ -173,7 +183,7 @@ class _AdminScreenState extends State<AdminScreen>
     });
   }
 
-  // ------------------------------
+  // ── Actions ─────────────────────────────────────────────────────────────────
 
   Future<void> _setUserActive(Map<String, dynamic> user, bool next) async {
     final id = _asInt(user['id']);
@@ -301,100 +311,237 @@ class _AdminScreenState extends State<AdminScreen>
     if (ok) await _loadFeedback();
   }
 
-  // ------------------------------
+  // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     if (_checkingAccess) {
       return const Scaffold(
         backgroundColor: kAdminBg,
-        body: Center(child: CircularProgressIndicator(color: kAdminAccent)),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: kAdminAccent,
+            strokeWidth: 2,
+            strokeCap: StrokeCap.round,
+          ),
+        ),
       );
     }
-
     if (!_isAdmin) return _buildAccessDenied();
 
-    return Theme(
-      data: _darkTheme(),
-      child: Scaffold(
-        backgroundColor: kAdminBg,
-        body: Column(
-          children: [
-            _AdminTopBar(
-              onBack: () => Navigator.of(context).maybePop(),
-              onRefresh: _refreshAll,
-              tabCtrl: _tabCtrl,
-              tabs: _tabs,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Theme(
+        data: _buildDarkTheme(),
+        child: Scaffold(
+          backgroundColor: kAdminBg,
+          body: FadeTransition(
+            opacity: _fadeAnim,
+            child: Column(
+              children: [
+                _buildTopBar(),
+                _buildTabStrip(),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabCtrl,
+                    children: [
+                      _buildOverviewTab(),
+                      _buildUsersTab(),
+                      _buildCatalogTab(),
+                      _buildOutfitsTab(),
+                      _buildFeedbackTab(),
+                      _buildInvitesTab(),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabCtrl,
-                children: [
-                  _buildOverviewTab(),
-                  _buildUsersTab(),
-                  _buildCatalogTab(),
-                  _buildOutfitsTab(),
-                  _buildFeedbackTab(),
-                  _buildInvitesTab(),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildAccessDenied() {
-    return Scaffold(
-      backgroundColor: kAdminBg,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
+  // ── Top bar ──────────────────────────────────────────────────────────────────
+
+  Widget _buildTopBar() {
+    return Container(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 10,
+        left: 20,
+        right: 12,
+        bottom: 10,
+      ),
+      decoration: const BoxDecoration(
+        color: kAdminSurface,
+        border: Border(bottom: BorderSide(color: kAdminBorder)),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).maybePop(),
+            child: Container(
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: kAdminRedDim,
-                borderRadius: BorderRadius.circular(20),
+                color: kAdminSurface2,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kAdminBorder),
               ),
-              child: const Icon(Icons.lock_rounded, color: kAdminRed, size: 32),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Admin Only',
-              style: TextStyle(
-                color: kAdminText,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 15,
+                color: kAdminTextMuted,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'You don\'t have permission to access this area.',
-              style: TextStyle(color: kAdminTextMuted, fontSize: 14),
+          ),
+          const SizedBox(width: 14),
+          // Logo mark
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: kAdminAccent.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(color: kAdminAccent.withOpacity(0.3)),
             ),
-            const SizedBox(height: 24),
-            _DarkButton(label: 'Go back', onTap: () => Navigator.pop(context)),
-          ],
-        ),
+            child: const Icon(
+              Icons.admin_panel_settings_rounded,
+              size: 15,
+              color: kAdminAccent,
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Admin Console',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: kAdminText,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Text(
+                'Closet Buddy',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: kAdminTextDim,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          // Live indicator
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: kAdminGreen.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: kAdminGreen.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: kAdminGreen,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                const Text(
+                  'Live',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: kAdminGreen,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () async {
+              HapticFeedback.lightImpact();
+              await _refreshAll();
+            },
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: kAdminSurface2,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kAdminBorder),
+              ),
+              child: const Icon(
+                Icons.refresh_rounded,
+                size: 18,
+                color: kAdminTextMuted,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // ------------------------------
+  // ── Tab strip ────────────────────────────────────────────────────────────────
+
+  Widget _buildTabStrip() {
+    return Container(
+      height: 44,
+      color: kAdminSurface,
+      child: TabBar(
+        controller: _tabCtrl,
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
+        indicatorColor: kAdminAccent,
+        indicatorWeight: 2,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelColor: kAdminAccent,
+        unselectedLabelColor: kAdminTextMuted,
+        labelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        tabs: _tabs
+            .map(
+              (t) => Tab(
+                height: 44,
+                child: Row(
+                  children: [
+                    Icon(t.icon, size: 14),
+                    const SizedBox(width: 6),
+                    Text(t.label),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  // ── Overview tab — REDESIGNED ─────────────────────────────────────────────────
 
   Widget _buildOverviewTab() {
     if (_loadingOverview && _dashboard == null) {
-      return _scrollableState(
-        const CircularProgressIndicator(color: kAdminAccent),
-      );
+      return _loadingCenter();
     }
     if (_dashboard == null) {
-      return _scrollableState(
-        _DarkButton(label: 'Retry', onTap: _loadDashboard),
-      );
+      return _errorCenter(_loadDashboard);
     }
 
     final overview = _map(_dashboard!['overview']);
@@ -406,15 +553,33 @@ class _AdminScreenState extends State<AdminScreen>
     final topColors = _list(_dashboard!['top_colors']);
     final recentUsers = _list(_dashboard!['recent_users']);
 
-    final slotRows = [
-      {'label': 'Topwear', 'total': slotCoverage['topwear_percent'] ?? 0},
-      {'label': 'Bottomwear', 'total': slotCoverage['bottomwear_percent'] ?? 0},
-      {'label': 'Shoes', 'total': slotCoverage['shoes_percent'] ?? 0},
-      {'label': 'Outerwear', 'total': slotCoverage['outerwear_percent'] ?? 0},
-      {
-        'label': 'Accessories',
-        'total': slotCoverage['accessories_percent'] ?? 0,
-      },
+    // Build slot data for ring chart
+    final slotData = [
+      _SlotDatum(
+        'Top',
+        _toDouble(slotCoverage['topwear_percent']),
+        kAdminAccent,
+      ),
+      _SlotDatum(
+        'Bottom',
+        _toDouble(slotCoverage['bottomwear_percent']),
+        kAdminBlue,
+      ),
+      _SlotDatum(
+        'Shoes',
+        _toDouble(slotCoverage['shoes_percent']),
+        kAdminGreen,
+      ),
+      _SlotDatum(
+        'Outer',
+        _toDouble(slotCoverage['outerwear_percent']),
+        kAdminYellow,
+      ),
+      _SlotDatum(
+        'Acc',
+        _toDouble(slotCoverage['accessories_percent']),
+        kAdminRed,
+      ),
     ];
 
     return RefreshIndicator(
@@ -422,211 +587,217 @@ class _AdminScreenState extends State<AdminScreen>
       color: kAdminAccent,
       backgroundColor: kAdminSurface,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         children: [
-          // ------------------------------
-          _SectionLabel(label: 'Platform totals'),
-          const SizedBox(height: 12),
-          _MetricGrid(
-            children: [
-              _BigMetric(
-                label: 'Total users',
-                value: '${overview['total_users'] ?? 0}',
-                accent: kAdminBlue,
-              ),
-              _BigMetric(
-                label: 'Active users',
-                value: '${overview['active_users'] ?? 0}',
-                accent: kAdminGreen,
-              ),
-              _BigMetric(
-                label: 'Clothing items',
-                value: '${overview['total_clothing_items'] ?? 0}',
-                accent: kAdminAccent,
-              ),
-              _BigMetric(
-                label: 'Outfits saved',
-                value: '${overview['total_outfits'] ?? 0}',
-                accent: kAdminAccent,
-              ),
-              _BigMetric(
-                label: 'Accessories',
-                value: '${overview['total_accessories'] ?? 0}',
-                accent: kAdminTextMuted,
-              ),
-              _BigMetric(
-                label: 'Storages',
-                value: '${overview['total_storages'] ?? 0}',
-                accent: kAdminTextMuted,
-              ),
-            ],
+          // ── KPI ticker row ─────────────────────────────────────────────────
+          _AdminSectionLabel('Platform Totals'),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 90,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              children: [
+                _KpiCard(
+                  label: 'Users',
+                  value: '${overview['total_users'] ?? 0}',
+                  delta: '+${last7['new_users'] ?? 0}',
+                  color: kAdminBlue,
+                ),
+                _KpiCard(
+                  label: 'Active',
+                  value: '${overview['active_users'] ?? 0}',
+                  color: kAdminGreen,
+                ),
+                _KpiCard(
+                  label: 'Items',
+                  value: '${overview['total_clothing_items'] ?? 0}',
+                  delta: '+${last7['new_clothing'] ?? 0}',
+                  color: kAdminAccent,
+                ),
+                _KpiCard(
+                  label: 'Outfits',
+                  value: '${overview['total_outfits'] ?? 0}',
+                  delta: '+${last7['new_outfits'] ?? 0}',
+                  color: kAdminYellow,
+                ),
+                _KpiCard(
+                  label: 'Acc',
+                  value: '${overview['total_accessories'] ?? 0}',
+                  delta: '+${last7['new_accessories'] ?? 0}',
+                  color: kAdminRed,
+                ),
+                _KpiCard(
+                  label: 'Storages',
+                  value: '${overview['total_storages'] ?? 0}',
+                  color: kAdminTextMuted,
+                ),
+              ],
+            ),
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
-          // ------------------------------
-          _SectionLabel(label: 'Last 7 days', badge: 'NEW'),
-          const SizedBox(height: 12),
-          _MetricGrid(
-            children: [
-              _SmallMetric(
-                label: 'New users',
-                value: '${last7['new_users'] ?? 0}',
-                delta: true,
-              ),
-              _SmallMetric(
-                label: 'New clothing',
-                value: '${last7['new_clothing'] ?? 0}',
-                delta: true,
-              ),
-              _SmallMetric(
-                label: 'New outfits',
-                value: '${last7['new_outfits'] ?? 0}',
-                delta: true,
-              ),
-              _SmallMetric(
-                label: 'Accessories',
-                value: '${last7['new_accessories'] ?? 0}',
-                delta: true,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 28),
-
-          // ------------------------------
-          _SectionLabel(label: 'Engagement'),
-          const SizedBox(height: 12),
+          // ── Engagement row ─────────────────────────────────────────────────
+          _AdminSectionLabel('Engagement'),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
-                child: _EngagementCard(
+                child: _EngagementGauge(
                   label: 'DAU',
-                  value: '${engagement['dau'] ?? 0}',
-                  subLabel: 'Daily active',
-                  icon: Icons.person_outline_rounded,
+                  value: _toDouble(engagement['dau']),
+                  max: _toDouble(
+                    overview['active_users'],
+                  ).clamp(1, double.infinity),
                   color: kAdminBlue,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _EngagementCard(
+                child: _EngagementGauge(
                   label: 'WAU',
-                  value: '${engagement['wau'] ?? 0}',
-                  subLabel: 'Weekly active',
-                  icon: Icons.people_outline_rounded,
+                  value: _toDouble(engagement['wau']),
+                  max: _toDouble(
+                    overview['active_users'],
+                  ).clamp(1, double.infinity),
                   color: kAdminGreen,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _EngagementCard(
-                  label: 'Sessions / user',
+                child: _StatPill(
+                  label: 'Sessions/user',
                   value: '${engagement['sessions_per_user'] ?? '-'}',
-                  subLabel: 'Weekly',
                   icon: Icons.repeat_rounded,
                   color: kAdminAccent,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _EngagementCard(
+                child: _StatPill(
                   label: 'Avg session',
                   value: '${engagement['average_session_seconds'] ?? '-'}s',
-                  subLabel: 'Duration',
                   icon: Icons.timer_outlined,
-                  color: kAdminTextMuted,
+                  color: kAdminYellow,
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
-          // ------------------------------
-          _SectionLabel(label: 'Outfit quality'),
-          const SizedBox(height: 12),
+          // ── Outfit quality + slot ring ─────────────────────────────────────
+          _AdminSectionLabel('Outfit Analytics'),
+          const SizedBox(height: 10),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Slot ring chart
+              Expanded(flex: 5, child: _SlotRingChart(data: slotData)),
+              const SizedBox(width: 12),
+              // Rating + fav stacked
               Expanded(
-                child: _StatBlock(
-                  label: 'Avg rating',
-                  value:
-                      outfitStats['average_rating']?.toStringAsFixed(1) ?? '-',
-                  unit: '/ 5',
-                  color: kAdminAccent,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _StatBlock(
-                  label: 'Favourite rate',
-                  value: '${outfitStats['favourite_rate'] ?? '-'}',
-                  unit: '%',
-                  color: kAdminRed,
+                flex: 4,
+                child: Column(
+                  children: [
+                    _RatingMeter(
+                      rating: _toDouble(outfitStats['average_rating']),
+                      max: 5.0,
+                    ),
+                    const SizedBox(height: 10),
+                    _StatBlock2(
+                      label: 'Favourite rate',
+                      value: '${outfitStats['favourite_rate'] ?? '-'}%',
+                      icon: Icons.favorite_rounded,
+                      color: kAdminRed,
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
-          // ------------------------------
-          _SectionLabel(label: 'Slot coverage'),
-          const SizedBox(height: 12),
-          _BarChart(rows: slotRows, labelKey: 'label', color: kAdminGreen),
-
-          const SizedBox(height: 20),
-          _SectionLabel(label: 'Top categories'),
-          const SizedBox(height: 12),
-          _BarChart(
+          // ── Top categories horizontal bar ──────────────────────────────────
+          _AdminSectionLabel('Top Categories'),
+          const SizedBox(height: 10),
+          _HorizontalBarChart(
             rows: topCategories,
             labelKey: 'category',
+            valueKey: 'total',
             color: kAdminBlue,
           ),
 
-          const SizedBox(height: 20),
-          _SectionLabel(label: 'Top colors'),
-          const SizedBox(height: 12),
-          _ColorBarChart(rows: topColors),
+          const SizedBox(height: 24),
 
-          const SizedBox(height: 28),
+          // ── Color distribution ─────────────────────────────────────────────
+          _AdminSectionLabel('Color Distribution'),
+          const SizedBox(height: 10),
+          _ColorSwatchChart(rows: topColors),
 
-          // ------------------------------
-          _SectionLabel(label: 'Recent sign-ups'),
-          const SizedBox(height: 12),
+          const SizedBox(height: 24),
+
+          // ── Recent sign-ups ────────────────────────────────────────────────
+          _AdminSectionLabel('Recent Sign-ups'),
+          const SizedBox(height: 10),
           ...recentUsers.map((u) => _RecentUserRow(user: u)),
         ],
       ),
     );
   }
 
-  // ------------------------------
+  // ── Users tab ────────────────────────────────────────────────────────────────
 
   Widget _buildUsersTab() {
     return Column(
       children: [
         _SearchBar(
           controller: _searchCtrl,
-          hint: 'Search by name or email...',
+          hint: 'Search by name or email…',
           onSearch: _loadUsers,
         ),
+        // User count strip
+        if (_users.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: kAdminBlue.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: kAdminBlue.withOpacity(0.25)),
+                  ),
+                  child: Text(
+                    '${_users.length} users',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: kAdminBlue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _loadUsers,
             color: kAdminAccent,
             backgroundColor: kAdminSurface,
             child: _loadingUsers && _users.isEmpty
-                ? _scrollableState(
-                    const CircularProgressIndicator(color: kAdminAccent),
-                  )
+                ? _loadingCenter()
                 : _users.isEmpty
-                ? _scrollableState(
-                    _emptyState('No users found', Icons.group_off_rounded),
-                  )
+                ? _emptyCenter('No users found', Icons.group_off_rounded)
                 : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
                     itemCount: _users.length,
                     itemBuilder: (_, i) => _UserCard(
                       user: _users[i],
@@ -644,14 +815,14 @@ class _AdminScreenState extends State<AdminScreen>
     );
   }
 
-  // ------------------------------
+  // ── Catalog tab ──────────────────────────────────────────────────────────────
 
   Widget _buildCatalogTab() {
     return Column(
       children: [
         _SearchBar(
           controller: _catalogSearchCtrl,
-          hint: 'Search catalog...',
+          hint: 'Search catalog…',
           onSearch: _loadCatalog,
           trailing: _DarkChipButton(
             label: 'Filters',
@@ -660,19 +831,34 @@ class _AdminScreenState extends State<AdminScreen>
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: Row(
             children: [
-              Text(
-                _selectedCatalogIds.isEmpty
-                    ? 'Tap items to select'
-                    : '${_selectedCatalogIds.length} selected',
-                style: TextStyle(
-                  fontSize: 12,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
                   color: _selectedCatalogIds.isEmpty
-                      ? kAdminTextDim
-                      : kAdminAccent,
-                  fontWeight: FontWeight.w600,
+                      ? kAdminSurface2
+                      : kAdminAccent.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _selectedCatalogIds.isEmpty
+                        ? kAdminBorder
+                        : kAdminAccent.withOpacity(0.4),
+                  ),
+                ),
+                child: Text(
+                  _selectedCatalogIds.isEmpty
+                      ? 'Tap to select items'
+                      : '${_selectedCatalogIds.length} selected',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _selectedCatalogIds.isEmpty
+                        ? kAdminTextDim
+                        : kAdminAccent,
+                  ),
                 ),
               ),
               const Spacer(),
@@ -692,13 +878,9 @@ class _AdminScreenState extends State<AdminScreen>
             color: kAdminAccent,
             backgroundColor: kAdminSurface,
             child: _loadingCatalog && _catalogItems.isEmpty
-                ? _scrollableState(
-                    const CircularProgressIndicator(color: kAdminAccent),
-                  )
+                ? _loadingCenter()
                 : _catalogItems.isEmpty
-                ? _scrollableState(
-                    _emptyState('No items found', Icons.checkroom_rounded),
-                  )
+                ? _emptyCenter('No items found', Icons.checkroom_rounded)
                 : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
@@ -726,7 +908,7 @@ class _AdminScreenState extends State<AdminScreen>
     );
   }
 
-  // ------------------------------
+  // ── Outfits tab ──────────────────────────────────────────────────────────────
 
   Widget _buildOutfitsTab() {
     return RefreshIndicator(
@@ -734,23 +916,40 @@ class _AdminScreenState extends State<AdminScreen>
       color: kAdminAccent,
       backgroundColor: kAdminSurface,
       child: _loadingOutfits && _adminOutfits.isEmpty
-          ? _scrollableState(
-              const CircularProgressIndicator(color: kAdminAccent),
-            )
+          ? _loadingCenter()
           : _adminOutfits.isEmpty
-          ? _scrollableState(
-              _emptyState('No outfits saved yet', Icons.style_rounded),
-            )
-          : ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-              itemCount: _adminOutfits.length,
-              itemBuilder: (_, i) => _OutfitRow(outfit: _adminOutfits[i]),
+          ? _emptyCenter('No outfits saved yet', Icons.style_rounded)
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final crossAxisCount = width >= 1200
+                    ? 4
+                    : width >= 900
+                    ? 3
+                    : width >= 600
+                    ? 2
+                    : 1;
+                final childAspectRatio = width >= 900 ? 1.4 : 1.2;
+
+                return GridView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                  itemCount: _adminOutfits.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: childAspectRatio,
+                  ),
+                  itemBuilder: (_, i) =>
+                      _OutfitGridCard(outfit: _adminOutfits[i]),
+                );
+              },
             ),
     );
   }
 
-  // ------------------------------
+  // ── Feedback tab ─────────────────────────────────────────────────────────────
 
   Widget _buildFeedbackTab() {
     final unread = _feedback.where((f) => f['is_read'] != true).length;
@@ -761,16 +960,16 @@ class _AdminScreenState extends State<AdminScreen>
             margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: kAdminAccentDim,
+              color: kAdminAccent.withOpacity(0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kAdminAccent.withOpacity(0.3)),
+              border: Border.all(color: kAdminAccent.withOpacity(0.25)),
             ),
             child: Row(
               children: [
                 const Icon(
                   Icons.mark_email_unread_rounded,
                   color: kAdminAccent,
-                  size: 16,
+                  size: 15,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -790,13 +989,9 @@ class _AdminScreenState extends State<AdminScreen>
             color: kAdminAccent,
             backgroundColor: kAdminSurface,
             child: _loadingFeedback && _feedback.isEmpty
-                ? _scrollableState(
-                    const CircularProgressIndicator(color: kAdminAccent),
-                  )
+                ? _loadingCenter()
                 : _feedback.isEmpty
-                ? _scrollableState(
-                    _emptyState('No feedback yet', Icons.forum_rounded),
-                  )
+                ? _emptyCenter('No feedback yet', Icons.forum_rounded)
                 : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
@@ -818,7 +1013,7 @@ class _AdminScreenState extends State<AdminScreen>
     );
   }
 
-  // ------------------------------
+  // ── Invites tab ──────────────────────────────────────────────────────────────
 
   Widget _buildInvitesTab() {
     return Column(
@@ -846,16 +1041,9 @@ class _AdminScreenState extends State<AdminScreen>
             color: kAdminAccent,
             backgroundColor: kAdminSurface,
             child: _loadingInvites && _invites.isEmpty
-                ? _scrollableState(
-                    const CircularProgressIndicator(color: kAdminAccent),
-                  )
+                ? _loadingCenter()
                 : _invites.isEmpty
-                ? _scrollableState(
-                    _emptyState(
-                      'No invites yet',
-                      Icons.alternate_email_rounded,
-                    ),
-                  )
+                ? _emptyCenter('No invites yet', Icons.alternate_email_rounded)
                 : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
@@ -875,19 +1063,139 @@ class _AdminScreenState extends State<AdminScreen>
     );
   }
 
-  // ------------------------------
+  Widget _loadingCenter() {
+    return Center(
+      child: CircularProgressIndicator(color: kAdminAccent, strokeWidth: 2),
+    );
+  }
+
+  Widget _errorCenter(VoidCallback onRetry) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: kAdminSurface2,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.cloud_off_rounded,
+              color: kAdminTextDim,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Could not load dashboard',
+            style: TextStyle(
+              color: kAdminTextMuted,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _DarkButton(label: 'Retry', onTap: onRetry),
+        ],
+      ),
+    );
+  }
+
+  // ── Access denied ────────────────────────────────────────────────────────────
+
+  Widget _buildAccessDenied() => Scaffold(
+    backgroundColor: kAdminBg,
+    body: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              color: kAdminRedDim,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: kAdminRed.withOpacity(0.3)),
+            ),
+            child: const Icon(Icons.lock_rounded, color: kAdminRed, size: 30),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Admin Only',
+            style: TextStyle(
+              color: kAdminText,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'You don\'t have permission to access this area.',
+            style: TextStyle(color: kAdminTextMuted, fontSize: 13),
+          ),
+          const SizedBox(height: 24),
+          _DarkButton(label: 'Go back', onTap: () => Navigator.pop(context)),
+        ],
+      ),
+    ),
+  );
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  Widget _emptyCenter(String label, IconData icon) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: kAdminSurface2,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kAdminBorder),
+          ),
+          child: Icon(icon, color: kAdminTextDim, size: 26),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          label,
+          style: const TextStyle(color: kAdminTextMuted, fontSize: 14),
+        ),
+      ],
+    ),
+  );
 
   void _snack(String message, Color color) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(color: kAdminText)),
+        content: Row(
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              message,
+              style: const TextStyle(
+                color: kAdminText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
         backgroundColor: kAdminSurface2,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: color.withOpacity(0.4)),
+          side: BorderSide(color: color.withOpacity(0.3)),
         ),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       ),
     );
   }
@@ -901,45 +1209,77 @@ class _AdminScreenState extends State<AdminScreen>
     return showDialog<bool>(
       context: context,
       builder: (ctx) => Theme(
-        data: _darkTheme(),
-        child: AlertDialog(
+        data: _buildDarkTheme(),
+        child: Dialog(
           backgroundColor: kAdminSurface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             side: const BorderSide(color: kAdminBorder),
           ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: kAdminText,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (subtitle != null)
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  subtitle,
-                  style: const TextStyle(color: kAdminTextMuted, fontSize: 12),
+                  title,
+                  style: const TextStyle(
+                    color: kAdminText,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
                 ),
-            ],
+                if (subtitle != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: kAdminTextMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                ...children,
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(ctx, false),
+                        child: Container(
+                          height: 42,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: kAdminSurface2,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: kAdminBorder),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: kAdminTextMuted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _DarkButton(
+                        label: confirmLabel,
+                        onTap: () => Navigator.pop(ctx, true),
+                        compact: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          content: Column(mainAxisSize: MainAxisSize.min, children: children),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: kAdminTextMuted),
-              ),
-            ),
-            _DarkButton(
-              label: confirmLabel,
-              onTap: () => Navigator.pop(ctx, true),
-              compact: true,
-            ),
-          ],
         ),
       ),
     );
@@ -965,42 +1305,7 @@ class _AdminScreenState extends State<AdminScreen>
     if (confirmed == true) await _loadCatalog();
   }
 
-  Widget _emptyState(String label, IconData icon) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: kAdminSurface2,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(icon, color: kAdminTextDim, size: 28),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            label,
-            style: const TextStyle(color: kAdminTextMuted, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _scrollableState(Widget child) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-      children: [
-        const SizedBox(height: 120),
-        Center(child: child),
-      ],
-    );
-  }
-
-  ThemeData _darkTheme() => ThemeData.dark().copyWith(
+  ThemeData _buildDarkTheme() => ThemeData.dark().copyWith(
     scaffoldBackgroundColor: kAdminBg,
     colorScheme: const ColorScheme.dark(
       primary: kAdminAccent,
@@ -1047,12 +1352,11 @@ class _AdminScreenState extends State<AdminScreen>
   }
 
   List<Map<String, dynamic>> _list(dynamic raw) {
-    if (raw is List) {
+    if (raw is List)
       return raw
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
-    }
     return [];
   }
 
@@ -1060,5 +1364,10 @@ class _AdminScreenState extends State<AdminScreen>
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '');
+  }
+
+  double _toDouble(dynamic v) {
+    if (v is num) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '') ?? 0;
   }
 }
