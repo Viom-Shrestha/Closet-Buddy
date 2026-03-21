@@ -29,6 +29,12 @@ class OutfitService {
     return Map<String, dynamic>.from(jsonDecode(res.body));
   }
 
+  Future<Map<String, dynamic>?> updatePartial(int id, Map<String, dynamic> data) async {
+    final res = await client.patch('/outfits/$id/', data);
+    if (res.statusCode != 200) return null;
+    return Map<String, dynamic>.from(jsonDecode(res.body));
+  }
+
   Future<bool> delete(int id) async {
     final res = await client.delete('/outfits/$id/');
     return res.statusCode == 204;
@@ -36,6 +42,12 @@ class OutfitService {
 
   Future<Map<String, dynamic>?> toggleFavourite(int id) async {
     final res = await client.post('/outfits/$id/toggle-favourite/', {});
+    if (res.statusCode != 200) return null;
+    return Map<String, dynamic>.from(jsonDecode(res.body));
+  }
+
+  Future<Map<String, dynamic>?> markWorn(int id) async {
+    final res = await client.post('/outfits/$id/wear/', {});
     if (res.statusCode != 200) return null;
     return Map<String, dynamic>.from(jsonDecode(res.body));
   }

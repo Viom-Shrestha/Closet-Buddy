@@ -2,6 +2,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from django.db.models import F
+from django.utils import timezone
 
 from ..models import Outfit
 from ..serializer import OutfitReadSerializer, OutfitWriteSerializer
@@ -68,6 +70,28 @@ def toggle_outfit_favourite(request, pk):
 
     outfit.is_favourite = not outfit.is_favourite
     outfit.save(update_fields=["is_favourite"])
+
+    serializer = OutfitReadSerializer(outfit, context={"request": request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def mark_outfit_worn(request, pk):
+    outfit = _get_user_outfit_or_404(request.user, pk)
+    if not outfit:
+        return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    today = timezone.localdate()
+    if outfit.last_worn_at and outfit.last_worn_at.date() == today:
+        serializer = OutfitReadSerializer(outfit, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    Outfit.objects.filter(id=outfit.id).update(
+        wear_count=F("wear_count") + 1,
+        last_worn_at=timezone.now(),
+    )
+    outfit.refresh_from_db(fields=["wear_count", "last_worn_at"])
 
     serializer = OutfitReadSerializer(outfit, context={"request": request})
     return Response(serializer.data, status=status.HTTP_200_OK)

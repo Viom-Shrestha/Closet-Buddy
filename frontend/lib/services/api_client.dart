@@ -108,6 +108,33 @@ class ApiClient {
     return res;
   }
 
+  Future<http.Response> patch(String path, Map body) async {
+    var token = await _accessToken();
+
+    var res = await http.patch(
+      Uri.parse('$baseUrl$path'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (res.statusCode == 401 && await refresh()) {
+      token = await _accessToken();
+      return http.patch(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+    }
+
+    return res;
+  }
+
   Future<http.Response> delete(String path) async {
     var token = await _accessToken();
 

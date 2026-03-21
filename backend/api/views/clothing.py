@@ -19,6 +19,7 @@ from ai_models.classification.clothing_classification import (
     map_category_from_subcategory,
 )
 from ai_models.classification.occasion import predict_occasion
+from ai_models.classification.weather import classify_clothing_weather
 
 from ..models import ClothingItem, StorageUnit
 from ..serializer import ClothingItemSerializer, ClothingItemUpdateSerializer
@@ -210,6 +211,22 @@ def _coerce_attributes(raw_attributes) -> List:
     return []
 
 
+def _coerce_weather_label(raw_label):
+    candidate = _first_value(raw_label)
+    if candidate is None:
+        return None
+    text = str(candidate).strip()
+    return text or None
+
+
+def _classify_weather_safe(image_path: Path) -> Tuple[Optional[str], Optional[str]]:
+    try:
+        result = classify_clothing_weather(str(image_path))
+        return result.get("temperature"), result.get("weather")
+    except Exception:
+        return None, None
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def clothing_process(request):
@@ -252,6 +269,9 @@ def clothing_process(request):
     else:
         category, subcategory, attributes = _classify_clothing_safe(image_path)
 
+    # -------- WEATHER LABELS --------
+    detected_temp, detected_weather = _classify_weather_safe(image_path)
+
     result = {
         "segmented_image": segmented_url,
         "dominant_color": colors.get("dominant_color", UNKNOWN_COLORS["dominant_color"]),
@@ -261,6 +281,8 @@ def clothing_process(request):
         "occasion": occasion,
         "occasion_confidence": occasion_conf,
         "attributes": attributes,
+        "detected_temp": detected_temp,
+        "detected_weather": detected_weather,
         "is_shoe": is_shoe,
     }
 
@@ -293,6 +315,8 @@ def clothing_save(request):
 
     attributes = _coerce_attributes(data.get("attributes", []))
     fit_values = _extract_fit_values(data, data["category"], data["subcategory"])
+    detected_temp = _coerce_weather_label(data.get("detected_temp"))
+    detected_weather = _coerce_weather_label(data.get("detected_weather"))
 
     normalized_image = _normalize_segmented_image(image_path)
 
@@ -306,10 +330,17 @@ def clothing_save(request):
         subcategory=data["subcategory"],
         occasion=data.get("occasion"),
         attributes=attributes,
+        detected_temp=detected_temp,
+        detected_weather=detected_weather,
         fit_scale=fit_values["fit_scale"],
         fit_offset_x=fit_values["fit_offset_x"],
         fit_offset_y=fit_values["fit_offset_y"],
     )
+    if not detected_temp or not detected_weather:
+        detected_temp, detected_weather = _classify_weather_safe(Path(clothing.image.path))
+        clothing.detected_temp = detected_temp
+        clothing.detected_weather = detected_weather
+        clothing.save(update_fields=["detected_temp", "detected_weather"])
     try:
         os.remove(image_path)
     except Exception as e:
