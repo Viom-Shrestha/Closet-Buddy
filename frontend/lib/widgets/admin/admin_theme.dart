@@ -1,18 +1,38 @@
 ﻿import 'package:flutter/material.dart';
 
-const Color kAdminBg = Color(0xFF0F0F0F);
-const Color kAdminSurface = Color(0xFF1A1A1A);
-const Color kAdminSurface2 = Color(0xFF242424);
-const Color kAdminBorder = Color(0xFF2E2E2E);
-const Color kAdminText = Color(0xFFF0EDE8);
-const Color kAdminTextMuted = Color(0xFF8A8580);
-const Color kAdminTextDim = Color(0xFF5A5550);
-const Color kAdminAccent = Color(0xFFC9A96E);
-const Color kAdminAccentDim = Color(0xFF3D2E18);
-const Color kAdminGreen = Color(0xFF4CAF7D);
-const Color kAdminGreenDim = Color(0xFF132A1E);
-const Color kAdminRed = Color(0xFFE05252);
-const Color kAdminRedDim = Color(0xFF2A1313);
-const Color kAdminBlue = Color(0xFF5B8FD4);
-const Color kAdminBlueDim = Color(0xFF131D2A);
+// ─────────────────────────────────────────────────────────────────────────────
+//  Admin Design Tokens
+// ─────────────────────────────────────────────────────────────────────────────
 
+// Backgrounds
+const kAdminBg = Color(0xFF0C0C0F);
+const kAdminSurface = Color(0xFF161619);
+const kAdminSurface2 = Color(0xFF1E1E22);
+const kAdminSurface3 = Color(0xFF252529);
+
+// Borders
+const kAdminBorder = Color(0xFF2A2A30);
+const kAdminBorderBright = Color(0xFF3A3A42);
+
+// Text
+const kAdminText = Color(0xFFF0F0F5);
+const kAdminTextMuted = Color(0xFFAEAEB8);
+const kAdminTextDim = Color(0xFF68687A);
+
+// Accent — lavender purple
+const kAdminAccent = Color(0xFFBF9FFF);
+const kAdminAccentDim = Color(0xFF2A1F3D);
+const kAdminAccentDeep = Color(0xFF8B6FE0);
+
+// Semantic colors
+const kAdminBlue = Color(0xFF60A5FA);
+const kAdminBlueDim = Color(0xFF1A2D42);
+
+const kAdminGreen = Color(0xFF6EE7B7);
+const kAdminGreenDim = Color(0xFF0F2A20);
+
+const kAdminRed = Color(0xFFFF6B6B);
+const kAdminRedDim = Color(0xFF2A1515);
+
+const kAdminYellow = Color(0xFFFBD38D);
+const kAdminYellowDim = Color(0xFF2A1F0A);
