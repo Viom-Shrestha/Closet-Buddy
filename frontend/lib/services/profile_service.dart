@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'api_client.dart';
 
 class ProfileService {
@@ -12,6 +14,24 @@ class ProfileService {
   Future<bool> updateProfile(Map<String, String> data) async {
     final res = await client.put('/profile/', data);
     return res.statusCode == 200;
+  }
+
+  Future<Map<String, dynamic>?> uploadAvatar(File image) async {
+    final token = await client.token();
+    final req = http.MultipartRequest(
+      'PUT',
+      Uri.parse('${ApiClient.baseUrl}/profile/'),
+    );
+    req.headers['Authorization'] = 'Bearer $token';
+    req.files.add(await http.MultipartFile.fromPath('avatar', image.path));
+
+    final res = await req.send();
+    final body = await res.stream.bytesToString();
+
+    if (res.statusCode == 200) {
+      return jsonDecode(body);
+    }
+    return null;
   }
 
   Future<Map<String, dynamic>?> fetchAdminDashboard() async {
