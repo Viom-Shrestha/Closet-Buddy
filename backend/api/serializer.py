@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import (
     AccessoryItem,
-    BetaAllowlist,
     ClothingItem,
     NonClothingItem,
     Outfit,
@@ -17,12 +16,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ('username', 'email', 'password', 'first_name', 'last_name')
 
     def validate_email(self, value):
-        email = (value or "").strip().lower()
-        if not BetaAllowlist.objects.filter(email__iexact=email, is_active=True).exists():
-            raise serializers.ValidationError(
-                "This email is not approved for the beta yet."
-            )
-        return email
+        return (value or "").strip().lower()
+
     def create(self, validated_data):
         user = User.objects.create_user(
             username=validated_data['username'],

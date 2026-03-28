@@ -26,7 +26,7 @@ def _get_model() -> CLIPModel:
 def _get_processor() -> CLIPProcessor:
     global _PROCESSOR
     if _PROCESSOR is None:
-        _PROCESSOR = CLIPProcessor.from_pretrained(MODEL_NAME)
+        _PROCESSOR = CLIPProcessor.from_pretrained(MODEL_NAME, use_fast=True)
     return _PROCESSOR
 
 

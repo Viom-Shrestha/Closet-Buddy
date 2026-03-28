@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'api_client.dart';
 
 class AdminService {
-  final ApiClient _client = ApiClient();
+  AdminService({ApiClient? client}) : _client = client ?? ApiClient();
+
+  final ApiClient _client;
 
   Future<Map<String, dynamic>?> fetchDashboard() async {
     final res = await _client.get('/admin/dashboard/');
@@ -166,26 +168,4 @@ class AdminService {
     });
     return res.statusCode == 200;
   }
-
-  Future<List<Map<String, dynamic>>> fetchInvites() async {
-    final res = await _client.get('/admin/invites/');
-    if (res.statusCode != 200) return const [];
-    final decoded = jsonDecode(res.body);
-    final results = (decoded['results'] as List?) ?? const [];
-    return results
-        .whereType<Map>()
-        .map((row) => Map<String, dynamic>.from(row))
-        .toList();
-  }
-
-  Future<bool> addInvite(String email) async {
-    final res = await _client.post('/admin/invites/', {'email': email});
-    return res.statusCode == 201 || res.statusCode == 200;
-  }
-
-  Future<bool> deleteInvite(int inviteId) async {
-    final res = await _client.delete('/admin/invites/$inviteId/');
-    return res.statusCode == 204;
-  }
-
 }

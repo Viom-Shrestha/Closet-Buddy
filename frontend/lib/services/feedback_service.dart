@@ -1,7 +1,9 @@
 import 'api_client.dart';
 
 class FeedbackService {
-  final ApiClient client = ApiClient();
+  FeedbackService({ApiClient? client}) : client = client ?? ApiClient();
+
+  final ApiClient client;
 
   Future<bool> submit(String message, {int? rating}) async {
     final payload = {

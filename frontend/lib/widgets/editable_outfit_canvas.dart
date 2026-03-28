@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
+import '../theme/app_theme.dart';
 
 class EditableCanvasItem {
   final String id;
@@ -26,15 +27,9 @@ class EditableCanvasTransform {
   final Offset offset;
   final double scale;
 
-  const EditableCanvasTransform({
-    required this.offset,
-    required this.scale,
-  });
+  const EditableCanvasTransform({required this.offset, required this.scale});
 
-  EditableCanvasTransform copyWith({
-    Offset? offset,
-    double? scale,
-  }) {
+  EditableCanvasTransform copyWith({Offset? offset, double? scale}) {
     return EditableCanvasTransform(
       offset: offset ?? this.offset,
       scale: scale ?? this.scale,
@@ -115,7 +110,9 @@ class _EditableOutfitCanvasState extends State<EditableOutfitCanvas> {
   }
 
   void _notifyChange() {
-    widget.onChanged?.call(Map<String, EditableCanvasTransform>.from(_transforms));
+    widget.onChanged?.call(
+      Map<String, EditableCanvasTransform>.from(_transforms),
+    );
   }
 
   @override
@@ -130,10 +127,12 @@ class _EditableOutfitCanvasState extends State<EditableOutfitCanvas> {
           width: double.infinity,
           height: size.height,
           decoration: BoxDecoration(
-            color: widget.showSurface ? const Color(0xFFF7F5F2) : Colors.transparent,
+            color: widget.showSurface
+                ? WidgetTokens.surfaceWarm
+                : WidgetTokens.transparent,
             borderRadius: BorderRadius.circular(widget.borderRadius),
             border: widget.showBorder
-                ? Border.all(color: const Color(0xFFE8E3DB))
+                ? Border.all(color: WidgetTokens.lineWarm)
                 : null,
           ),
           clipBehavior: Clip.antiAlias,
@@ -146,13 +145,12 @@ class _EditableOutfitCanvasState extends State<EditableOutfitCanvas> {
                       child: Icon(
                         Icons.accessibility_new_rounded,
                         size: size.height * 0.82,
-                        color: const Color(0xFFBFB8AD).withValues(alpha: 0.18),
+                        color: WidgetTokens.borderWarmSoft.withValues(alpha: 0.18),
                       ),
                     ),
                   ),
                 ),
-              for (final item in _orderedItems())
-                _buildItem(item, size),
+              for (final item in _orderedItems()) _buildItem(item, size),
             ],
           ),
         );
@@ -174,7 +172,8 @@ class _EditableOutfitCanvasState extends State<EditableOutfitCanvas> {
   Widget _buildItem(EditableCanvasItem item, Size canvasSize) {
     final transform = _transforms[item.id]!;
     final scaledWidth = canvasSize.width * item.widthFactor * transform.scale;
-    final scaledHeight = canvasSize.height * item.heightFactor * transform.scale;
+    final scaledHeight =
+        canvasSize.height * item.heightFactor * transform.scale;
 
     final centerX = canvasSize.width * (0.5 + transform.offset.dx);
     final centerY = canvasSize.height * (0.5 + transform.offset.dy);
@@ -185,7 +184,7 @@ class _EditableOutfitCanvasState extends State<EditableOutfitCanvas> {
     final child = DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(
-          color: isActive ? const Color(0xFFC9A96E) : Colors.transparent,
+          color: isActive ? WidgetTokens.accent : WidgetTokens.transparent,
           width: 1.8,
         ),
         borderRadius: BorderRadius.circular(10),
@@ -193,8 +192,10 @@ class _EditableOutfitCanvasState extends State<EditableOutfitCanvas> {
       child: Image.network(
         _resolveImage(item.imageUrl),
         fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.broken_image_outlined, color: Color(0xFF9A8F7F)),
+        errorBuilder: (context, error, stackTrace) => const Icon(
+          Icons.broken_image_outlined,
+          color: WidgetTokens.mutedWarm,
+        ),
       ),
     );
 
@@ -226,9 +227,13 @@ class _EditableOutfitCanvasState extends State<EditableOutfitCanvas> {
           final current = _transforms[item.id] ?? transform;
           final nextOffset = Offset(
             current.offset.dx + (details.focalPointDelta.dx / canvasSize.width),
-            current.offset.dy + (details.focalPointDelta.dy / canvasSize.height),
+            current.offset.dy +
+                (details.focalPointDelta.dy / canvasSize.height),
           );
-          final nextScale = (_gestureStartScale * details.scale).clamp(_minScale, _maxScale);
+          final nextScale = (_gestureStartScale * details.scale).clamp(
+            _minScale,
+            _maxScale,
+          );
 
           setState(() {
             _transforms[item.id] = transform.copyWith(

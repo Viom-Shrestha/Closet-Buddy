@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db.models.functions import Lower
 
 
 class UserProfile(models.Model):
@@ -12,6 +11,15 @@ class UserProfile(models.Model):
         related_name="profile",
     )
     avatar = models.ImageField(upload_to="profiles/", null=True, blank=True)
+    # Per-day engagement map:
+    # {
+    #   "YYYY-MM-DD": {
+    #     "last_seen_at": "<iso datetime>|null",
+    #     "session_count": <int>,
+    #     "total_session_seconds": <int>
+    #   }
+    # }
+    activity_daily = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -227,53 +235,6 @@ class Outfit(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.user.username})"
-
-
-class BetaAllowlist(models.Model):
-    email = models.EmailField(unique=False)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(
-        User,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="beta_allowlist_entries",
-    )
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                Lower("email"),
-                name="unique_beta_allowlist_email",
-            ),
-        ]
-
-    def save(self, *args, **kwargs):
-        if self.email:
-            self.email = self.email.strip().lower()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.email} (active={self.is_active})"
-
-
-class UserActivityDaily(models.Model):
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="daily_activity",
-    )
-    date = models.DateField()
-    last_seen_at = models.DateTimeField(null=True, blank=True)
-    session_count = models.IntegerField(default=0)
-    total_session_seconds = models.IntegerField(default=0)
-
-    class Meta:
-        unique_together = ("user", "date")
-
-    def __str__(self):
-        return f"{self.user.username} {self.date}"
 
 
 class BetaFeedback(models.Model):
