@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:frontend/core/core.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import 'package:frontend/services/accessory_service.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/clothing_service.dart';
 import 'package:frontend/services/clothing_query_service.dart';
 import 'package:frontend/theme/app_theme.dart';
+import 'package:frontend/features/wardrobe/screens/accessory_detail_screen.dart';
 import 'package:frontend/features/wardrobe/screens/clothing_detail_screen.dart';
 
 class WardrobeScreen extends StatefulWidget {
@@ -25,6 +27,8 @@ class WardrobeScreen extends StatefulWidget {
 class _WardrobeScreenState extends State<WardrobeScreen> {
   final ClothingService _clothingService =
       ServiceRegistry.instance.clothingService;
+  final AccessoryService _accessoryService =
+      ServiceRegistry.instance.accessoryService;
   final TextEditingController _searchController = TextEditingController();
 
   List<Map<String, dynamic>> _allItems = [];
@@ -89,17 +93,37 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
 
   Future<void> _loadWardrobe() async {
     setState(() => _loading = true);
-    final items = await _clothingService.getAllClothes();
+    final results = await Future.wait([
+      _clothingService.getAllClothes(),
+      _accessoryService.getAll(),
+    ]);
+    final clothes = List<Map<String, dynamic>>.from(results[0]);
+    final accessories = List<Map<String, dynamic>>.from(
+      results[1],
+    ).map(_normalizeAccessoryItem).toList();
     if (!mounted) return;
     setState(() {
-      _allItems = items;
+      _allItems = [...clothes, ...accessories];
       _loading = false;
     });
     _applyFilters();
   }
 
+  Map<String, dynamic> _normalizeAccessoryItem(Map<String, dynamic> item) {
+    final name = (item['name'] ?? '').toString().trim();
+    return {
+      ...item,
+      'category': 'Accessory',
+      'subcategory': name.isEmpty ? 'Accessory' : name,
+      'occasion': '',
+      'attributes': const <String>[],
+      '_item_kind': 'accessory',
+    };
+  }
+
   Future<void> _toggleFavourite(Map<String, dynamic> item) async {
     final itemId = _itemId(item);
+    final isAccessory = _itemKind(item) == 'accessory';
     if (itemId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -114,7 +138,9 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
     final oldValue = item['is_favourite'] == true;
     setState(() => item['is_favourite'] = !oldValue);
 
-    final ok = await _clothingService.toggleFavourite(itemId);
+    final ok = isAccessory
+        ? await _accessoryService.toggleFavourite(itemId)
+        : await _clothingService.toggleFavourite(itemId);
     if (!mounted) return;
 
     if (!ok) {
@@ -192,8 +218,22 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
     );
     if (confirm != true) return;
 
-    final ids = _selectedIds.toList();
-    await Future.wait(ids.map(_clothingService.deleteClothing));
+    final selectedItems = _allItems.where((item) {
+      final key = _selectionId(item);
+      return key != null && _selectedIds.contains(key);
+    }).toList();
+
+    await Future.wait(
+      selectedItems.map((item) async {
+        final rawId = _itemId(item);
+        if (rawId == null) return;
+        if (_itemKind(item) == 'accessory') {
+          await _accessoryService.delete(rawId);
+        } else {
+          await _clothingService.deleteClothing(rawId);
+        }
+      }),
+    );
     if (!mounted) return;
     setState(() {
       _selectMode = false;
@@ -216,6 +256,16 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
     return int.tryParse(raw?.toString() ?? '');
+  }
+
+  String _itemKind(Map<String, dynamic> item) {
+    return (item['_item_kind'] ?? 'clothing').toString();
+  }
+
+  int? _selectionId(Map<String, dynamic> item) {
+    final id = _itemId(item);
+    if (id == null) return null;
+    return _itemKind(item) == 'accessory' ? -id : id;
   }
 
   List<String> _optionsFor(String field) {
@@ -1104,13 +1154,36 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
 
   Widget _buildWardrobeItemCard(Map<String, dynamic> item) {
     final image = _resolveImage(item['image']);
-    final id = _itemId(item);
-    final selected = id != null && _selectedIds.contains(id);
+    final selectionId = _selectionId(item);
+    final selected = selectionId != null && _selectedIds.contains(selectionId);
+    final isAccessory = _itemKind(item) == 'accessory';
 
     return GestureDetector(
       onTap: () async {
         if (_selectMode) {
-          _toggleSelected(id);
+          _toggleSelected(selectionId);
+          return;
+        }
+        if (isAccessory) {
+          final accessoryId = _itemId(item);
+          if (accessoryId == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Unable to open this accessory')),
+            );
+            return;
+          }
+          final changed = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AccessoryDetailScreen(
+                accessoryId: accessoryId,
+                initialData: item,
+              ),
+            ),
+          );
+          if (changed == true) {
+            _loadWardrobe();
+          }
           return;
         }
         final itemId = _itemId(item);
@@ -1134,7 +1207,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
         if (!_selectMode) {
           _toggleSelectMode();
         }
-        _toggleSelected(id);
+        _toggleSelected(selectionId);
       },
       child: Container(
         decoration: BoxDecoration(
