@@ -1,3 +1,4 @@
+export 'screens/accessory_detail_screen.dart';
 export 'screens/clothing_detail_screen.dart';
 export 'screens/wardrobe_screen.dart';
 export '../../services/clothing_query_service.dart';

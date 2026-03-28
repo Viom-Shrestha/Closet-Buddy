@@ -133,9 +133,7 @@ class _LoginScreenState extends State<LoginScreen>
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: AuthTokens.ink.withValues(
-                                  alpha: 0.15,
-                                ),
+                                color: AuthTokens.ink.withValues(alpha: 0.15),
                                 blurRadius: 24,
                                 offset: Offset(0, 8),
                               ),
@@ -190,10 +188,7 @@ class _LoginScreenState extends State<LoginScreen>
 
                     Text(
                       'Sign in to continue to your wardrobe',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: AuthTokens.muted,
-                      ),
+                      style: TextStyle(fontSize: 15, color: AuthTokens.muted),
                     ),
 
                     SizedBox(height: 32),
@@ -452,59 +447,6 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ),
 
-                    const SizedBox(height: 30),
-
-                    // Divider
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Divider(
-                            color: AuthTokens.line,
-                            thickness: 1,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            'or continue with',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AuthTokens.mutedSoft,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Divider(
-                            color: AuthTokens.line,
-                            thickness: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    SizedBox(height: 24),
-
-                    // Social login buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SocialButton(
-                            icon: Icons.g_mobiledata,
-                            label: 'Google',
-                            onTap: () {},
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: SocialButton(
-                            icon: Icons.apple,
-                            label: 'Apple',
-                            onTap: () {},
-                          ),
-                        ),
-                      ],
-                    ),
-
                     SizedBox(height: 32),
 
                     // Sign up text
@@ -541,57 +483,6 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class SocialButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const SocialButton({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 52,
-        decoration: BoxDecoration(
-          color: AuthTokens.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AuthTokens.line, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: AuthTokens.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: AuthTokens.ink, size: 24),
-            SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: AuthTokens.ink,
-              ),
-            ),
-          ],
         ),
       ),
     );
