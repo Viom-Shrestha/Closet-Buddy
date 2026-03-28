@@ -174,13 +174,8 @@ class AccessoryItem(models.Model):
     def clean(self):
         if self.storage_unit.user != self.user:
             raise ValidationError("Storage unit must belong to the same user.")
-        
-class Outfit(models.Model):
-    SILHOUETTE_CHOICES = [
-        ("male", "Male"),
-        ("female", "Female"),
-    ]
 
+class Outfit(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -197,7 +192,6 @@ class Outfit(models.Model):
     last_worn_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_favourite = models.BooleanField(default=False)
-    silhouette = models.CharField(max_length=10, choices=SILHOUETTE_CHOICES, default="male")
     topwear = models.ForeignKey(
         ClothingItem,
         on_delete=models.SET_NULL,

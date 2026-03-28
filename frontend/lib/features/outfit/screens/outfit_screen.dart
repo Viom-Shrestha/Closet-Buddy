@@ -1376,7 +1376,6 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
   final Set<int> _accessoryIndices = {};
 
   // Builder UI state
-  String _silhouette = 'male';
   bool _loading = true;
   bool _saving = false;
   Map<String, dynamic> _previewLayout = {};
@@ -1408,10 +1407,6 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
     if (rating != null) {
       _ratingValue = _asInt(rating) ?? 0;
     }
-    _silhouette =
-        (e['silhouette'] ?? 'male').toString().toLowerCase() == 'female'
-        ? 'female'
-        : 'male';
     final rawPreview = e['preview_layout'];
     if (rawPreview is Map<String, dynamic>) {
       _previewLayout = rawPreview;
@@ -1568,7 +1563,6 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
           ? null
           : _occasionCtrl.text.trim(),
       'rating': rating,
-      'silhouette': _silhouette,
       'preview_layout': _layoutForSave(),
       'outerwear_id': _asInt(_selected(_outerwear, _outerwearIndex)?['id']),
       'topwear_id': _asInt(top?['id']),
@@ -1816,15 +1810,6 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'male', label: Text('Male')),
-              ButtonSegment(value: 'female', label: Text('Female')),
-            ],
-            selected: {_silhouette},
-            onSelectionChanged: (s) => setState(() => _silhouette = s.first),
           ),
         ],
       ),
