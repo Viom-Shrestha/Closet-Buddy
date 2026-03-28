@@ -1,4 +1,4 @@
-﻿part of admin_screen;
+﻿part of '../../features/admin/screens/admin_screen.dart';
 
 class _AdminTabMeta {
   final IconData icon;
@@ -64,7 +64,7 @@ class _KpiCard extends StatelessWidget {
     decoration: BoxDecoration(
       color: kAdminSurface,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: color.withOpacity(0.25)),
+      border: Border.all(color: color.withValues(alpha: 0.25)),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,7 +75,7 @@ class _KpiCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 9,
             fontWeight: FontWeight.w800,
-            color: color.withOpacity(0.8),
+            color: color.withValues(alpha: 0.8),
             letterSpacing: 1.2,
           ),
         ),
@@ -93,7 +93,7 @@ class _KpiCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: kAdminGreen.withOpacity(0.12),
+              color: kAdminGreen.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -193,7 +193,7 @@ class _ArcPainter extends CustomPainter {
       sweepFull,
       false,
       Paint()
-        ..color = color.withOpacity(0.12)
+        ..color = color.withValues(alpha: 0.12)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 5
         ..strokeCap = StrokeCap.round,
@@ -534,7 +534,7 @@ class _StatBlock2 extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, size: 18, color: color),
@@ -681,7 +681,7 @@ class _HBarRow extends StatelessWidget {
                 child: Container(
                   height: 8,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(alpha),
+                    color: color.withValues(alpha: alpha),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -806,7 +806,7 @@ class _ColorBarRow extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: swatch.withOpacity(0.5),
+                color: swatch.withValues(alpha: 0.5),
                 blurRadius: 6,
                 offset: const Offset(0, 1),
               ),
@@ -843,7 +843,7 @@ class _ColorBarRow extends StatelessWidget {
                 child: Container(
                   height: 8,
                   decoration: BoxDecoration(
-                    color: swatch.withOpacity(0.85),
+                    color: swatch.withValues(alpha: 0.85),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -897,7 +897,7 @@ class _RecentUserRow extends StatelessWidget {
           width: 34,
           height: 34,
           decoration: BoxDecoration(
-            color: kAdminAccent.withOpacity(0.15),
+            color: kAdminAccent.withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -1018,9 +1018,9 @@ class _SearchBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: kAdminAccent.withOpacity(0.15),
+              color: kAdminAccent.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kAdminAccent.withOpacity(0.3)),
+              border: Border.all(color: kAdminAccent.withValues(alpha: 0.3)),
             ),
             child: const Text(
               'Search',
@@ -1086,12 +1086,12 @@ class _UserCard extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     color: isActive
-                        ? kAdminAccent.withOpacity(0.15)
+                        ? kAdminAccent.withValues(alpha: 0.15)
                         : kAdminSurface2,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isActive
-                          ? kAdminAccent.withOpacity(0.3)
+                          ? kAdminAccent.withValues(alpha: 0.3)
                           : kAdminBorder,
                     ),
                   ),
@@ -1129,7 +1129,7 @@ class _UserCard extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: kAdminAccent.withOpacity(0.12),
+                                color: kAdminAccent.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: const Text(
@@ -1164,7 +1164,7 @@ class _UserCard extends StatelessWidget {
                     boxShadow: isActive
                         ? [
                             BoxShadow(
-                              color: kAdminGreen.withOpacity(0.5),
+                              color: kAdminGreen.withValues(alpha: 0.5),
                               blurRadius: 6,
                             ),
                           ]
@@ -1237,7 +1237,7 @@ class _UserAction extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 3),
         padding: const EdgeInsets.symmetric(vertical: 7),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
@@ -1299,10 +1299,10 @@ class _CatalogItemCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? kAdminAccent.withOpacity(0.08) : kAdminSurface,
+          color: selected ? kAdminAccent.withValues(alpha: 0.08) : kAdminSurface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? kAdminAccent.withOpacity(0.4) : kAdminBorder,
+            color: selected ? kAdminAccent.withValues(alpha: 0.4) : kAdminBorder,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -1324,7 +1324,7 @@ class _CatalogItemCard extends StatelessWidget {
                   ? const Icon(
                       Icons.check_rounded,
                       size: 10,
-                      color: Colors.black,
+                      color: kAdminBlack,
                     )
                   : null,
             ),
@@ -1577,7 +1577,7 @@ class _SmallBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: fg.withOpacity(0.25)),
+        border: Border.all(color: fg.withValues(alpha: 0.25)),
       ),
       child: Text(
         text,
@@ -1607,9 +1607,9 @@ class _SlotPreviewRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -1617,16 +1617,16 @@ class _SlotPreviewRow extends StatelessWidget {
             width: 26,
             height: 26,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
+              color: kAdminWhite.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: color.withOpacity(0.25)),
+              border: Border.all(color: color.withValues(alpha: 0.25)),
             ),
             clipBehavior: Clip.antiAlias,
             child: imageUrl.isNotEmpty
                 ? Image.network(
                     imageUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
+                    errorBuilder: (context, error, stackTrace) =>
                         Icon(icon, size: 14, color: color),
                   )
                 : Icon(icon, size: 14, color: color),
@@ -1682,7 +1682,7 @@ class _FeedbackCard extends StatelessWidget {
         color: kAdminSurface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isRead ? kAdminBorder : kAdminAccent.withOpacity(0.3),
+          color: isRead ? kAdminBorder : kAdminAccent.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -1744,7 +1744,7 @@ class _FeedbackCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: isRead
                           ? kAdminSurface2
-                          : kAdminAccent.withOpacity(0.12),
+                          : kAdminAccent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -1785,84 +1785,7 @@ class _FeedbackCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Invite row
 // ─────────────────────────────────────────────────────────────────────────────
-
-class _InviteRow extends StatelessWidget {
-  final Map<String, dynamic> invite;
-  final VoidCallback? onDelete;
-  const _InviteRow({required this.invite, this.onDelete});
-
-  @override
-  Widget build(BuildContext context) {
-    final email = invite['email']?.toString() ?? '—';
-    final isUsed = invite['is_used'] == true;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: kAdminSurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kAdminBorder),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.alternate_email_rounded,
-            size: 16,
-            color: kAdminTextDim,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              email,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: kAdminText,
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: isUsed ? kAdminGreen.withOpacity(0.1) : kAdminSurface2,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              isUsed ? 'Used' : 'Pending',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: isUsed ? kAdminGreen : kAdminTextDim,
-              ),
-            ),
-          ),
-          if (onDelete != null) ...[
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: onDelete,
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: kAdminRedDim,
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                child: const Icon(
-                  Icons.delete_outline_rounded,
-                  size: 14,
-                  color: kAdminRed,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Shared buttons / inputs
@@ -1889,9 +1812,9 @@ class _DarkButton extends StatelessWidget {
           : const EdgeInsets.symmetric(horizontal: 24),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: kAdminAccent.withOpacity(0.15),
+        color: kAdminAccent.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(compact ? 10 : 12),
-        border: Border.all(color: kAdminAccent.withOpacity(0.3)),
+        border: Border.all(color: kAdminAccent.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
@@ -1924,10 +1847,10 @@ class _DarkChipButton extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: highlight ? kAdminAccent.withOpacity(0.15) : kAdminSurface2,
+        color: highlight ? kAdminAccent.withValues(alpha: 0.15) : kAdminSurface2,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: highlight ? kAdminAccent.withOpacity(0.35) : kAdminBorder,
+          color: highlight ? kAdminAccent.withValues(alpha: 0.35) : kAdminBorder,
         ),
       ),
       child: Row(
@@ -1956,26 +1879,21 @@ class _DarkChipButton extends StatelessWidget {
 class _DarkTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
-  final String? hint;
-  final TextInputType keyboardType;
 
   const _DarkTextField({
     required this.controller,
     required this.label,
-    this.hint,
-    this.keyboardType = TextInputType.text,
   });
 
   @override
   Widget build(BuildContext context) => TextField(
     controller: controller,
-    keyboardType: keyboardType,
     style: const TextStyle(fontSize: 14, color: kAdminText),
     decoration: InputDecoration(
       labelText: label,
-      hintText: hint,
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     ),
   );
 }
+

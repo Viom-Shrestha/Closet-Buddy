@@ -4,7 +4,9 @@ import 'package:http/http.dart' as http;
 import 'api_client.dart';
 
 class ProfileService {
-  final ApiClient client = ApiClient();
+  ProfileService({ApiClient? client}) : client = client ?? ApiClient();
+
+  final ApiClient client;
 
   Future<Map<String, dynamic>?> fetchProfile() async {
     final res = await client.get('/profile/');

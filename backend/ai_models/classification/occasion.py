@@ -8,7 +8,7 @@ device =  "cpu"
 MODEL_NAME = "patrickjohncyh/fashion-clip"
 
 clip_model = CLIPModel.from_pretrained(MODEL_NAME).to(device)
-clip_processor = CLIPProcessor.from_pretrained(MODEL_NAME)
+clip_processor = CLIPProcessor.from_pretrained(MODEL_NAME, use_fast=True)
 
 OCCASION_PROMPTS: Dict[str, List[str]] = {
     "Casual": [
@@ -47,11 +47,6 @@ OCCASION_PROMPTS: Dict[str, List[str]] = {
     "Beach": [
         "beach vacation outfit",
         "resort beachwear",
-    ],
-    "Weather": [
-        "winter cold weather clothing",
-        "summer hot weather outfit",
-        "rainy day outerwear",
     ],
 }
 

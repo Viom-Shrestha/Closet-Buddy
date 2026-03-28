@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class HoverClickable extends StatefulWidget {
   final Widget child;
@@ -41,7 +42,7 @@ class _HoverClickableState extends State<HoverClickable> {
                 ? BoxDecoration(
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
+                        color: WidgetTokens.black.withValues(alpha: 0.08),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),

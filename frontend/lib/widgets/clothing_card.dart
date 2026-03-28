@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class AppLogo extends StatelessWidget {
   final double size;
@@ -14,7 +15,7 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = darkBackground ? const Color(0xFF1A1A1A) : Colors.white;
+    final bgColor = darkBackground ? WidgetTokens.ink : WidgetTokens.surface;
 
     return Container(
       width: size,
@@ -28,10 +29,9 @@ class AppLogo extends StatelessWidget {
         'assets/images/Logo.png',
         fit: BoxFit.contain,
         errorBuilder: (context, error, stackTrace) {
-          return const Icon(Icons.checkroom_rounded, color: Colors.white);
+          return const Icon(Icons.checkroom_rounded, color: WidgetTokens.surface);
         },
       ),
     );
   }
 }
-

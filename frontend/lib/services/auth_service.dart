@@ -3,7 +3,9 @@ import 'package:http/http.dart' as http;
 import 'api_client.dart';
 
 class AuthService {
-  final ApiClient client = ApiClient();
+  AuthService({ApiClient? client}) : client = client ?? ApiClient();
+
+  final ApiClient client;
 
   Future<bool> register(
     String username,

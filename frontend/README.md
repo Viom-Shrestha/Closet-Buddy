@@ -1,16 +1,39 @@
-# frontend
+# Closet Buddy Frontend
 
-A new Flutter project.
+Flutter client for Closet Buddy.
 
-## Getting Started
+## Run
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+Optional API host override:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```bash
+flutter run --dart-define=API_HOST=http://127.0.0.1:8000
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Quality Checks
+
+```bash
+dart analyze lib
+flutter test
+flutter test test/theme/theme_color_guardrails_test.dart
+```
+
+## Project Structure
+
+- `lib/app` app shell + auth gate
+- `lib/core` cross-cutting infrastructure (DI/service registry)
+- `lib/features` domain modules (`<domain>/screens` + barrel exports)
+- `lib/services` API/data layer
+- `lib/widgets` reusable UI components
+- `lib/theme` theme + tokens + color system
+- `lib/utils` pure utility helpers
+
+## Architecture Guide
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for layer rules and extension
+guidelines.

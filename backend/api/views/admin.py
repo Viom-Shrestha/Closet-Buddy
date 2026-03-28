@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordResetForm
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import Avg, Count, Q
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -11,13 +11,12 @@ from rest_framework.response import Response
 
 from ..models import (
     AccessoryItem,
-    BetaAllowlist,
     BetaFeedback,
     ClothingItem,
     NonClothingItem,
     Outfit,
     StorageUnit,
-    UserActivityDaily,
+    UserProfile,
 )
 from ..serializer import ClothingItemSerializer, OutfitReadSerializer
 
@@ -90,6 +89,54 @@ def _is_outerwear_label(category: str, subcategory: str) -> bool:
     return any(key in text for key in keys)
 
 
+def _to_non_negative_int(value) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _engagement_from_profiles(today, week_start):
+    today_key = today.isoformat()
+    week_keys = {
+        (week_start + timedelta(days=i)).isoformat()
+        for i in range(7)
+    }
+    dau = 0
+    wau = 0
+    total_sessions = 0
+    total_seconds = 0
+
+    for profile in UserProfile.objects.only("activity_daily").iterator():
+        activity_daily = profile.activity_daily or {}
+        if not isinstance(activity_daily, dict):
+            continue
+
+        today_entry = activity_daily.get(today_key)
+        if isinstance(today_entry, dict):
+            today_sessions = _to_non_negative_int(today_entry.get("session_count"))
+            today_seconds = _to_non_negative_int(today_entry.get("total_session_seconds"))
+            if today_sessions > 0 or today_seconds > 0:
+                dau += 1
+
+        is_weekly_active = False
+        for key in week_keys:
+            entry = activity_daily.get(key)
+            if not isinstance(entry, dict):
+                continue
+            sessions = _to_non_negative_int(entry.get("session_count"))
+            seconds = _to_non_negative_int(entry.get("total_session_seconds"))
+            total_sessions += sessions
+            total_seconds += seconds
+            if sessions > 0 or seconds > 0:
+                is_weekly_active = True
+
+        if is_weekly_active:
+            wau += 1
+
+    return dau, wau, total_sessions, total_seconds
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def admin_dashboard(request):
@@ -138,12 +185,10 @@ def admin_dashboard(request):
     total_outfits = Outfit.objects.count()
     favourite_outfits = Outfit.objects.filter(is_favourite=True).count()
 
-    daily_activity = UserActivityDaily.objects.filter(date=today)
-    weekly_activity = UserActivityDaily.objects.filter(date__gte=week_start)
-    dau = daily_activity.values("user_id").distinct().count()
-    wau = weekly_activity.values("user_id").distinct().count()
-    total_sessions = weekly_activity.aggregate(total=Sum("session_count"))["total"] or 0
-    total_seconds = weekly_activity.aggregate(total=Sum("total_session_seconds"))["total"] or 0
+    dau, wau, total_sessions, total_seconds = _engagement_from_profiles(
+        today=today,
+        week_start=week_start,
+    )
     average_session_seconds = int(total_seconds / total_sessions) if total_sessions else 0
     sessions_per_user = round(total_sessions / wau, 2) if wau else 0
 
@@ -507,65 +552,6 @@ def admin_send_password_reset(request, user_id):
     return Response({"detail": "Password reset email sent."})
 
 
-@api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
-def admin_invites(request):
-    denied = _require_admin(request)
-    if denied:
-        return denied
-
-    if request.method == "GET":
-        entries = BetaAllowlist.objects.order_by("-created_at")
-        data = [
-            {
-                "id": entry.id,
-                "email": entry.email,
-                "is_active": entry.is_active,
-                "created_at": entry.created_at.isoformat(),
-            }
-            for entry in entries
-        ]
-        return Response({"results": data})
-
-    email = (request.data.get("email") or "").strip().lower()
-    if not email:
-        return Response({"detail": "Email is required."}, status=400)
-
-    entry, created = BetaAllowlist.objects.get_or_create(
-        email=email,
-        defaults={"created_by": request.user},
-    )
-    if not created and not entry.is_active:
-        entry.is_active = True
-        entry.created_by = request.user
-        entry.save(update_fields=["is_active", "created_by"])
-
-    return Response(
-        {
-            "id": entry.id,
-            "email": entry.email,
-            "is_active": entry.is_active,
-        },
-        status=201 if created else 200,
-    )
-
-
-@api_view(["DELETE"])
-@permission_classes([IsAuthenticated])
-def admin_invite_detail(request, invite_id):
-    denied = _require_admin(request)
-    if denied:
-        return denied
-
-    try:
-        entry = BetaAllowlist.objects.get(id=invite_id)
-    except BetaAllowlist.DoesNotExist:
-        return Response({"detail": "Invite not found."}, status=404)
-
-    entry.delete()
-    return Response(status=204)
-
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def admin_clothing_list(request):
@@ -779,4 +765,3 @@ def admin_feedback_mark_read(request, feedback_id):
     feedback.is_read = _as_bool(request.data.get("is_read", True))
     feedback.save(update_fields=["is_read"])
     return Response({"id": feedback.id, "is_read": feedback.is_read})
-
