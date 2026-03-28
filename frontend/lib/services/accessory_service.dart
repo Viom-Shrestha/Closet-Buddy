@@ -6,7 +6,9 @@ import 'package:http/http.dart' as http;
 import 'api_client.dart';
 
 class AccessoryService {
-  final ApiClient client = ApiClient();
+  AccessoryService({ApiClient? client}) : client = client ?? ApiClient();
+
+  final ApiClient client;
 
   Future<Map<String, dynamic>?> process(File image) async {
     final token = await client.token();

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class PrimaryButton extends StatelessWidget {
   final String text;
@@ -28,17 +29,21 @@ class PrimaryButton extends StatelessWidget {
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white,
+                  color: WidgetTokens.surface,
                 ),
               )
             : Icon(icon ?? Icons.check, size: 18),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF1A1A1A),
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: const Color(0xFF1A1A1A).withValues(alpha: 0.3),
+          backgroundColor: WidgetTokens.accent,
+          foregroundColor: WidgetTokens.surface,
+          disabledBackgroundColor: WidgetTokens.accent.withValues(
+            alpha: 0.3,
+          ),
           minimumSize: const Size(double.infinity, 52),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
         label: Text(
           text,

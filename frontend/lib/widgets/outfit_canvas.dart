@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
+import '../theme/app_theme.dart';
 
 /// A static, slot-based outfit canvas.
 ///
@@ -44,15 +45,6 @@ class OutfitCanvas extends StatelessWidget {
     this.slotScale = 1.0,
   });
 
-  // ── Design tokens ────────────────────────────────────────────────────────
-  static const Color _bg = Color(0xFFF7F5F2);
-  static const Color _cardBg = Colors.white;
-  static const Color _borderColor = Color(0xFFE8E3DB);
-  static const Color _emptyBorder = Color(0xFFD5CFC6);
-  static const Color _labelBg = Color(0xFFFAF8F5);
-  static const Color _categoryText = Color(0xFF9A8F7F);
-  static const Color _inkColor = Color(0xFF0F0F0F);
-
   @override
   Widget build(BuildContext context) {
     final double scale = compact ? 1.0 : slotScale.clamp(0.8, 1.5);
@@ -62,9 +54,9 @@ class OutfitCanvas extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: _bg,
+        color: OutfitCanvasTokens.bg,
         borderRadius: BorderRadius.circular(compact ? 14 : 20),
-        border: Border.all(color: _borderColor),
+        border: Border.all(color: OutfitCanvasTokens.border),
       ),
       padding: EdgeInsets.all(compact ? 8 : 12),
       child: Column(
@@ -257,12 +249,12 @@ class _SlotCard extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: OutfitCanvas._cardBg,
+        color: OutfitCanvasTokens.cardBg,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
           color: hasItem
-              ? OutfitCanvas._borderColor
-              : OutfitCanvas._emptyBorder,
+              ? OutfitCanvasTokens.border
+              : OutfitCanvasTokens.emptyBorder,
           width: hasItem ? 1 : 1.5,
         ),
       ),
@@ -336,28 +328,10 @@ class _SlotCard extends StatelessWidget {
 
   Color? _accentColor() {
     final color = item?['color']?.toString().toLowerCase() ?? '';
-    const colorMap = {
-      'navy': Color(0xFF2C3E6B),
-      'blue': Color(0xFF3B8BD4),
-      'black': Color(0xFF222222),
-      'white': Color(0xFFD0CCC6),
-      'grey': Color(0xFF888888),
-      'gray': Color(0xFF888888),
-      'olive': Color(0xFF7A8C5A),
-      'green': Color(0xFF2D7A4F),
-      'red': Color(0xFFC94040),
-      'brown': Color(0xFF8B6347),
-      'tan': Color(0xFFC9A96E),
-      'beige': Color(0xFFD4B896),
-      'pink': Color(0xFFE8A0B0),
-      'purple': Color(0xFF7B5EA7),
-      'yellow': Color(0xFFE8C547),
-      'orange': Color(0xFFE8843C),
-    };
-    for (final entry in colorMap.entries) {
+    for (final entry in NamedColors.outfit.entries) {
       if (color.contains(entry.key)) return entry.value;
     }
-    return const Color(0xFFD5CFC6);
+    return OutfitCanvasTokens.borderWarm;
   }
 
   String _resolveImage(dynamic rawUrl) {
@@ -419,14 +393,14 @@ class _AccessoriesStrip extends StatelessWidget {
                     width: tileSize,
                     height: tileSize,
                     decoration: BoxDecoration(
-                      color: OutfitCanvas._cardBg,
+                      color: OutfitCanvasTokens.cardBg,
                       borderRadius: BorderRadius.circular(compact ? 8 : 12),
-                      border: Border.all(color: OutfitCanvas._emptyBorder),
+                      border: Border.all(color: OutfitCanvasTokens.emptyBorder),
                     ),
                     child: Icon(
                       Icons.add_rounded,
                       size: tileSize * 0.36,
-                      color: OutfitCanvas._categoryText,
+                      color: OutfitCanvasTokens.categoryText,
                     ),
                   ),
                 );
@@ -440,16 +414,16 @@ class _AccessoriesStrip extends StatelessWidget {
                   width: tileSize,
                   height: tileSize,
                   decoration: BoxDecoration(
-                    color: OutfitCanvas._cardBg,
+                    color: OutfitCanvasTokens.cardBg,
                     borderRadius: BorderRadius.circular(compact ? 8 : 12),
-                    border: Border.all(color: OutfitCanvas._borderColor),
+                    border: Border.all(color: OutfitCanvasTokens.border),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: imageUrl.isEmpty
                       ? Icon(
                           Icons.watch_outlined,
                           size: tileSize * 0.4,
-                          color: OutfitCanvas._categoryText,
+                          color: OutfitCanvasTokens.categoryText,
                         )
                       : Padding(
                           padding: const EdgeInsets.all(6),
@@ -460,7 +434,7 @@ class _AccessoriesStrip extends StatelessWidget {
                             errorBuilder: (context, error, stackTrace) => Icon(
                               Icons.watch_outlined,
                               size: tileSize * 0.4,
-                              color: OutfitCanvas._categoryText,
+                              color: OutfitCanvasTokens.categoryText,
                             ),
                           ),
                         ),
@@ -497,7 +471,7 @@ class _SlotTapArea extends StatelessWidget {
   Widget build(BuildContext context) {
     if (onTap == null) return child;
     return Material(
-      color: Colors.transparent,
+      color: OutfitCanvasTokens.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(radius),
@@ -521,20 +495,20 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     if (compact) {
       return Center(
-        child: Icon(_iconFor(label), color: const Color(0xFFCCC7C0), size: 22),
+        child: Icon(_iconFor(label), color: OutfitCanvasTokens.iconMuted, size: 22),
       );
     }
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(_iconFor(label), color: const Color(0xFFCCC7C0), size: 28),
+          Icon(_iconFor(label), color: OutfitCanvasTokens.iconMuted, size: 28),
           const SizedBox(height: 6),
           Text(
             'Add $label',
             style: const TextStyle(
               fontSize: 11,
-              color: OutfitCanvas._categoryText,
+              color: OutfitCanvasTokens.categoryText,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -568,16 +542,16 @@ class _CategoryChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: OutfitCanvas._labelBg,
+        color: OutfitCanvasTokens.labelBg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: OutfitCanvas._borderColor),
+        border: Border.all(color: OutfitCanvasTokens.border),
       ),
       child: Text(
         label.toUpperCase(),
         style: const TextStyle(
           fontSize: 9,
           fontWeight: FontWeight.w600,
-          color: OutfitCanvas._categoryText,
+          color: OutfitCanvasTokens.categoryText,
           letterSpacing: 0.5,
         ),
       ),
@@ -595,9 +569,9 @@ class _NameLabel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
+        color: OutfitCanvasTokens.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: OutfitCanvas._borderColor),
+        border: Border.all(color: OutfitCanvasTokens.border),
       ),
       child: Text(
         name,
@@ -606,7 +580,7 @@ class _NameLabel extends StatelessWidget {
         style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w500,
-          color: OutfitCanvas._inkColor,
+          color: OutfitCanvasTokens.ink,
         ),
       ),
     );
@@ -622,14 +596,14 @@ class _EditBadge extends StatelessWidget {
       width: 26,
       height: 26,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: OutfitCanvasTokens.white.withValues(alpha: 0.9),
         shape: BoxShape.circle,
-        border: Border.all(color: OutfitCanvas._borderColor),
+        border: Border.all(color: OutfitCanvasTokens.border),
       ),
       child: const Icon(
         Icons.swap_horiz_rounded,
         size: 14,
-        color: OutfitCanvas._categoryText,
+        color: OutfitCanvasTokens.categoryText,
       ),
     );
   }

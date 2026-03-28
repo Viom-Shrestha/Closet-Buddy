@@ -5,7 +5,8 @@ from transformers import AutoModelForImageClassification, AutoImageProcessor
 
 # Load once
 processor = AutoImageProcessor.from_pretrained(
-    "prithivMLmods/Fashion-Product-subCategory"
+    "prithivMLmods/Fashion-Product-subCategory",
+    use_fast=True,
 )
 model = AutoModelForImageClassification.from_pretrained(
     "prithivMLmods/Fashion-Product-subCategory"

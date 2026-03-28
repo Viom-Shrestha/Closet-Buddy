@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'api_client.dart';
 
 class OutfitService {
-  final ApiClient client = ApiClient();
+  OutfitService({ApiClient? client}) : client = client ?? ApiClient();
+
+  final ApiClient client;
 
   Future<List<Map<String, dynamic>>> getAll() async {
     final res = await client.get('/outfits/');

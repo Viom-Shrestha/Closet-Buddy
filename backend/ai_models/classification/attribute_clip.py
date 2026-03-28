@@ -9,7 +9,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_NAME = "patrickjohncyh/fashion-clip"
 
 clip_model = CLIPModel.from_pretrained(MODEL_NAME).to(device)
-clip_processor = CLIPProcessor.from_pretrained(MODEL_NAME)
+clip_processor = CLIPProcessor.from_pretrained(MODEL_NAME, use_fast=True)
 
 
 # ===============================

@@ -1,7 +1,9 @@
 import 'api_client.dart';
 
 class MiscService {
-  final ApiClient client = ApiClient();
+  MiscService({ApiClient? client}) : client = client ?? ApiClient();
+
+  final ApiClient client;
 
   Future<bool> saveNonClothing(Map<String, dynamic> data) async {
     final res = await client.post('/non-clothing/', data);

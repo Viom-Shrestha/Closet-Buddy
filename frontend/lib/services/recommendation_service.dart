@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'api_client.dart';
 
 class RecommendationService {
-  final ApiClient _client = ApiClient();
+  RecommendationService({ApiClient? client}) : _client = client ?? ApiClient();
+
+  final ApiClient _client;
 
   Future<List<Map<String, dynamic>>> recommend({
     required String temperature,
