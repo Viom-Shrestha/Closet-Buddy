@@ -18,7 +18,7 @@ def recommend_outfits(
     weather: Dict,
     occasion: Optional[str] = None,
     prompt: Optional[str] = None,
-    limit: int = 5,
+    limit: int = 3,
 ) -> List[Dict]:
     items = list(ClothingItem.objects.filter(user=user))
     if not items:
@@ -29,6 +29,10 @@ def recommend_outfits(
 
     filtered_items = filters.filter_items(items, normalized_weather)
     topwear, bottomwear, footwear, outerwear = filters.split_by_category(filtered_items)
+
+    # If weather filtering is too strict, gracefully fall back to all items.
+    if not topwear or not bottomwear or not footwear:
+        topwear, bottomwear, footwear, outerwear = filters.split_by_category(items)
 
     if not topwear or not bottomwear or not footwear:
         return []
@@ -45,6 +49,16 @@ def recommend_outfits(
         outerwear,
         normalized_weather.get("temperature", ""),
     )
+
+    # If strict layering policy yields no outfits, retry with optional outerwear.
+    if not outfits:
+        outfits = generator.generate_outfits(
+            topwear,
+            bottomwear,
+            footwear,
+            outerwear,
+            "cool",
+        )
 
     if not outfits:
         return []
