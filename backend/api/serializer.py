@@ -305,6 +305,10 @@ class OutfitReadSerializer(serializers.ModelSerializer):
             "name",
             "occasion",
             "rating",
+            "ai_rating_score",
+            "ai_rating_reasons",
+            "ai_rating_breakdown",
+            "ai_rated_at",
             "wear_count",
             "last_worn_at",
             "is_favourite",
@@ -356,6 +360,10 @@ class OutfitWriteSerializer(serializers.ModelSerializer):
             "name",
             "occasion",
             "rating",
+            "ai_rating_score",
+            "ai_rating_reasons",
+            "ai_rating_breakdown",
+            "ai_rated_at",
             "is_favourite",
             "preview_layout",
             "outerwear_id",
@@ -414,7 +422,28 @@ class OutfitWriteSerializer(serializers.ModelSerializer):
         return outfit
 
     def update(self, instance, validated_data):
+        ai_fields = {"ai_rating_score", "ai_rating_reasons", "ai_rating_breakdown", "ai_rated_at"}
+        had_fresh_ai_snapshot = any(field in validated_data for field in ai_fields)
+
+        slot_changed = False
+        for field_name in ["outerwear", "topwear", "bottomwear", "shoes"]:
+            if field_name in validated_data and validated_data[field_name] != getattr(instance, field_name):
+                slot_changed = True
+                break
+
         accessories = validated_data.pop("accessories", None)
+        accessories_changed = False
+        if accessories is not None:
+            current_ids = set(instance.accessories.values_list("id", flat=True))
+            incoming_ids = {acc.id for acc in accessories}
+            accessories_changed = current_ids != incoming_ids
+
+        if (slot_changed or accessories_changed) and not had_fresh_ai_snapshot:
+            validated_data["ai_rating_score"] = None
+            validated_data["ai_rating_reasons"] = []
+            validated_data["ai_rating_breakdown"] = {}
+            validated_data["ai_rated_at"] = None
+
         for key, value in validated_data.items():
             setattr(instance, key, value)
         instance.save()

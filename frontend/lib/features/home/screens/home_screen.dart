@@ -223,9 +223,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _openOutfitsPage() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const OutfitsPage()),
+      MaterialPageRoute(
+        builder: (_) => const OutfitsPage(),
+      ),
     );
     if (mounted) fetchHomeData();
+  }
+
+  Future<void> _openCreateOutfit() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const OutfitBuilderPage()),
+    );
+    if (changed == true && mounted) {
+      fetchHomeData();
+    }
   }
 
   void _refreshTodayOutfit({bool force = false, int? excludeId}) {
@@ -425,7 +437,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final showHome = _selectedIndex == 0;
     final showWardrobe = _selectedIndex == 1;
-    final showOutfit = _selectedIndex == 2;
+    final showOutfit = _selectedIndex == 3;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: ThemeService.instance.isDark
@@ -456,18 +468,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   horizontal: 20,
                                 ),
                                 children: [
-                                  const SizedBox(height: 24),
-                                  _buildWelcomeSection(),
                                   const SizedBox(height: 20),
-                                  _buildWeatherCard(),
-                                  const SizedBox(height: 24),
                                   _buildTodayOutfitCard(),
                                   const SizedBox(height: 32),
                                   _buildQuickActions(),
-                                  const SizedBox(height: 32),
-                                  _buildStorageOverview(),
-                                  const SizedBox(height: 32),
-                                  _buildRecentClothing(),
                                   const SizedBox(height: 32),
                                   _buildRecentOutfits(),
                                   const SizedBox(height: 120),
@@ -580,6 +584,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Welcome ────────────────────────────────────────────────────────────────
 
+  // ignore: unused_element
   Widget _buildWelcomeSection() {
     final hour = DateTime.now().hour;
     String greeting;
@@ -675,6 +680,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Weather ────────────────────────────────────────────────────────────────
 
+  // ignore: unused_element
   Widget _buildWeatherCard() {
     if (isLoadingWeather) {
       return Container(
@@ -1155,62 +1161,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(title: 'Quick Access'),
+        _SectionHeader(title: 'Quick Actions'),
         const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
               child: _QuickActionTile(
-                label: 'Add Item',
-                icon: Icons.add_circle_outline_rounded,
-                iconColor: HomeTokens.accent,
-                iconBg: HomeTokens.accentBg,
-                onTap: () async {
-                  final result = await showAddItemSheet(context);
-                  _handleAddItemResult(result);
-                },
+                label: 'Create Outfit',
+                icon: Icons.draw_outlined,
+                iconColor: HomeTokens.sky,
+                iconBg: HomeTokens.skyBg,
+                onTap: _openCreateOutfit,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _QuickActionTile(
-                label: 'Style Me',
+                label: 'Generate Outfit',
                 icon: Icons.auto_awesome_outlined,
                 iconColor: HomeTokens.gold,
                 iconBg: HomeTokens.goldBg,
                 onTap: _openRecommendation,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _QuickActionTile(
-                label: 'My Storage',
-                icon: Icons.inventory_2_outlined,
-                iconColor: HomeTokens.sky,
-                iconBg: HomeTokens.skyBg,
-                onTap: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const StorageListScreen(),
-                    ),
-                  );
-                  if (result == true) fetchHomeData();
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _QuickActionTile(
-                label: 'Saved Looks',
-                icon: Icons.favorite_border_rounded,
-                iconColor: HomeTokens.rose,
-                iconBg: HomeTokens.roseBg,
-                onTap: _openOutfitsPage,
               ),
             ),
           ],
@@ -1221,6 +1192,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Storage ────────────────────────────────────────────────────────────────
 
+  // ignore: unused_element
   Widget _buildStorageOverview() {
     final topLevel = storages
         .where((s) => s['parent_storage'] == null)
@@ -1290,6 +1262,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  // ignore: unused_element
   Widget _storageCard(Map<String, dynamic> storage, double width) {
     final name = (storage['name'] ?? 'Storage').toString();
     final count = storage['item_count'] is num
@@ -1375,6 +1348,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Recent clothing ────────────────────────────────────────────────────────
 
+  // ignore: unused_element
   Widget _buildRecentClothing() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1403,6 +1377,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  // ignore: unused_element
   Widget _buildClothingCard(Map<String, dynamic> item) {
     final imageUrl = _resolveImageUrl(item['image']);
     final isFav = item['is_favourite'] ?? false;
@@ -1556,6 +1531,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final outfit = outfits[index];
     final name = (outfit['name'] ?? 'Outfit').toString();
     final ratingRaw = outfit['rating'];
+    final aiRatingScore = _asDouble(outfit['ai_rating_score']);
     final rating = ratingRaw == null ? '—' : ratingRaw.toString();
     final wearCount = _asInt(outfit['wear_count']) ?? 0;
     final previewItems = _previewItems(outfit);
@@ -1667,6 +1643,42 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ],
                   ),
+                  if (aiRatingScore != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: HomeTokens.parchment,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                size: 11,
+                                color: HomeTokens.gold,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                aiRatingScore.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: HomeTokens.inkSub,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1723,7 +1735,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         elevation: 0,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
         onTap: (index) {
-          if (index == 3) {
+          if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const StorageListScreen()),
+            ).then((result) {
+              if (result == true && mounted) {
+                fetchHomeData();
+              }
+              if (mounted) setState(() => _selectedIndex = 0);
+            });
+            return;
+          }
+          if (index == 4) {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ProfileScreen()),
@@ -1751,6 +1775,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           BottomNavigationBarItem(
             icon: Icon(Icons.auto_awesome_outlined),
             activeIcon: Icon(Icons.auto_awesome_rounded),
+            label: 'Storage',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.checkroom_outlined),
+            activeIcon: Icon(Icons.checkroom_rounded),
             label: 'Outfits',
           ),
           BottomNavigationBarItem(
@@ -1938,6 +1967,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
     return int.tryParse(raw?.toString() ?? '');
+  }
+
+  double? _asDouble(dynamic raw) {
+    if (raw is double) return raw;
+    if (raw is num) return raw.toDouble();
+    return double.tryParse(raw?.toString() ?? '');
+  }
+
+  // ignore: unused_element
+  List<String> _stringList(dynamic raw) {
+    if (raw is! List) return [];
+    return raw
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
   }
 
   bool _isWornToday(Map<String, dynamic>? outfit) {

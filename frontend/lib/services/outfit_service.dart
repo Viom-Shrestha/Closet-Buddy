@@ -6,8 +6,11 @@ class OutfitService {
 
   final ApiClient client;
 
-  Future<List<Map<String, dynamic>>> getAll() async {
-    final res = await client.get('/outfits/');
+  Future<List<Map<String, dynamic>>> getAll({bool? favouritesOnly}) async {
+    final query = favouritesOnly == null
+        ? ''
+        : '?is_favourite=${favouritesOnly ? 'true' : 'false'}';
+    final res = await client.get('/outfits/$query');
     return res.statusCode == 200
         ? List<Map<String, dynamic>>.from(jsonDecode(res.body))
         : [];
@@ -25,13 +28,19 @@ class OutfitService {
     return Map<String, dynamic>.from(jsonDecode(res.body));
   }
 
-  Future<Map<String, dynamic>?> update(int id, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>?> update(
+    int id,
+    Map<String, dynamic> data,
+  ) async {
     final res = await client.put('/outfits/$id/', data);
     if (res.statusCode != 200) return null;
     return Map<String, dynamic>.from(jsonDecode(res.body));
   }
 
-  Future<Map<String, dynamic>?> updatePartial(int id, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>?> updatePartial(
+    int id,
+    Map<String, dynamic> data,
+  ) async {
     final res = await client.patch('/outfits/$id/', data);
     if (res.statusCode != 200) return null;
     return Map<String, dynamic>.from(jsonDecode(res.body));
@@ -50,6 +59,12 @@ class OutfitService {
 
   Future<Map<String, dynamic>?> markWorn(int id) async {
     final res = await client.post('/outfits/$id/wear/', {});
+    if (res.statusCode != 200) return null;
+    return Map<String, dynamic>.from(jsonDecode(res.body));
+  }
+
+  Future<Map<String, dynamic>?> rateAi(Map<String, dynamic> data) async {
+    final res = await client.post('/outfits/ai-rate/', data);
     if (res.statusCode != 200) return null;
     return Map<String, dynamic>.from(jsonDecode(res.body));
   }
