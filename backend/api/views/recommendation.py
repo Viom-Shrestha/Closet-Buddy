@@ -7,6 +7,7 @@ from ..recommend.engine import recommend_outfits
 
 ALLOWED_TEMPERATURES = {"freezing", "cold", "cool", "warm", "hot"}
 ALLOWED_WEATHER = {"rainy", "snowy", "windy", "humid", "dry"}
+RECOMMENDATION_LIMIT = 3
 
 
 def _normalize_text(value):
@@ -37,7 +38,7 @@ def recommend_outfits_view(request):
         weather={"temperature": temperature, "weather": condition},
         occasion=occasion,
         prompt=prompt,
-        limit=5,
+        limit=RECOMMENDATION_LIMIT,
     )
 
     return Response(results, status=200)

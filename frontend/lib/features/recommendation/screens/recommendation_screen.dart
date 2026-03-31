@@ -167,10 +167,9 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         occasion: _occasionCtrl.text,
         prompt: _promptCtrl.text,
       );
-      final trimmed = results.take(3).toList();
       if (!mounted) return;
       setState(() {
-        _results = trimmed;
+        _results = results;
         _saved.clear();
         _savedOutfits.clear();
         _compare.clear();
@@ -201,7 +200,26 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       _showSnack('Missing required items for this outfit.');
       return;
     }
-    _openRatingSheet(index, payload);
+    setState(() => _saving.add(index));
+    final created = await _outfitService.create(payload);
+    if (!mounted) return;
+    setState(() {
+      _saving.remove(index);
+      if (created != null) {
+        _saved.add(index);
+        _savedOutfits[index] = created;
+      }
+    });
+
+    if (created == null) {
+      _showSnack('Failed to save outfit.');
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OutfitDetailPage(initialOutfit: created)),
+    );
   }
 
   void _openSavedOutfit(int index) {
@@ -213,137 +231,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => OutfitDetailPage(initialOutfit: saved)),
-    );
-  }
-
-  void _openRatingSheet(int index, Map<String, dynamic> payload) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: RecommendationTokens.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (_) {
-        int currentRating = 0;
-        bool savingRating = false;
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                20,
-                20,
-                20 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Rate this outfit',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Pick a quick rating before saving.',
-                    style: TextStyle(color: RecommendationTokens.muted),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: RecommendationTokens.surfaceAlt,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: RecommendationTokens.line),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Your rating',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 8),
-                        _starRatingRow(
-                          rating: currentRating,
-                          size: 26,
-                          onSelected: (value) {
-                            setModalState(() => currentRating = value);
-                          },
-                        ),
-                        if (currentRating == 0)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 6),
-                            child: Text(
-                              'Choose at least 1 star to continue.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: RecommendationTokens.muted,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: savingRating || currentRating == 0
-                          ? null
-                          : () async {
-                              setModalState(() => savingRating = true);
-                              final payloadWithRating =
-                                  Map<String, dynamic>.from(payload)
-                                    ..['rating'] = currentRating;
-                              setState(() => _saving.add(index));
-                              final created = await _outfitService.create(
-                                payloadWithRating,
-                              );
-                              if (!mounted) return;
-                              setState(() {
-                                _saving.remove(index);
-                                if (created != null) {
-                                  _saved.add(index);
-                                  _savedOutfits[index] = created;
-                                }
-                              });
-                              if (created == null) {
-                                if (mounted) {
-                                  setModalState(() => savingRating = false);
-                                }
-                                _showSnack('Failed to save outfit.');
-                                return;
-                              }
-                              if (context.mounted) Navigator.pop(context);
-                              Navigator.pushReplacement(
-                                this.context,
-                                MaterialPageRoute(
-                                  builder: (_) => OutfitBuilderPage(
-                                    existingOutfit: created,
-                                  ),
-                                ),
-                              );
-                            },
-                      icon: const Icon(Icons.check_circle_outline),
-                      label: const Text('Save outfit'),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -369,30 +256,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
-  }
-
-  Widget _starRatingRow({
-    required int rating,
-    required ValueChanged<int> onSelected,
-    double size = 22,
-  }) {
-    return Row(
-      children: List.generate(5, (index) {
-        final value = index + 1;
-        final isActive = value <= rating;
-        return IconButton(
-          onPressed: () => onSelected(value),
-          icon: Icon(
-            isActive ? Icons.star_rounded : Icons.star_border_rounded,
-            color: isActive ? RecommendationTokens.warning : RecommendationTokens.mutedSoft,
-          ),
-          iconSize: size,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          tooltip: '$value stars',
-        );
-      }),
     );
   }
 

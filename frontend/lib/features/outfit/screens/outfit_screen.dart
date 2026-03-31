@@ -18,8 +18,13 @@ import 'package:frontend/utils/outfit_slot_rules.dart';
 
 class OutfitsPage extends StatefulWidget {
   final bool embedded;
+  final bool favouritesOnly;
 
-  const OutfitsPage({super.key, this.embedded = false});
+  const OutfitsPage({
+    super.key,
+    this.embedded = false,
+    this.favouritesOnly = false,
+  });
 
   @override
   State<OutfitsPage> createState() => _OutfitsPageState();
@@ -41,7 +46,9 @@ class _OutfitsPageState extends State<OutfitsPage> {
 
   Future<void> _loadOutfits() async {
     setState(() => _loading = true);
-    final outfits = await _outfitService.getAll();
+    final outfits = await _outfitService.getAll(
+      favouritesOnly: widget.favouritesOnly ? true : null,
+    );
     if (!mounted) return;
     setState(() {
       _outfits = outfits;
@@ -64,6 +71,9 @@ class _OutfitsPageState extends State<OutfitsPage> {
         builder: (_) => const RecommendationScreen(title: 'Outfit Generation'),
       ),
     );
+    if (mounted) {
+      _loadOutfits();
+    }
   }
 
   Future<void> _openDetail(Map<String, dynamic> outfit) async {
@@ -108,7 +118,9 @@ class _OutfitsPageState extends State<OutfitsPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: OutfitTokens.dangerStrong),
+            style: FilledButton.styleFrom(
+              backgroundColor: OutfitTokens.dangerStrong,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -161,7 +173,9 @@ class _OutfitsPageState extends State<OutfitsPage> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                   child: Text(
-                    '$total Saved ${total == 1 ? 'Outfit' : 'Outfits'}',
+                    widget.favouritesOnly
+                        ? '$total Favourite ${total == 1 ? 'Outfit' : 'Outfits'}'
+                        : '$total Saved ${total == 1 ? 'Outfit' : 'Outfits'}',
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -291,7 +305,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
     return Scaffold(
       backgroundColor: OutfitTokens.bg,
       appBar: AppBar(
-        title: const Text('Outfits'),
+        title: Text(widget.favouritesOnly ? 'Favourite Outfits' : 'Outfits'),
         backgroundColor: OutfitTokens.surface,
         foregroundColor: OutfitTokens.ink,
       ),
@@ -300,6 +314,12 @@ class _OutfitsPageState extends State<OutfitsPage> {
   }
 
   Widget _emptyState() {
+    final title = widget.favouritesOnly
+        ? 'No favourite outfits yet'
+        : 'No outfits yet';
+    final subtitle = widget.favouritesOnly
+        ? 'Favourite an outfit to see it here.'
+        : 'Build your first look and it will appear here.';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -308,15 +328,19 @@ class _OutfitsPageState extends State<OutfitsPage> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: OutfitTokens.border),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          Icon(Icons.checkroom_outlined, size: 34, color: OutfitTokens.muted),
-          SizedBox(height: 10),
-          Text('No outfits yet'),
-          SizedBox(height: 4),
+          const Icon(
+            Icons.checkroom_outlined,
+            size: 34,
+            color: OutfitTokens.muted,
+          ),
+          const SizedBox(height: 10),
+          Text(title),
+          const SizedBox(height: 4),
           Text(
-            'Build your first look and it will appear here.',
-            style: TextStyle(fontSize: 12, color: OutfitTokens.muted),
+            subtitle,
+            style: const TextStyle(fontSize: 12, color: OutfitTokens.muted),
             textAlign: TextAlign.center,
           ),
         ],
@@ -517,6 +541,7 @@ class _GalleryCard extends StatelessWidget {
     final name = (outfit['name'] ?? 'Untitled Outfit').toString();
     final occasion = (outfit['occasion'] ?? 'Any Occasion').toString();
     final rating = outfit['rating']?.toString() ?? '-';
+    final aiRatingScore = _asDouble(outfit['ai_rating_score']);
     final wearCount = _asInt(outfit['wear_count']) ?? 0;
     final isFav = outfit['is_favourite'] == true;
     final previewItems = _previewItems(outfit);
@@ -581,6 +606,38 @@ class _GalleryCard extends StatelessWidget {
                       color: OutfitTokens.muted,
                     ),
                   ),
+                  if (aiRatingScore != null) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: OutfitTokens.tagBgSoft,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 11,
+                            color: OutfitTokens.warning,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            aiRatingScore.toStringAsFixed(1),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: OutfitTokens.ink,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   Row(
                     children: [
@@ -613,9 +670,7 @@ class _GalleryCard extends StatelessWidget {
                       Icon(
                         isFav ? Icons.favorite : Icons.favorite_border,
                         size: 15,
-                        color: isFav
-                            ? OutfitTokens.danger
-                            : OutfitTokens.muted,
+                        color: isFav ? OutfitTokens.danger : OutfitTokens.muted,
                       ),
                       if (selectionMode) ...[
                         const SizedBox(width: 8),
@@ -765,6 +820,20 @@ class _GalleryCard extends StatelessWidget {
     return int.tryParse(raw?.toString() ?? '');
   }
 
+  double? _asDouble(dynamic raw) {
+    if (raw is double) return raw;
+    if (raw is num) return raw.toDouble();
+    return double.tryParse(raw?.toString() ?? '');
+  }
+
+  List<String> _stringList(dynamic raw) {
+    if (raw is! List) return [];
+    return raw
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
   String _imageOf(Map<String, dynamic> item) {
     final raw = (item['image'] ?? '').toString().trim();
     if (raw.isEmpty) return '';
@@ -787,8 +856,10 @@ class OutfitItemSelectionPage extends StatefulWidget {
 }
 
 class _OutfitItemSelectionPageState extends State<OutfitItemSelectionPage> {
-  final AccessoryService _accessoryService = ServiceRegistry.instance.accessoryService;
-  final ClothingService _clothingService = ServiceRegistry.instance.clothingService;
+  final AccessoryService _accessoryService =
+      ServiceRegistry.instance.accessoryService;
+  final ClothingService _clothingService =
+      ServiceRegistry.instance.clothingService;
 
   // Items per slot
   List<Map<String, dynamic>> _tops = [];
@@ -1353,13 +1424,20 @@ class OutfitBuilderPage extends StatefulWidget {
 }
 
 class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
-  final AccessoryService _accessoryService = ServiceRegistry.instance.accessoryService;
-  final ClothingService _clothingService = ServiceRegistry.instance.clothingService;
+  final AccessoryService _accessoryService =
+      ServiceRegistry.instance.accessoryService;
+  final ClothingService _clothingService =
+      ServiceRegistry.instance.clothingService;
   final OutfitService _outfitService = ServiceRegistry.instance.outfitService;
 
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _occasionCtrl = TextEditingController();
-  int _ratingValue = 0;
+  double? _aiRatingScore;
+  List<String> _aiRatingReasons = [];
+  Map<String, dynamic> _aiRatingBreakdown = {};
+  String? _aiRatedAt;
+  bool _aiRatingLoading = false;
+  bool _aiRatingStale = false;
 
   // All items grouped by slot
   List<Map<String, dynamic>> _tops = [];
@@ -1403,16 +1481,13 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
     if (e == null) return;
     _nameCtrl.text = (e['name'] ?? '').toString();
     _occasionCtrl.text = (e['occasion'] ?? '').toString();
-    final rating = e['rating'];
-    if (rating != null) {
-      _ratingValue = _asInt(rating) ?? 0;
-    }
     final rawPreview = e['preview_layout'];
     if (rawPreview is Map<String, dynamic>) {
       _previewLayout = rawPreview;
     } else if (rawPreview is Map) {
       _previewLayout = Map<String, dynamic>.from(rawPreview);
     }
+    _refreshAiSnapshot(e);
   }
 
   Future<void> _loadClothes() async {
@@ -1553,8 +1628,6 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
       return;
     }
 
-    final rating = _ratingValue > 0 ? _ratingValue : null;
-
     setState(() => _saving = true);
 
     final payload = <String, dynamic>{
@@ -1562,7 +1635,6 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
       'occasion': _occasionCtrl.text.trim().isEmpty
           ? null
           : _occasionCtrl.text.trim(),
-      'rating': rating,
       'preview_layout': _layoutForSave(),
       'outerwear_id': _asInt(_selected(_outerwear, _outerwearIndex)?['id']),
       'topwear_id': _asInt(top?['id']),
@@ -1573,6 +1645,7 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
           .whereType<int>()
           .toList(),
     };
+    payload.addAll(_buildAiSnapshotForSave());
 
     final id = _editingOutfitId;
     final result = id == null
@@ -1589,6 +1662,43 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
       return;
     }
     Navigator.pop(context, true);
+  }
+
+  Map<String, dynamic> _buildAiSnapshotForSave() {
+    if (_aiRatingScore != null && !_aiRatingStale) {
+      return {
+        'ai_rating_score': _aiRatingScore,
+        'ai_rating_reasons': _aiRatingReasons,
+        'ai_rating_breakdown': _aiRatingBreakdown,
+        'ai_rated_at': _aiRatedAt,
+      };
+    }
+    return {
+      'ai_rating_score': null,
+      'ai_rating_reasons': <String>[],
+      'ai_rating_breakdown': <String, dynamic>{},
+      'ai_rated_at': null,
+    };
+  }
+
+  void _refreshAiSnapshot(Map<String, dynamic> payload) {
+    _aiRatingScore = _asDouble(payload['ai_rating_score']);
+    _aiRatingReasons = _stringList(payload['ai_rating_reasons']);
+    final rawBreakdown = payload['ai_rating_breakdown'];
+    if (rawBreakdown is Map<String, dynamic>) {
+      _aiRatingBreakdown = rawBreakdown;
+    } else if (rawBreakdown is Map) {
+      _aiRatingBreakdown = Map<String, dynamic>.from(rawBreakdown);
+    } else {
+      _aiRatingBreakdown = {};
+    }
+    _aiRatedAt = payload['ai_rated_at']?.toString();
+    _aiRatingStale = false;
+  }
+
+  void _markAiRatingStale() {
+    if (_aiRatingScore == null || _aiRatingStale) return;
+    _aiRatingStale = true;
   }
 
   // ── Build ────────────────────────────────────────────────────────────────
@@ -1697,7 +1807,9 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          _buildInlineDetailsPanel(),
+                          _buildCreationSection(),
+                          const SizedBox(height: 10),
+                          _buildEvaluationSection(),
                         ],
                       ),
                     ),
@@ -1746,7 +1858,55 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
     _loadClothes();
   }
 
-  Widget _buildInlineDetailsPanel() {
+  Future<void> _rateOutfitAi() async {
+    if (_aiRatingLoading) return;
+
+    final topId = _asInt(_selected(_tops, _topIndex)?['id']);
+    final bottomId = _asInt(_selected(_bottoms, _bottomIndex)?['id']);
+    final shoesId = _asInt(_selected(_shoes, _shoesIndex)?['id']);
+    if (topId == null || bottomId == null || shoesId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Select topwear, bottomwear, and shoes before AI rating.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final payload = <String, dynamic>{
+      'topwear_id': topId,
+      'bottomwear_id': bottomId,
+      'shoes_id': shoesId,
+      'outerwear_id': _asInt(_selected(_outerwear, _outerwearIndex)?['id']),
+      'accessory_ids': _accessoryIndices
+          .map((i) => _asInt(_selected(_accessories, i)?['id']))
+          .whereType<int>()
+          .toList(),
+    };
+    if (_editingOutfitId != null) {
+      payload['outfit_id'] = _editingOutfitId;
+    }
+
+    setState(() => _aiRatingLoading = true);
+    final result = await _outfitService.rateAi(payload);
+    if (!mounted) return;
+    setState(() => _aiRatingLoading = false);
+
+    if (result == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to rate outfit.')));
+      return;
+    }
+
+    setState(() {
+      _refreshAiSnapshot(result);
+    });
+  }
+
+  Widget _buildCreationSection() {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 6),
@@ -1757,7 +1917,17 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
         border: Border.all(color: OutfitTokens.border),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text(
+            'Creation',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: OutfitTokens.ink,
+            ),
+          ),
+          const SizedBox(height: 8),
           TextField(
             controller: _nameCtrl,
             decoration: const InputDecoration(
@@ -1767,57 +1937,95 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _occasionCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Occasion',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: OutfitTokens.line),
-                    color: OutfitTokens.white,
-                  ),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'Rating',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: OutfitTokens.muted,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      _StarRatingBar(
-                        rating: _ratingValue,
-                        onSelected: (value) {
-                          setState(() => _ratingValue = value);
-                        },
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          TextField(
+            controller: _occasionCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Occasion',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Use slot taps above to adjust topwear, bottomwear, shoes, outerwear, and accessories.',
+            style: TextStyle(
+              fontSize: 11,
+              color: OutfitTokens.muted,
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ── Utility helpers ──────────────────────────────────────────────────────
+  Widget _buildEvaluationSection() {
+    final hasAiScore = _aiRatingScore != null;
+    final actionLabel = _aiRatingLoading
+        ? 'Rating...'
+        : (_aiRatingStale || hasAiScore)
+        ? 'Re-rate Outfit'
+        : 'Rate Outfit';
 
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: OutfitTokens.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: OutfitTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'AI Style Rating',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: OutfitTokens.ink,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Evaluate this outfit after you finish creating it.',
+            style: TextStyle(fontSize: 11, color: OutfitTokens.muted),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _aiRatingLoading ? null : _rateOutfitAi,
+              style: FilledButton.styleFrom(
+                backgroundColor: OutfitTokens.accent,
+                foregroundColor: OutfitTokens.white,
+              ),
+              icon: _aiRatingLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: OutfitTokens.white,
+                      ),
+                    )
+                  : const Icon(Icons.auto_awesome_outlined),
+              label: Text(actionLabel),
+            ),
+          ),
+          if (hasAiScore) ...[
+            const SizedBox(height: 10),
+            _AiRatingCard(
+              score: _aiRatingScore!,
+              reasons: _aiRatingReasons,
+              ratedAtText: _formatAiRatedAt(_aiRatedAt),
+              stale: _aiRatingStale,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
   void _handleCanvasItemLongPress(String id) {
     if (id.startsWith('top-')) {
       _openSlotPicker('topwear');
@@ -1980,7 +2188,12 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
           title: 'Select Topwear',
           items: _tops,
           selectedIndex: _topIndex,
-          onSelect: (index) => setState(() => _topIndex = index),
+          onSelect: (index) => setState(() {
+            if (_topIndex != index) {
+              _topIndex = index;
+              _markAiRatingStale();
+            }
+          }),
         );
         break;
       case 'bottomwear':
@@ -1988,7 +2201,12 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
           title: 'Select Bottomwear',
           items: _bottoms,
           selectedIndex: _bottomIndex,
-          onSelect: (index) => setState(() => _bottomIndex = index),
+          onSelect: (index) => setState(() {
+            if (_bottomIndex != index) {
+              _bottomIndex = index;
+              _markAiRatingStale();
+            }
+          }),
         );
         break;
       case 'shoes':
@@ -1996,7 +2214,12 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
           title: 'Select Shoes',
           items: _shoes,
           selectedIndex: _shoesIndex,
-          onSelect: (index) => setState(() => _shoesIndex = index),
+          onSelect: (index) => setState(() {
+            if (_shoesIndex != index) {
+              _shoesIndex = index;
+              _markAiRatingStale();
+            }
+          }),
         );
         break;
       case 'outerwear':
@@ -2005,7 +2228,12 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
           items: _outerwear,
           selectedIndex: _outerwearIndex,
           optionalNone: true,
-          onSelect: (index) => setState(() => _outerwearIndex = index),
+          onSelect: (index) => setState(() {
+            if (_outerwearIndex != index) {
+              _outerwearIndex = index;
+              _markAiRatingStale();
+            }
+          }),
         );
         break;
       case 'accessories':
@@ -2237,10 +2465,19 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: () {
+                          final previous = Set<int>.from(_accessoryIndices);
                           setState(() {
                             _accessoryIndices
                               ..clear()
                               ..addAll(working);
+                            final changed =
+                                previous.length != _accessoryIndices.length ||
+                                previous.any(
+                                  (item) => !_accessoryIndices.contains(item),
+                                );
+                            if (changed) {
+                              _markAiRatingStale();
+                            }
                           });
                           Navigator.pop(context);
                         },
@@ -2279,6 +2516,30 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
     return -1;
   }
 
+  double? _asDouble(dynamic raw) {
+    if (raw is double) return raw;
+    if (raw is num) return raw.toDouble();
+    return double.tryParse(raw?.toString() ?? '');
+  }
+
+  List<String> _stringList(dynamic raw) {
+    if (raw is! List) return [];
+    return raw
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
+  String _formatAiRatedAt(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return '-';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    final local = parsed.toLocal();
+    return '${local.year}-${_two(local.month)}-${_two(local.day)} ${_two(local.hour)}:${_two(local.minute)}';
+  }
+
+  String _two(int value) => value < 10 ? '0$value' : '$value';
+
   int? _asInt(dynamic raw) {
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
@@ -2315,6 +2576,8 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
   bool _updatingFav = false;
   bool _savingRating = false;
   bool _markingWorn = false;
+  bool _aiRatingLoading = false;
+  bool _ratingOutdated = false;
 
   bool _isWornToday(Map<String, dynamic>? outfit) {
     final raw = outfit?['last_worn_at'];
@@ -2375,6 +2638,97 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
     });
   }
 
+  Future<void> _rateWithAi() async {
+    final outfit = _outfit;
+    final id = _outfitId;
+    if (outfit == null || id == null || _aiRatingLoading) return;
+
+    final topwearId = _slotId(outfit, 'topwear_item');
+    final bottomwearId = _slotId(outfit, 'bottomwear_item');
+    final shoesId = _slotId(outfit, 'shoes_item');
+    if (topwearId == null || bottomwearId == null || shoesId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Select topwear, bottomwear, and shoes before AI rating.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final payload = <String, dynamic>{
+      'outfit_id': id,
+      'topwear_id': topwearId,
+      'bottomwear_id': bottomwearId,
+      'shoes_id': shoesId,
+      'outerwear_id': _slotId(outfit, 'outerwear_item'),
+      'accessory_ids': _accessoryIds(outfit),
+    };
+
+    setState(() => _aiRatingLoading = true);
+    final result = await _outfitService.rateAi(payload);
+    if (!mounted) return;
+
+    setState(() => _aiRatingLoading = false);
+    if (result == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to rate outfit.')));
+      return;
+    }
+
+    setState(() {
+      _outfit = {
+        ...outfit,
+        'ai_rating_score': result['ai_rating_score'],
+        'ai_rating_reasons': result['ai_rating_reasons'],
+        'ai_rating_breakdown': result['ai_rating_breakdown'],
+        'ai_rated_at': result['ai_rated_at'],
+      };
+      _ratingOutdated = false;
+    });
+  }
+
+  bool _hasAiSnapshot(Map<String, dynamic>? outfit) {
+    return _asDouble(outfit?['ai_rating_score']) != null;
+  }
+
+  bool _itemsChanged(Map<String, dynamic>? before, Map<String, dynamic>? after) {
+    if (before == null || after == null) return false;
+    if (_slotId(before, 'topwear_item') != _slotId(after, 'topwear_item')) {
+      return true;
+    }
+    if (_slotId(before, 'bottomwear_item') != _slotId(after, 'bottomwear_item')) {
+      return true;
+    }
+    if (_slotId(before, 'shoes_item') != _slotId(after, 'shoes_item')) {
+      return true;
+    }
+    if (_slotId(before, 'outerwear_item') != _slotId(after, 'outerwear_item')) {
+      return true;
+    }
+    final beforeAccessories = _accessoryIds(before).toSet();
+    final afterAccessories = _accessoryIds(after).toSet();
+    if (beforeAccessories.length != afterAccessories.length) {
+      return true;
+    }
+    return beforeAccessories.any((id) => !afterAccessories.contains(id));
+  }
+
+  int? _slotId(Map<String, dynamic>? outfit, String key) {
+    final item = outfit == null ? null : _slot(outfit, key);
+    return _asInt(item?['id']);
+  }
+
+  List<int> _accessoryIds(Map<String, dynamic>? outfit) {
+    if (outfit == null) return const [];
+    return _accessoryList(outfit)
+        .map((item) => _asInt(item['id']))
+        .whereType<int>()
+        .toList();
+  }
+
   Future<void> _markWorn() async {
     final id = _outfitId;
     if (id == null || _markingWorn) return;
@@ -2411,6 +2765,7 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
   Future<void> _editOutfit() async {
     final outfit = _outfit;
     if (outfit == null) return;
+    final before = Map<String, dynamic>.from(outfit);
     final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -2418,7 +2773,11 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
       ),
     );
     if (changed == true) {
-      _loadDetail();
+      await _loadDetail();
+      if (!mounted) return;
+      if (_hasAiSnapshot(before) && _itemsChanged(before, _outfit)) {
+        setState(() => _ratingOutdated = true);
+      }
     }
   }
 
@@ -2437,7 +2796,9 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: OutfitTokens.dangerStrong),
+            style: FilledButton.styleFrom(
+              backgroundColor: OutfitTokens.dangerStrong,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -2461,6 +2822,9 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
     final name = (outfit?['name'] ?? 'Outfit').toString();
     final occasion = (outfit?['occasion'] ?? 'Any Occasion').toString();
     final ratingValue = _asInt(outfit?['rating']) ?? 0;
+    final aiRatingScore = _asDouble(outfit?['ai_rating_score']);
+    final aiRatingReasons = _stringList(outfit?['ai_rating_reasons']);
+    final aiRatedAtText = _formatDate(outfit?['ai_rated_at']?.toString());
     final wearCount = _asInt(outfit?['wear_count']) ?? 0;
     final alreadyWornToday = _isWornToday(outfit);
     final isFav = outfit?['is_favourite'] == true;
@@ -2500,6 +2864,14 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
                         accessories: _accessoryList(outfit),
                       ),
                 const SizedBox(height: 14),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -2510,10 +2882,97 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 20,
+                      const Text(
+                        'AI Style Rating',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _aiRatingLoading ? null : _rateWithAi,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: OutfitTokens.accent,
+                            foregroundColor: OutfitTokens.white,
+                          ),
+                          icon: _aiRatingLoading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: OutfitTokens.white,
+                                  ),
+                                )
+                              : const Icon(Icons.auto_awesome_outlined),
+                          label: Text(
+                            aiRatingScore == null
+                                ? 'Rate with AI'
+                                : 'Re-rate Outfit',
+                          ),
+                        ),
+                      ),
+                      if (_ratingOutdated) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: OutfitTokens.warning.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: OutfitTokens.warning),
+                          ),
+                          child: const Text(
+                            'Rating outdated. Re-rate for an updated AI score.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: OutfitTokens.warning,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (aiRatingScore != null) ...[
+                        const SizedBox(height: 10),
+                        _AiRatingCard(
+                          score: aiRatingScore,
+                          reasons: aiRatingReasons,
+                          ratedAtText: aiRatedAtText,
+                          stale: _ratingOutdated,
+                        ),
+                      ],
+                      if (aiRatingScore == null && !_ratingOutdated)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 10),
+                          child: Text(
+                            'No AI rating yet. Rate this outfit when you want evaluation feedback.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: OutfitTokens.muted,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: OutfitTokens.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: OutfitTokens.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Outfit Details',
+                        style: TextStyle(
+                          fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -2738,6 +3197,20 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
     return '${ApiClient.host}/$raw';
   }
 
+  double? _asDouble(dynamic raw) {
+    if (raw is double) return raw;
+    if (raw is num) return raw.toDouble();
+    return double.tryParse(raw?.toString() ?? '');
+  }
+
+  List<String> _stringList(dynamic raw) {
+    if (raw is! List) return [];
+    return raw
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
   int? _asInt(dynamic raw) {
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
@@ -2769,6 +3242,118 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
   }
 
   String _two(int value) => value < 10 ? '0$value' : '$value';
+}
+
+class _AiRatingCard extends StatelessWidget {
+  final double score;
+  final List<String> reasons;
+  final String ratedAtText;
+  final bool stale;
+
+  const _AiRatingCard({
+    required this.score,
+    required this.reasons,
+    required this.ratedAtText,
+    this.stale = false,
+  });
+
+  List<String> _feedbackLines() {
+    final cleaned = reasons
+        .map((reason) => reason.trim())
+        .where((reason) => reason.isNotEmpty)
+        .toList();
+    const fallback = [
+      'Balanced overall composition.',
+      'Color pairing is generally coherent.',
+      'Try swapping one item for stronger contrast.',
+    ];
+    while (cleaned.length < 3) {
+      cleaned.add(fallback[cleaned.length]);
+    }
+    return cleaned.take(3).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = _feedbackLines();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: OutfitTokens.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: stale ? OutfitTokens.warning : OutfitTokens.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'AI Style Score',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: OutfitTokens.muted,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text(
+                '${score.toStringAsFixed(1)} / 5',
+                style: const TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
+                  color: OutfitTokens.ink,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.star_rounded,
+                size: 18,
+                color: OutfitTokens.warning,
+              ),
+            ],
+          ),
+          if (ratedAtText.trim().isNotEmpty && ratedAtText != '-') ...[
+            const SizedBox(height: 4),
+            Text(
+              'Rated $ratedAtText',
+              style: const TextStyle(fontSize: 11, color: OutfitTokens.muted),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            '- ${lines[0]}',
+            style: const TextStyle(fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '- ${lines[1]}',
+            style: const TextStyle(fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '- ${lines[2]}',
+            style: const TextStyle(fontSize: 12),
+          ),
+          if (stale)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Rating outdated. Re-rate to refresh this score.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: OutfitTokens.warning,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {
@@ -2831,3 +3416,5 @@ class _StarRatingBar extends StatelessWidget {
     );
   }
 }
+
+

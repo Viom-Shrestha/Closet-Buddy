@@ -9,6 +9,7 @@ from .filters import (
     WARM_SIGNALS,
     attr_set,
     is_outerwear,
+    normalize_occasion,
 )
 
 
@@ -97,15 +98,16 @@ def weather_score(outfit: Dict, weather: Dict) -> float:
 def occasion_score(outfit: Dict, occasion: Optional[str]) -> float:
     if not occasion:
         return 0.5
-    target = occasion.strip().lower()
+    target = normalize_occasion(occasion)
     items = [outfit["topwear"], outfit["bottomwear"], outfit["shoes"]]
     if outfit.get("outerwear"):
         items.append(outfit["outerwear"])
 
     matches = 0
     for item in items:
-        item_occ = (item.occasion or "").strip().lower()
+        item_occ = normalize_occasion(item.occasion)
         attrs = attr_set(item)
+        attrs = {normalize_occasion(attr) for attr in attrs}
         if item_occ == target or target in attrs:
             matches += 1
     return matches / max(len(items), 1)
@@ -159,13 +161,17 @@ def layering_score(outfit: Dict, weather: Dict) -> float:
 
 
 def clip_score(outfit: Dict, text_prompt: str) -> float:
-    items = [outfit["topwear"], outfit["bottomwear"], outfit["shoes"]]
-    if outfit.get("outerwear"):
-        items.append(outfit["outerwear"])
-    embeddings = [clip_utils.get_image_embedding(item.image.path) for item in items]
-    outfit_embedding = clip_utils.average_embeddings(embeddings)
-    text_embedding = clip_utils.get_text_embedding(text_prompt)
-    return clip_utils.cosine_similarity(outfit_embedding, text_embedding)
+    try:
+        items = [outfit["topwear"], outfit["bottomwear"], outfit["shoes"]]
+        if outfit.get("outerwear"):
+            items.append(outfit["outerwear"])
+        embeddings = [clip_utils.get_image_embedding(item.image.path) for item in items]
+        outfit_embedding = clip_utils.average_embeddings(embeddings)
+        text_embedding = clip_utils.get_text_embedding(text_prompt)
+        return clip_utils.cosine_similarity(outfit_embedding, text_embedding)
+    except Exception:
+        # Keep recommendations available if model loading/inference fails.
+        return 0.5
 
 
 def final_score(outfit: Dict, weather: Dict, occasion: Optional[str], text_prompt: str) -> float:
@@ -182,3 +188,68 @@ def final_score(outfit: Dict, weather: Dict, occasion: Optional[str], text_promp
         + (0.1 * color_fit)
         + (0.05 * layering_fit)
     )
+
+
+def _ai_cohesion_reason(clip: float) -> str:
+    if clip >= 0.8:
+        return "The pieces feel cohesive and stylistically aligned."
+    if clip >= 0.65:
+        return "The outfit has decent cohesion with room for tighter styling."
+    return "The outfit feels a bit mixed; the pieces do not fully align yet."
+
+
+def _ai_color_reason(color: float) -> str:
+    if color >= 0.85:
+        return "Color harmony is strong, with a balanced palette."
+    if color >= 0.7:
+        return "Color pairing works reasonably well, though it could be cleaner."
+    return "The color mix is busy; reducing contrast would improve balance."
+
+
+def _ai_improvement_tip(clip: float, color: float, neutral_weather_fit: float, has_outerwear: bool) -> str:
+    weakest = min(
+        [
+            ("cohesion", clip),
+            ("color", color),
+            ("weather", neutral_weather_fit),
+        ],
+        key=lambda item: item[1],
+    )[0]
+
+    if weakest == "cohesion":
+        return "Try swapping one piece for a style that better matches the others."
+    if weakest == "color":
+        return "Limit the outfit to one dominant accent color with neutral support."
+    if has_outerwear:
+        return "Consider a lighter outer layer to keep the outfit more versatile."
+    return "A light jacket option could make this outfit easier to adapt."
+
+
+def ai_rating_snapshot(outfit: Dict) -> Dict:
+    text_prompt = "a cohesive stylish everyday outfit"
+    neutral_weather = {"temperature": "cool", "weather": "dry"}
+
+    clip = clip_score(outfit, text_prompt)
+    color = color_harmony_score(outfit)
+    neutral_weather_fit = weather_score(outfit, neutral_weather)
+
+    overall_raw = (0.60 * clip) + (0.25 * color) + (0.15 * neutral_weather_fit)
+    score = round(1 + (4 * overall_raw), 1)
+    score = max(1.0, min(5.0, score))
+
+    reasons = [
+        _ai_cohesion_reason(clip),
+        _ai_color_reason(color),
+        _ai_improvement_tip(clip, color, neutral_weather_fit, outfit.get("outerwear") is not None),
+    ]
+
+    return {
+        "ai_rating_score": score,
+        "ai_rating_reasons": reasons,
+        "ai_rating_breakdown": {
+            "clip": round(clip, 4),
+            "color_harmony": round(color, 4),
+            "neutral_weather_fit": round(neutral_weather_fit, 4),
+            "overall_raw": round(overall_raw, 4),
+        },
+    }

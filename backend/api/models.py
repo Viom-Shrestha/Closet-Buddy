@@ -188,6 +188,14 @@ class Outfit(models.Model):
     )
     occasion = models.CharField(max_length=50, null=True, blank=True)
     rating = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
+    ai_rating_score = models.FloatField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1.0), MaxValueValidator(5.0)],
+    )
+    ai_rating_reasons = models.JSONField(default=list, blank=True)
+    ai_rating_breakdown = models.JSONField(default=dict, blank=True)
+    ai_rated_at = models.DateTimeField(null=True, blank=True)
     wear_count = models.IntegerField(default=0)
     last_worn_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

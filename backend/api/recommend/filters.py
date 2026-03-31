@@ -133,7 +133,19 @@ def normalize_weather(weather: Dict) -> Dict[str, str]:
 
 
 def normalize_occasion(value: Optional[str]) -> str:
-    return _normalize_text(value)
+    normalized = _normalize_text(value)
+    aliases = {
+        "any": "",
+        "sports": "sport",
+        "athletic": "sport",
+        "gym": "sport",
+        "work": "office",
+        "workwear": "office",
+        "business": "office",
+        "dating": "date",
+        "streetwear": "street",
+    }
+    return aliases.get(normalized, normalized)
 
 
 def attr_set(item: ClothingItem) -> set:

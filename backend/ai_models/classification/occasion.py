@@ -21,16 +21,26 @@ OCCASION_PROMPTS: Dict[str, List[str]] = {
         "business meeting outfit",
         "semi-formal outfit",
     ],
+    "Office": [
+        "office workwear outfit",
+        "business casual office look",
+        "professional corporate attire",
+    ],
     "Party": [
         "party night outfit",
-        "date night outfit",
         "club party clothing",
+        "date night outfit",
+    ],
+    "Date": [
+        "date night outfit",
+        "romantic dinner outfit",
+        "stylish date outfit",
     ],
     "Traditional": [
         "traditional ethnic clothing",
         "cultural festival outfit",
     ],
-    "Sports": [
+    "Sport": [
         "sports gym activewear",
         "athletic workout outfit",
         "running training outfit",
@@ -47,6 +57,11 @@ OCCASION_PROMPTS: Dict[str, List[str]] = {
     "Beach": [
         "beach vacation outfit",
         "resort beachwear",
+    ],
+    "Street": [
+        "street style outfit",
+        "urban streetwear look",
+        "trendy street fashion",
     ],
 }
 
