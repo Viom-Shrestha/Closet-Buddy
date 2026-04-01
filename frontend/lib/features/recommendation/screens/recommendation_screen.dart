@@ -28,8 +28,10 @@ class RecommendationScreen extends StatefulWidget {
 }
 
 class _RecommendationScreenState extends State<RecommendationScreen> {
-  final RecommendationService _service = ServiceRegistry.instance.recommendationService;
-  final ClothingService _clothingService = ServiceRegistry.instance.clothingService;
+  final RecommendationService _service =
+      ServiceRegistry.instance.recommendationService;
+  final ClothingService _clothingService =
+      ServiceRegistry.instance.clothingService;
   final OutfitService _outfitService = ServiceRegistry.instance.outfitService;
 
   final TextEditingController _occasionCtrl = TextEditingController();
@@ -50,27 +52,125 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     'humid',
     'dry',
   ];
-  final List<String> _occasionOptions = const [
-    'Any',
-    'Casual',
-    'Formal',
-    'Office',
-    'Party',
-    'Date',
-    'Sport',
-    'Travel',
-    'Street',
+  final List<String> _occasionOptions = [''];
+  static const Set<String> _canonicalOccasions = {
+    'casual',
+    'formal',
+    'office',
+    'party',
+    'date',
+    'traditional',
+    'sport',
+    'home',
+    'travel',
+    'beach',
+    'street',
+    'outdoor',
+    'workout',
+  };
+  static const Set<String> _occasionAttributeSignals = {
+    'casual',
+    'formal',
+    'sport',
+    'sporty',
+    'street',
+    'streetwear',
+    'vintage',
+    'office',
+    'party',
+    'date',
+    'traditional',
+    'outdoor',
+    'home',
+    'travel',
+    'beach',
+    'workout',
+    'active',
+    'athletic',
+    'gym',
+    'fitness',
+  };
+  static const Map<String, String> _occasionAliases = {
+    'casual': 'casual',
+    'formal': 'formal',
+    'office': 'office',
+    'party': 'party',
+    'date': 'date',
+    'traditional': 'traditional',
+    'sport': 'sport',
+    'home': 'home',
+    'travel': 'travel',
+    'beach': 'beach',
+    'street': 'street',
+    'sporty': 'sport',
+    'sports': 'sport',
+    'formal shoes': 'formal',
+    'casual shoes': 'casual',
+    'sports shoes': 'sport',
+    'athletic': 'sport',
+    'gym': 'sport',
+    'active': 'workout',
+    'workout': 'workout',
+    'fitness': 'workout',
+    'work': 'office',
+    'workwear': 'office',
+    'business': 'office',
+    'business casual': 'office',
+    'professional': 'office',
+    'corporate': 'office',
+    'dating': 'date',
+    'date night': 'date',
+    'romantic': 'date',
+    'streetwear': 'street',
+    'street style': 'street',
+    'urban': 'street',
+    'night out': 'party',
+    'cocktail': 'party',
+    'going out': 'party',
+    'club': 'party',
+    'smart casual': 'casual',
+    'weekend': 'casual',
+    'everyday': 'casual',
+    'relaxed': 'casual',
+    'brunch': 'casual',
+    'outdoor': 'outdoor',
+    'hiking': 'outdoor',
+    'camping': 'outdoor',
+    'festival': 'casual',
+    'vacation': 'beach',
+    'black tie': 'formal',
+    'gala': 'formal',
+    'wedding': 'formal',
+    'any': '',
+  };
+  static const List<String> _occasionOrder = [
+    'casual',
+    'formal',
+    'office',
+    'party',
+    'date',
+    'sport',
+    'travel',
+    'street',
+    'beach',
+    'home',
+    'outdoor',
+    'traditional',
+    'workout',
   ];
 
   String _temperature = 'cool';
   String _weather = 'dry';
-  String _occasionValue = 'Any';
+  String _occasionValue = '';
 
   // Results state
   bool _showResults = false;
   bool _loading = false;
   String? _error;
   List<Map<String, dynamic>> _results = [];
+  String? _processingWarning;
+  String? _processedTemperature;
+  String? _processedWeather;
 
   // Interaction state
   Map<int, Map<String, dynamic>> _clothingById = {};
@@ -147,10 +247,25 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       }
     }
     if (!mounted) return;
-    setState(() => _clothingById = map);
+    setState(() {
+      _clothingById = map;
+      _rebuildOccasionOptions();
+    });
   }
 
   Future<void> _generate() async {
+    final selectedOccasion = _occasionCtrl.text.trim();
+    if (selectedOccasion.isNotEmpty &&
+        !_occasionOptions.contains(selectedOccasion)) {
+      setState(() {
+        _occasionValue = '';
+        _occasionCtrl.clear();
+      });
+      _showSnack(
+        'No clothing found for ${_occasionDisplayLabel(selectedOccasion)} yet. Showing best available outfits instead.',
+      );
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -161,12 +276,33 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       if (_clothingById.isEmpty) {
         await _loadClothing();
       }
-      final results = await _service.recommend(
+      if (_occasionCtrl.text.trim().isNotEmpty &&
+          !_occasionOptions.contains(_occasionCtrl.text.trim())) {
+        if (!mounted) return;
+        setState(() {
+          _occasionValue = '';
+          _occasionCtrl.clear();
+        });
+        _showSnack(
+          'Not enough items for that occasion right now. Showing best available outfits instead.',
+        );
+      }
+      final data = await _service.recommend(
         temperature: _temperature,
         weather: _weather,
         occasion: _occasionCtrl.text,
         prompt: _promptCtrl.text,
       );
+      final outfitsRaw = data['outfits'];
+      final results = outfitsRaw is List
+          ? List<Map<String, dynamic>>.from(outfitsRaw)
+          : <Map<String, dynamic>>[];
+      final metadataRaw = data['metadata'];
+      final metadata = metadataRaw is Map<String, dynamic>
+          ? metadataRaw
+          : metadataRaw is Map
+          ? Map<String, dynamic>.from(metadataRaw)
+          : <String, dynamic>{};
       if (!mounted) return;
       setState(() {
         _results = results;
@@ -174,10 +310,24 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         _savedOutfits.clear();
         _compare.clear();
         _overrides.clear();
+        _processingWarning = data['warning']?.toString();
+        _processedTemperature = _coerceOption(
+          metadata['temperature'],
+          _temperatureOptions,
+          fallback: _temperature,
+        );
+        _processedWeather = _coerceOption(
+          metadata['weather'],
+          _weatherOptions,
+          fallback: _weather,
+        );
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() {
+        _error = e.toString();
+        _processingWarning = null;
+      });
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -187,6 +337,130 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
 
   void _enterInputMode() {
     setState(() => _showResults = false);
+  }
+
+  String _coerceOption(
+    dynamic raw,
+    List<String> allowed, {
+    required String fallback,
+  }) {
+    final value = raw?.toString().trim().toLowerCase() ?? '';
+    if (allowed.contains(value)) return value;
+    return fallback;
+  }
+
+  String _normalizeToken(dynamic raw) {
+    final value = (raw ?? '').toString().trim().toLowerCase();
+    if (value.isEmpty) return '';
+    return value
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  String _normalizeOccasion(dynamic raw) {
+    final token = _normalizeToken(raw);
+    if (token.isEmpty) return '';
+    return _occasionAliases[token] ?? token;
+  }
+
+  String _canonicalOccasion(dynamic raw) {
+    final normalized = _normalizeOccasion(raw);
+    if (normalized.isEmpty) return '';
+    if (_canonicalOccasions.contains(normalized)) return normalized;
+    return '';
+  }
+
+  List<String> _attributeTokens(dynamic raw) {
+    final queue = <String>[];
+    if (raw is List) {
+      queue.addAll(raw.map((e) => e.toString()));
+    } else if (raw is String) {
+      queue.addAll(raw.split(RegExp(r'[,\n;]+')));
+    }
+
+    final seen = <String>{};
+    final tokens = <String>[];
+    for (final entry in queue) {
+      final token = _normalizeToken(entry);
+      if (token.isEmpty || !seen.add(token)) continue;
+      tokens.add(token);
+    }
+    return tokens;
+  }
+
+  Set<String> _occasionSignalsForItem(Map<String, dynamic> item) {
+    final signals = <String>{};
+
+    final direct = _canonicalOccasion(item['occasion']);
+    if (direct.isNotEmpty) {
+      signals.add(direct);
+    }
+
+    for (final attr in _attributeTokens(item['attributes'])) {
+      if (!_occasionAttributeSignals.contains(attr)) continue;
+      final mapped = _canonicalOccasion(attr);
+      if (mapped.isNotEmpty) {
+        signals.add(mapped);
+      }
+    }
+
+    return signals;
+  }
+
+  String _occasionDisplayLabel(String occasion) {
+    final token = _normalizeToken(occasion);
+    if (token.isEmpty) return 'Any Occasion';
+    final canonical = _canonicalOccasion(token);
+    if (canonical.isEmpty) {
+      return token
+          .split(' ')
+          .map(
+            (part) =>
+                part.isEmpty ? part : '${part[0].toUpperCase()}${part.substring(1)}',
+          )
+          .join(' ');
+    }
+    return canonical
+        .split(' ')
+        .map(
+          (part) =>
+              part.isEmpty ? part : '${part[0].toUpperCase()}${part.substring(1)}',
+        )
+        .join(' ');
+  }
+
+  void _rebuildOccasionOptions() {
+    final found = <String>{};
+    for (final item in _clothingById.values) {
+      found.addAll(_occasionSignalsForItem(item));
+    }
+
+    final orderIndex = <String, int>{
+      for (var i = 0; i < _occasionOrder.length; i++) _occasionOrder[i]: i,
+    };
+    final sorted = found.toList()
+      ..sort((left, right) {
+        final leftOrder = orderIndex[left] ?? _occasionOrder.length;
+        final rightOrder = orderIndex[right] ?? _occasionOrder.length;
+        if (leftOrder != rightOrder) {
+          return leftOrder.compareTo(rightOrder);
+        }
+        return left.compareTo(right);
+      });
+
+    final nextOptions = <String>['', ...sorted];
+    _occasionOptions
+      ..clear()
+      ..addAll(nextOptions);
+
+    if (!_occasionOptions.contains(_occasionValue)) {
+      _occasionValue = '';
+      _occasionCtrl.clear();
+      return;
+    }
+    _occasionCtrl.text = _occasionValue;
   }
 
   Future<void> _saveOutfit(int index, Map<String, dynamic> rec) async {
@@ -218,7 +492,9 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => OutfitDetailPage(initialOutfit: created)),
+      MaterialPageRoute(
+        builder: (_) => OutfitDetailPage(initialOutfit: created),
+      ),
     );
   }
 
@@ -273,11 +549,12 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       return null;
     }
 
+    final selectedOccasion = _occasionCtrl.text.trim();
     final payload = <String, dynamic>{
       'name': _buildOutfitName(rec),
-      'occasion': _occasionCtrl.text.trim().isEmpty
+      'occasion': selectedOccasion.isEmpty
           ? null
-          : _occasionCtrl.text.trim(),
+          : _occasionDisplayLabel(selectedOccasion),
       'topwear_id': topId,
       'bottomwear_id': bottomId,
       'shoes_id': shoesId,
@@ -775,7 +1052,10 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       ),
       clipBehavior: Clip.antiAlias,
       child: imageUrl.isEmpty
-          ? const Icon(Icons.image_outlined, color: RecommendationTokens.mutedSoft)
+          ? const Icon(
+              Icons.image_outlined,
+              color: RecommendationTokens.mutedSoft,
+            )
           : Image.network(imageUrl, fit: BoxFit.contain),
     );
   }
@@ -822,6 +1102,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                       key: const ValueKey('results'),
                       header: _buildResultsHeader(),
                       error: _error,
+                      warning: _processingWarning,
                       loading: _loading,
                       emptyState: _buildEmptyState(),
                       children: _buildResultCards(),
@@ -979,15 +1260,22 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   }
 
   List<Widget> _summaryChips() {
+    final displayTemp = _processedTemperature ?? _temperature;
+    final displayWeather = _processedWeather ?? _weather;
     final chips = <Widget>[
-      _chip('Temp: ${_titleCase(_temperature)}'),
-      _chip('Weather: ${_titleCase(_weather)}'),
+      _chip('Temp: ${_titleCase(displayTemp)}'),
+      _chip('Weather: ${_titleCase(displayWeather)}'),
     ];
     if (_occasionCtrl.text.trim().isNotEmpty) {
-      chips.add(_chip('Occasion: ${_occasionCtrl.text.trim()}'));
+      chips.add(
+        _chip('Occasion: ${_occasionDisplayLabel(_occasionCtrl.text.trim())}'),
+      );
     }
     if (_promptCtrl.text.trim().isNotEmpty) {
       chips.add(_chip('Prompt: ${_promptCtrl.text.trim()}'));
+    }
+    if ((_processingWarning ?? '').isNotEmpty) {
+      chips.add(_chip('Fallback mode'));
     }
     return chips;
   }
@@ -1083,34 +1371,52 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   }
 
   Widget _buildOccasionDropdown() {
-    return InputDecorator(
-      decoration: InputDecoration(
-        labelText: 'Occasion',
-        labelStyle: const TextStyle(color: RecommendationTokens.muted),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _occasionValue,
-          isExpanded: true,
-          items: _occasionOptions
-              .map(
-                (option) => DropdownMenuItem<String>(
-                  value: option,
-                  child: Text(option),
-                ),
-              )
-              .toList(),
-          onChanged: (value) {
-            if (value == null) return;
-            setState(() {
-              _occasionValue = value;
-              _occasionCtrl.text = value == 'Any' ? '' : value.toLowerCase();
-            });
-          },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InputDecorator(
+          decoration: InputDecoration(
+            labelText: 'Occasion',
+            labelStyle: const TextStyle(color: RecommendationTokens.muted),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 4,
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _occasionValue,
+              isExpanded: true,
+              items: _occasionOptions
+                  .map(
+                    (option) => DropdownMenuItem<String>(
+                      value: option,
+                      child: Text(_occasionDisplayLabel(option)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _occasionValue = value;
+                  _occasionCtrl.text = value;
+                });
+              },
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 6),
+        Text(
+          _occasionOptions.length <= 1
+              ? 'No occasion-tagged clothing detected yet. Add or edit clothing metadata to unlock filters.'
+              : 'Occasion choices are limited to what your wardrobe currently supports.',
+          style: const TextStyle(
+            fontSize: 11,
+            color: RecommendationTokens.muted,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1300,7 +1606,10 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     }
     final display = unique.take(4).toList();
     if (display.isEmpty) {
-      return [_dot(RecommendationTokens.line), _dot(RecommendationTokens.surfaceSoft)];
+      return [
+        _dot(RecommendationTokens.line),
+        _dot(RecommendationTokens.surfaceSoft),
+      ];
     }
     return display.map(_dot).toList();
   }
@@ -1347,31 +1656,27 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     final bottom = _resolvedItem(index, rec, 'bottomwear');
     final shoes = _resolvedItem(index, rec, 'shoes');
     final outer = _resolvedItem(index, rec, 'outerwear');
+    final displayTemp = _processedTemperature ?? _temperature;
+    final displayWeather = _processedWeather ?? _weather;
     final items = [top, bottom, shoes, outer].whereType<Map<String, dynamic>>();
 
-    if (_temperature == 'freezing' || _temperature == 'cold') {
+    if (displayTemp == 'freezing' || displayTemp == 'cold') {
       tags.add(outer != null ? 'Cold-ready' : 'Light layers');
     }
-    if (_temperature == 'hot' || _temperature == 'warm') {
+    if (displayTemp == 'hot' || displayTemp == 'warm') {
       tags.add(outer == null ? 'Breathable' : 'Layered');
     }
-    if (_weather == 'rainy' && outer != null) {
+    if (displayWeather == 'rainy' && outer != null) {
       tags.add('Rain-friendly');
     }
-    if (_weather == 'snowy' && outer != null) {
+    if (displayWeather == 'snowy' && outer != null) {
       tags.add('Winter-ready');
     }
 
-    final occasion = _occasionCtrl.text.trim().toLowerCase();
+    final occasion = _canonicalOccasion(_occasionCtrl.text.trim());
     if (occasion.isNotEmpty) {
       final matches = items.any((item) {
-        final itemOcc = (item['occasion'] ?? '').toString().toLowerCase();
-        final attrs = (item['attributes'] is List)
-            ? (item['attributes'] as List)
-                  .map((e) => e.toString().toLowerCase())
-                  .toList()
-            : <String>[];
-        return itemOcc == occasion || attrs.contains(occasion);
+        return _occasionSignalsForItem(item).contains(occasion);
       });
       if (matches) tags.add('Occasion fit');
     }
@@ -1489,6 +1794,7 @@ class _InputSection extends StatelessWidget {
 class _ResultsSection extends StatelessWidget {
   final Widget header;
   final String? error;
+  final String? warning;
   final bool loading;
   final Widget emptyState;
   final List<Widget> children;
@@ -1497,6 +1803,7 @@ class _ResultsSection extends StatelessWidget {
     super.key,
     required this.header,
     required this.error,
+    required this.warning,
     required this.loading,
     required this.emptyState,
     required this.children,
@@ -1523,6 +1830,26 @@ class _ResultsSection extends StatelessWidget {
             ),
           ),
         if (error != null) const SizedBox(height: 12),
+        if (warning != null && warning!.trim().isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: RecommendationTokens.warning.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: RecommendationTokens.warning.withValues(alpha: 0.42),
+              ),
+            ),
+            child: Text(
+              warning!,
+              style: const TextStyle(
+                color: RecommendationTokens.inkStrong,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        if (warning != null && warning!.trim().isNotEmpty)
+          const SizedBox(height: 12),
         if (loading)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 40),
@@ -1790,7 +2117,9 @@ class _ActionButton extends StatelessWidget {
         : filled
         ? RecommendationTokens.inkStrong
         : RecommendationTokens.surface;
-    final fg = filled ? RecommendationTokens.surface : RecommendationTokens.inkStrong;
+    final fg = filled
+        ? RecommendationTokens.surface
+        : RecommendationTokens.inkStrong;
 
     return _Pressable(
       onTap: enabled ? onTap : null,

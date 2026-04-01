@@ -195,4 +195,24 @@ class RecommendationApiTests(APITestCase):
         res = self.client.post("/api/recommendations/", payload, format="json")
 
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(len(res.data), 3)
+        self.assertIn("outfits", res.data)
+        self.assertIn("fallback_used", res.data)
+        self.assertIn("metadata", res.data)
+        self.assertEqual(len(res.data["outfits"]), 3)
+        self.assertEqual(res.data["metadata"]["temperature"], "cool")
+        self.assertEqual(res.data["metadata"]["weather"], "dry")
+
+    @patch("api.recommend.scoring.clip_score", return_value=0.78)
+    def test_recommendations_fallback_when_requested_occasion_lacks_items(self, _mock_clip):
+        payload = {
+            "weather": {"temperature": "cool", "weather": "dry"},
+            "occasion": "date",
+        }
+        res = self.client.post("/api/recommendations/", payload, format="json")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("outfits", res.data)
+        self.assertEqual(len(res.data["outfits"]), 3)
+        self.assertEqual(res.data["occasion_fallback_used"], True)
+        self.assertIn("warning", res.data)
+        self.assertIn("Not enough items match that occasion", res.data["warning"])
