@@ -1,4 +1,5 @@
 import os
+import logging
 from functools import lru_cache
 from typing import Iterable, Optional
 
@@ -13,6 +14,12 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 _MODEL: Optional[CLIPModel] = None
 _PROCESSOR: Optional[CLIPProcessor] = None
+LOGGER = logging.getLogger(__name__)
+
+# Fashion-CLIP cosine values typically occupy a narrow positive band.
+# Stretching this calibrated range improves score spread for ranking/rating.
+CLIP_SIM_LOW = 0.15
+CLIP_SIM_HIGH = 0.38
 
 
 def _get_model() -> CLIPModel:
@@ -91,6 +98,13 @@ def average_embeddings(embeddings: Iterable[Optional[np.ndarray]]) -> Optional[n
 
 def cosine_similarity(vec_a: Optional[np.ndarray], vec_b: Optional[np.ndarray]) -> float:
     if vec_a is None or vec_b is None:
-        return 0.0
-    sim = float(np.dot(vec_a, vec_b))
-    return max(min((sim + 1.0) / 2.0, 1.0), 0.0)
+        return 0.5
+    raw = float(np.dot(vec_a, vec_b))
+    LOGGER.debug("raw cosine similarity: %.4f", raw)
+
+    if CLIP_SIM_HIGH <= CLIP_SIM_LOW:
+        # Defensive fallback to neutral in case calibration constants are invalid.
+        return 0.5
+
+    stretched = (raw - CLIP_SIM_LOW) / (CLIP_SIM_HIGH - CLIP_SIM_LOW)
+    return max(min(stretched, 1.0), 0.0)

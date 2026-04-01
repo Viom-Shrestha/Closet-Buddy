@@ -1,10 +1,187 @@
 import cv2
 import numpy as np
 import webcolors
+from difflib import SequenceMatcher
 from sklearn.cluster import KMeans
 
 UNKNOWN_RESULT = {"dominant_color": "Unknown", "secondary_color": "Unknown"}
 MAX_SAMPLE_PIXELS = 20000
+
+# ─── Shared family vocabulary for extraction + scoring alignment ─────────────
+COLOR_FAMILIES = {
+    # Neutrals
+    "white": [
+        "white", "cream", "ivory", "off-white", "snow", "chalk",
+        "pearl", "alabaster", "eggshell", "linen", "porcelain",
+    ],
+    "black": [
+        "black", "charcoal", "onyx", "jet", "ebony", "obsidian",
+        "carbon", "midnight black", "matte black",
+    ],
+    "grey": [
+        "gray", "grey", "silver", "slate", "ash", "pewter",
+        "graphite", "steel", "dove grey", "cool grey", "warm grey",
+        "stone", "cement", "smoke",
+    ],
+    "navy": [
+        "navy", "midnight", "dark blue", "navy blue", "midnight blue",
+        "deep navy", "indigo navy",
+    ],
+    "beige": [
+        "beige", "tan", "sand", "camel", "khaki", "taupe",
+        "wheat", "oat", "ecru", "buff", "parchment", "latte",
+        "biscuit", "almond", "sesame", "flax",
+    ],
+    "brown": [
+        "brown", "chocolate", "espresso", "cognac", "rust",
+        "chestnut", "mahogany", "walnut", "mocha", "toffee",
+        "sienna", "umber", "hazel", "bark", "cinnamon",
+        "tobacco", "saddle", "pecan", "hickory",
+    ],
+    # Blues
+    "blue": [
+        "blue", "cobalt", "sky blue", "denim", "powder blue",
+        "cornflower", "periwinkle", "cerulean", "azure",
+        "electric blue", "sapphire", "royal blue", "steel blue",
+        "baby blue", "ice blue", "french blue", "china blue",
+    ],
+    "indigo": ["indigo", "deep indigo", "violet blue", "blue violet", "dark indigo"],
+    # Greens
+    "green": [
+        "green", "forest", "emerald", "bottle green", "hunter green",
+        "racing green", "pine", "fern", "moss", "jungle",
+    ],
+    "olive": [
+        "olive", "olive green", "dark olive", "military green",
+        "army green", "khaki green", "swamp", "avocado",
+    ],
+    "sage": [
+        "sage", "sage green", "muted green", "dusty green",
+        "eucalyptus", "celadon", "seafoam", "pale green",
+        "mint", "tea green", "pistachio",
+    ],
+    "teal": [
+        "teal", "teal green", "teal blue", "dark teal",
+        "petrol", "duck egg", "peacock", "lagoon",
+    ],
+    "turquoise": ["turquoise", "aqua", "cyan", "aquamarine", "sea green", "water green"],
+    # Reds & Pinks
+    "red": [
+        "red", "crimson", "scarlet", "fire red", "tomato",
+        "cherry", "apple red", "candy red", "vermillion",
+    ],
+    "burgundy": [
+        "burgundy", "wine", "bordeaux", "maroon", "oxblood",
+        "dark red", "deep red", "merlot", "claret", "garnet",
+        "cabernet", "port", "aubergine red",
+    ],
+    "pink": [
+        "pink", "hot pink", "fuchsia", "magenta", "flamingo",
+        "bubblegum", "candy pink", "bright pink", "neon pink",
+    ],
+    "blush": [
+        "blush", "rose", "mauve", "dusty pink", "dusty rose",
+        "pale pink", "ballet pink", "petal", "powder pink",
+        "rose quartz", "antique rose", "tea rose",
+    ],
+    "coral": [
+        "coral", "peach", "salmon", "terracotta", "apricot",
+        "melon", "clay", "burnt sienna pink", "adobe",
+    ],
+    # Yellows & Oranges
+    "yellow": [
+        "yellow", "bright yellow", "lemon", "canary", "sunshine",
+        "neon yellow", "chartreuse yellow",
+    ],
+    "mustard": [
+        "mustard", "gold", "amber", "honey", "ochre", "saffron",
+        "turmeric", "dijon", "straw", "goldenrod", "wheat gold",
+    ],
+    "orange": [
+        "orange", "burnt orange", "tangerine", "mandarin",
+        "pumpkin", "rust orange", "amber orange", "saffron orange",
+    ],
+    # Purples
+    "purple": [
+        "purple", "violet", "plum", "aubergine", "eggplant",
+        "dark purple", "deep purple", "grape", "amethyst",
+        "mulberry", "boysenberry", "raisin",
+    ],
+    "lavender": [
+        "lavender", "lilac", "periwinkle", "wisteria", "orchid",
+        "thistle", "soft purple", "pale purple", "violet grey",
+        "dusty purple", "pale violet", "pale lavender",
+    ],
+}
+
+
+def _normalize_name_token(value):
+    text = str(value or "").strip().lower().replace("_", " ").replace("-", " ")
+    return " ".join(text.split())
+
+
+COLOR_ALIAS_TO_FAMILY = {}
+for _family, _members in COLOR_FAMILIES.items():
+    for _name in [_family] + list(_members):
+        _norm = _normalize_name_token(_name)
+        if not _norm:
+            continue
+        COLOR_ALIAS_TO_FAMILY[_norm] = _family
+        COLOR_ALIAS_TO_FAMILY[_norm.replace(" ", "")] = _family
+
+
+def _family_from_name(name):
+    normalized = _normalize_name_token(name)
+    if not normalized:
+        return None
+    compact = normalized.replace(" ", "")
+
+    if normalized in COLOR_ALIAS_TO_FAMILY:
+        return COLOR_ALIAS_TO_FAMILY[normalized]
+    if compact in COLOR_ALIAS_TO_FAMILY:
+        return COLOR_ALIAS_TO_FAMILY[compact]
+
+    for family in COLOR_FAMILIES:
+        if family in normalized or normalized in family:
+            return family
+
+    return None
+
+
+def _best_alias_for_family(family, source_name):
+    members = [_normalize_name_token(member) for member in COLOR_FAMILIES.get(family, [])]
+    candidates = [member for member in members if member]
+    if not candidates:
+        return family
+
+    normalized_source = _normalize_name_token(source_name)
+    compact_source = normalized_source.replace(" ", "")
+
+    for candidate in candidates:
+        if candidate == normalized_source:
+            return candidate
+        if candidate.replace(" ", "") == compact_source:
+            return candidate
+
+    source_tokens = set(normalized_source.split())
+
+    def _candidate_score(candidate):
+        candidate_tokens = set(candidate.split())
+        overlap = 0.0
+        union = source_tokens | candidate_tokens
+        if union:
+            overlap = len(source_tokens & candidate_tokens) / len(union)
+        compact_ratio = SequenceMatcher(
+            None,
+            compact_source,
+            candidate.replace(" ", ""),
+        ).ratio()
+        contains_bonus = 0.05 if (
+            candidate in normalized_source or normalized_source in candidate
+        ) else 0.0
+        return (0.6 * overlap) + (0.4 * compact_ratio) + contains_bonus
+
+    return max(candidates, key=_candidate_score)
 
 
 def _closest_css_name(rgb):
@@ -45,9 +222,14 @@ def _normalize_color_name(rgb):
     if min_c > 225 and spread < 20:
         return "white"
     if spread < 15:
-        return "gray"
+        return "grey"
 
-    return _closest_css_name((r, g, b))
+    css_name = _closest_css_name((r, g, b))
+    family = _family_from_name(css_name)
+    if family:
+        return _best_alias_for_family(family, css_name)
+
+    return _normalize_name_token(css_name)
 
 
 def _extract_rgb_pixels(img):

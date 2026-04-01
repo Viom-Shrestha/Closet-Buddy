@@ -223,9 +223,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _openOutfitsPage() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const OutfitsPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const OutfitsPage()),
     );
     if (mounted) fetchHomeData();
   }
@@ -431,12 +429,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return _todayOutfit ?? (outfits.isNotEmpty ? outfits.first : null);
   }
 
+  String _activeTabLabel() {
+    switch (_selectedIndex) {
+      case 1:
+        return 'Wardrobe';
+      case 2:
+        return 'Storage';
+      case 3:
+        return 'Outfits';
+      default:
+        return 'Home';
+    }
+  }
+
+  IconData _activeTabIcon() {
+    switch (_selectedIndex) {
+      case 1:
+        return Icons.inventory_2_outlined;
+      case 2:
+        return Icons.apartment_outlined;
+      case 3:
+        return Icons.auto_awesome_outlined;
+      default:
+        return Icons.home_outlined;
+    }
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final showHome = _selectedIndex == 0;
     final showWardrobe = _selectedIndex == 1;
+    final showStorage = _selectedIndex == 2;
     final showOutfit = _selectedIndex == 3;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -468,10 +493,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   horizontal: 20,
                                 ),
                                 children: [
+                                  const SizedBox(height: 24),
+                                  _buildWelcomeSection(),
                                   const SizedBox(height: 20),
+                                  _buildWeatherCard(),
+                                  const SizedBox(height: 24),
                                   _buildTodayOutfitCard(),
                                   const SizedBox(height: 32),
                                   _buildQuickActions(),
+                                  const SizedBox(height: 32),
+                                  _buildRecentClothing(),
                                   const SizedBox(height: 32),
                                   _buildRecentOutfits(),
                                   const SizedBox(height: 120),
@@ -490,6 +521,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 setState(() => _wardrobeSelecting = v),
                           ),
                         )
+                      : showStorage
+                      ? StorageListScreen(
+                          key: ValueKey('storage_tab_$_themeRefreshRevision'),
+                          embedded: true,
+                        )
                       : showOutfit
                       ? OutfitsPage(
                           key: ValueKey('outfit_tab_$_themeRefreshRevision'),
@@ -501,7 +537,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ],
           ),
         ),
-        floatingActionButton: (showOutfit || _wardrobeSelecting)
+        floatingActionButton: (showOutfit || showStorage || _wardrobeSelecting)
             ? null
             : _buildFAB(),
         bottomNavigationBar: _buildBottomNav(),
@@ -516,11 +552,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final avatarInitial = _initial(
       (_profile?['username'] ?? _profile?['first_name'] ?? '').toString(),
     );
+    final tabLabel = _activeTabLabel();
+    final tabIcon = _activeTabIcon();
+    final showContextChip = MediaQuery.of(context).size.width >= 390;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
+      padding: const EdgeInsets.fromLTRB(20, 12, 12, 12),
       decoration: BoxDecoration(
         color: HomeTokens.card,
         border: Border(bottom: BorderSide(color: HomeTokens.rule)),
+        boxShadow: [
+          BoxShadow(
+            color: HomeTokens.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -534,18 +581,77 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   darkBackground: ThemeService.instance.isDark,
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  'Closet Buddy',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: HomeTokens.ink,
-                    letterSpacing: -0.5,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Closet Buddy',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: HomeTokens.ink,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: Row(
+                        key: ValueKey('tab_hint_$_selectedIndex'),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(tabIcon, size: 12, color: HomeTokens.inkMuted),
+                          const SizedBox(width: 4),
+                          Text(
+                            tabLabel,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: HomeTokens.inkMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+          if (showContextChip) ...[
+            const SizedBox(width: 10),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: Container(
+                key: ValueKey('tab_chip_$_selectedIndex'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: HomeTokens.parchment,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: HomeTokens.rule),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(tabIcon, size: 13, color: HomeTokens.accent),
+                    const SizedBox(width: 4),
+                    Text(
+                      tabLabel,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: HomeTokens.accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const Spacer(),
           _AppBarBtn(
             icon: ThemeService.instance.isDark
@@ -582,9 +688,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── Welcome ────────────────────────────────────────────────────────────────
-
-  // ignore: unused_element
   Widget _buildWelcomeSection() {
     final hour = DateTime.now().hour;
     String greeting;
@@ -680,7 +783,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Weather ────────────────────────────────────────────────────────────────
 
-  // ignore: unused_element
   Widget _buildWeatherCard() {
     if (isLoadingWeather) {
       return Container(
@@ -1348,7 +1450,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Recent clothing ────────────────────────────────────────────────────────
 
-  // ignore: unused_element
   Widget _buildRecentClothing() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1377,7 +1478,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ignore: unused_element
   Widget _buildClothingCard(Map<String, dynamic> item) {
     final imageUrl = _resolveImageUrl(item['image']);
     final isFav = item['is_favourite'] ?? false;
@@ -1718,81 +1818,76 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final width = MediaQuery.of(context).size.width;
     final isCompact = width < 380;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: HomeTokens.card,
-        border: Border(top: BorderSide(color: HomeTokens.rule)),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        selectedItemColor: HomeTokens.accent,
-        unselectedItemColor: HomeTokens.inkMuted,
-        type: BottomNavigationBarType.fixed,
-        selectedFontSize: isCompact ? 10 : 11,
-        unselectedFontSize: isCompact ? 10 : 11,
-        iconSize: isCompact ? 22 : 24,
-        backgroundColor: HomeTokens.card,
-        elevation: 0,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
-        onTap: (index) {
-          if (index == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const StorageListScreen()),
-            ).then((result) {
-              if (result == true && mounted) {
-                fetchHomeData();
-              }
-              if (mounted) setState(() => _selectedIndex = 0);
-            });
-            return;
-          }
-          if (index == 4) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            ).then((_) {
-              if (mounted) setState(() => _selectedIndex = 0);
-            });
-            return;
-          }
-          setState(() {
-            _selectedIndex = index;
-            if (index != 1) _wardrobeSelecting = false;
-          });
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home_rounded),
-            label: 'Home',
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: HomeTokens.card,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: HomeTokens.rule),
+          boxShadow: [
+            BoxShadow(
+              color: HomeTokens.black.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            selectedItemColor: HomeTokens.accent,
+            unselectedItemColor: HomeTokens.inkMuted,
+            type: BottomNavigationBarType.fixed,
+            selectedFontSize: isCompact ? 10 : 11,
+            unselectedFontSize: isCompact ? 10 : 11,
+            iconSize: isCompact ? 22 : 24,
+            backgroundColor: HomeTokens.card,
+            elevation: 0,
+            showUnselectedLabels: true,
+            selectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.1,
+            ),
+            onTap: (index) {
+              setState(() {
+                _selectedIndex = index;
+                if (index != 1) _wardrobeSelecting = false;
+              });
+            },
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                activeIcon: Icon(Icons.home_rounded),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.inventory_2_outlined),
+                activeIcon: Icon(Icons.inventory_2_rounded),
+                label: 'Wardrobe',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.apartment_outlined),
+                activeIcon: Icon(Icons.apartment_rounded),
+                label: 'Storage',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.auto_awesome_outlined),
+                activeIcon: Icon(Icons.auto_awesome_rounded),
+                label: 'Outfits',
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            activeIcon: Icon(Icons.inventory_2_rounded),
-            label: 'Wardrobe',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.auto_awesome_outlined),
-            activeIcon: Icon(Icons.auto_awesome_rounded),
-            label: 'Storage',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.checkroom_outlined),
-            activeIcon: Icon(Icons.checkroom_rounded),
-            label: 'Outfits',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline_rounded),
-            activeIcon: Icon(Icons.person_rounded),
-            label: 'Profile',
-          ),
-        ],
+        ),
       ),
     );
   }
-
-  // ── Empty state ────────────────────────────────────────────────────────────
 
   Widget _buildEmptyState(String title, String sub, IconData icon) {
     return Container(

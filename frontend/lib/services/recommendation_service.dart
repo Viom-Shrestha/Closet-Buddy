@@ -7,7 +7,7 @@ class RecommendationService {
 
   final ApiClient _client;
 
-  Future<List<Map<String, dynamic>>> recommend({
+  Future<Map<String, dynamic>> recommend({
     required String temperature,
     required String weather,
     String? occasion,
@@ -29,7 +29,34 @@ class RecommendationService {
 
     final res = await _client.post('/recommendations/', payload);
     if (res.statusCode == 200) {
-      return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+      final decoded = jsonDecode(res.body);
+      if (decoded is List) {
+        return {
+          'outfits': List<Map<String, dynamic>>.from(decoded),
+          'fallback_used': false,
+          'metadata': {'temperature': temperature, 'weather': weather},
+        };
+      }
+      if (decoded is Map) {
+        final outfitsRaw = decoded['outfits'] ?? decoded['results'] ?? [];
+        final outfits = outfitsRaw is List
+            ? List<Map<String, dynamic>>.from(outfitsRaw)
+            : <Map<String, dynamic>>[];
+        final metadataRaw = decoded['metadata'];
+        final metadata = metadataRaw is Map<String, dynamic>
+            ? metadataRaw
+            : metadataRaw is Map
+            ? Map<String, dynamic>.from(metadataRaw)
+            : <String, dynamic>{'temperature': temperature, 'weather': weather};
+        return {
+          'outfits': outfits,
+          'fallback_used': decoded['fallback_used'] == true,
+          'occasion_fallback_used': decoded['occasion_fallback_used'] == true,
+          'warning': decoded['warning']?.toString(),
+          'metadata': metadata,
+        };
+      }
+      throw 'Unexpected recommendation response shape.';
     }
 
     String message = 'Failed to generate recommendations';

@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List
 
 from ..models import ClothingItem
 
@@ -21,6 +21,7 @@ def generate_outfits(
     footwear: Iterable[ClothingItem],
     outerwear: Iterable[ClothingItem],
     temperature: str,
+    combo_limit: int = 50,
 ) -> List[Dict]:
     tops = list(topwear)
     bottoms = list(bottomwear)
@@ -31,48 +32,49 @@ def generate_outfits(
 
     outfits: List[Dict] = []
 
-    def add_base():
-        for top in tops:
-            for bottom in bottoms:
-                for shoe in shoes:
-                    outfits.append(
-                        {
-                            "topwear": top,
-                            "bottomwear": bottom,
-                            "shoes": shoe,
-                            "outerwear": None,
-                        }
-                    )
-
-    def add_with_outerwear():
-        for top in tops:
-            for bottom in bottoms:
-                for shoe in shoes:
-                    for outer in outers:
-                        outfits.append(
-                            {
-                                "topwear": top,
-                                "bottomwear": bottom,
-                                "shoes": shoe,
-                                "outerwear": outer,
-                            }
-                        )
+    def _append(top: ClothingItem, bottom: ClothingItem, shoe: ClothingItem, outer: ClothingItem | None) -> bool:
+        outfits.append(
+            {
+                "topwear": top,
+                "bottomwear": bottom,
+                "shoes": shoe,
+                "outerwear": outer,
+            }
+        )
+        return len(outfits) >= combo_limit
 
     if policy == "required":
         if not outers:
             return []
-        add_with_outerwear()
+        for top in tops:
+            for bottom in bottoms:
+                for shoe in shoes:
+                    for outer in outers:
+                        if _append(top, bottom, shoe, outer):
+                            return outfits
         return outfits
 
-    if policy in {"preferred", "optional"}:
-        add_base()
-        if outers:
-            add_with_outerwear()
+    if policy in {"preferred", "optional", "discouraged"}:
+        # Base combinations first: pools are already context-ranked in engine.
+        for top in tops:
+            for bottom in bottoms:
+                for shoe in shoes:
+                    if _append(top, bottom, shoe, None):
+                        return outfits
+
+        if policy in {"preferred", "optional"} and outers:
+            for top in tops:
+                for bottom in bottoms:
+                    for shoe in shoes:
+                        for outer in outers:
+                            if _append(top, bottom, shoe, outer):
+                                return outfits
         return outfits
 
-    if policy == "discouraged":
-        add_base()
-        return outfits
-
-    add_base()
+    # Fallback policy path.
+    for top in tops:
+        for bottom in bottoms:
+            for shoe in shoes:
+                if _append(top, bottom, shoe, None):
+                    return outfits
     return outfits

@@ -55,7 +55,9 @@ class StorageSpace {
 }
 
 class StorageListScreen extends StatefulWidget {
-  const StorageListScreen({super.key});
+  final bool embedded;
+
+  const StorageListScreen({super.key, this.embedded = false});
 
   @override
   State<StorageListScreen> createState() => _StorageListScreenState();
@@ -273,20 +275,24 @@ class _StorageListScreenState extends State<StorageListScreen> {
     final hasSubStorages = storage.subStorages.isNotEmpty;
     final isExpanded = _expandedStorages.contains(storage.id);
     final indentPadding = depth * 20.0;
+    final statusLabel = storage.isPutAway ? 'Put Away' : 'Active';
+    final statusColor = storage.isPutAway
+        ? StorageTokens.success
+        : StorageTokens.muted;
 
     return Column(
       children: [
         Container(
-          margin: EdgeInsets.only(left: indentPadding, bottom: 12),
+          margin: EdgeInsets.only(left: indentPadding, bottom: 14),
           decoration: BoxDecoration(
             color: StorageTokens.surface,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: StorageTokens.line),
             boxShadow: [
               BoxShadow(
-                color: StorageTokens.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: StorageTokens.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -294,7 +300,7 @@ class _StorageListScreenState extends State<StorageListScreen> {
             color: StorageTokens.transparent,
             child: InkWell(
               onTap: () => _navigateToStorageDetail(storage),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -366,10 +372,35 @@ class _StorageListScreenState extends State<StorageListScreen> {
                         const SizedBox(width: 8),
 
                         Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: statusColor.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Text(
+                                statusLabel,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
                             Switch(
                               value: storage.isPutAway,
                               activeThumbColor: StorageTokens.success,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
                               onChanged: (val) async {
                                 final oldValue = storage.isPutAway;
 
@@ -393,13 +424,6 @@ class _StorageListScreenState extends State<StorageListScreen> {
                                   );
                                 }
                               },
-                            ),
-                            const Text(
-                              "Put Away",
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: StorageTokens.mutedSoft,
-                              ),
                             ),
                           ],
                         ),
@@ -483,6 +507,17 @@ class _StorageListScreenState extends State<StorageListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) {
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: Container(color: StorageTokens.pageBg, child: _buildBody()),
+          ),
+          Positioned(right: 20, bottom: 20, child: _buildAddStorageFab()),
+        ],
+      );
+    }
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -509,102 +544,129 @@ class _StorageListScreenState extends State<StorageListScreen> {
             ),
           ],
         ),
-        body: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: StorageTokens.ink),
-              )
-            : _storages.isEmpty
-            ? _buildEmptyState()
-            : RefreshIndicator(
-                onRefresh: _loadStorages,
-                color: StorageTokens.ink,
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
+        body: _buildBody(),
+        floatingActionButton: _buildAddStorageFab(),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: StorageTokens.ink),
+      );
+    }
+
+    if (_storages.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadStorages,
+      color: StorageTokens.ink,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, widget.embedded ? 96 : 20),
+        children: [
+          // Summary Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  StorageTokens.analyticsStart,
+                  StorageTokens.analyticsEnd,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: StorageTokens.onAnalytics.withValues(alpha: 0.12),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: StorageTokens.black.withValues(alpha: 0.1),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
                   children: [
-                    // Summary Card
+                    Expanded(
+                      child: _buildSummaryItem(
+                        'Total Storages',
+                        '${_totalStorageCount(_storages)}',
+                        Icons.inventory_2_outlined,
+                      ),
+                    ),
                     Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            StorageTokens.analyticsStart,
-                            StorageTokens.analyticsEnd,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: StorageTokens.black.withValues(alpha: 0.1),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildSummaryItem(
-                              'Total Storages',
-                              '${_totalStorageCount(_storages)}',
-                              Icons.inventory_2_outlined,
-                            ),
-                          ),
-                          Container(
-                            width: 1,
-                            height: 40,
-                            color: StorageTokens.onAnalytics.withValues(alpha: 0.2),
-                          ),
-                          Expanded(
-                            child: _buildSummaryItem(
-                              'Total Items',
-                              '${_totalItemCount(_storages)}',
-                              Icons.checkroom_outlined,
-                            ),
-                          ),
-                        ],
+                      width: 1,
+                      height: 40,
+                      color: StorageTokens.onAnalytics.withValues(alpha: 0.2),
+                    ),
+                    Expanded(
+                      child: _buildSummaryItem(
+                        'Total Items',
+                        '${_totalItemCount(_storages)}',
+                        Icons.checkroom_outlined,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'All Storages',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: StorageTokens.ink,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        Text(
-                          '${_totalStorageCount(_storages)} spaces',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: StorageTokens.mutedSoft,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ..._storages.map((storage) => _buildStorageCard(storage)),
                   ],
                 ),
-              ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _showAddStorageDialog(),
-          backgroundColor: WidgetTokens.accent,
-          icon: const Icon(Icons.add, color: StorageTokens.surface),
-          label: const Text(
-            'Add Storage',
-            style: TextStyle(
-              color: StorageTokens.surface,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.2,
+                const SizedBox(height: 10),
+                Text(
+                  'Tap any storage card to view details or move items.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: StorageTokens.onAnalytics.withValues(alpha: 0.78),
+                  ),
+                ),
+              ],
             ),
           ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'All Storages',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: StorageTokens.ink,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Text(
+                '${_totalStorageCount(_storages)} spaces',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: StorageTokens.mutedSoft,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ..._storages.map((storage) => _buildStorageCard(storage)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddStorageFab() {
+    return FloatingActionButton.extended(
+      onPressed: () => _showAddStorageDialog(),
+      backgroundColor: WidgetTokens.accent,
+      icon: const Icon(Icons.add, color: StorageTokens.surface),
+      label: const Text(
+        'Add Storage',
+        style: TextStyle(
+          color: StorageTokens.surface,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.1,
         ),
       ),
     );
@@ -795,10 +857,7 @@ class _AddStorageSheetState extends State<AddStorageSheet> {
             TextField(
               controller: _nameController,
               autofocus: true,
-              style: const TextStyle(
-                fontSize: 15,
-                color: StorageTokens.ink,
-              ),
+              style: const TextStyle(fontSize: 15, color: StorageTokens.ink),
               decoration: InputDecoration(
                 hintText: 'e.g., Master Bedroom Closet',
                 hintStyle: const TextStyle(color: StorageTokens.mutedSoft),
@@ -847,7 +906,9 @@ class _AddStorageSheetState extends State<AddStorageSheet> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: isSelected ? StorageTokens.surface : StorageTokens.ink,
+                      color: isSelected
+                          ? StorageTokens.surface
+                          : StorageTokens.ink,
                     ),
                   ),
                   selected: isSelected,
@@ -857,9 +918,7 @@ class _AddStorageSheetState extends State<AddStorageSheet> {
                   backgroundColor: StorageTokens.pageBg,
                   selectedColor: StorageTokens.ink,
                   side: BorderSide(
-                    color: isSelected
-                        ? StorageTokens.ink
-                        : StorageTokens.line,
+                    color: isSelected ? StorageTokens.ink : StorageTokens.line,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -949,7 +1008,10 @@ class _EditStorageSheetState extends State<EditStorageSheet> {
               Navigator.pop(context);
               widget.onDelete();
             },
-            child: const Text('Delete', style: TextStyle(color: StorageTokens.dangerStrong)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: StorageTokens.dangerStrong),
+            ),
           ),
         ],
       ),
@@ -987,14 +1049,14 @@ class _EditStorageSheetState extends State<EditStorageSheet> {
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: StorageTokens.dangerStrong),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: StorageTokens.dangerStrong,
+                      ),
                       onPressed: _confirmDelete,
                     ),
                     IconButton(
-                      icon: const Icon(
-                        Icons.close,
-                        color: StorageTokens.muted,
-                      ),
+                      icon: const Icon(Icons.close, color: StorageTokens.muted),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -1014,10 +1076,7 @@ class _EditStorageSheetState extends State<EditStorageSheet> {
             const SizedBox(height: 8),
             TextField(
               controller: _nameController,
-              style: const TextStyle(
-                fontSize: 15,
-                color: StorageTokens.ink,
-              ),
+              style: const TextStyle(fontSize: 15, color: StorageTokens.ink),
               decoration: InputDecoration(
                 hintText: 'Storage name',
                 hintStyle: const TextStyle(color: StorageTokens.mutedSoft),
@@ -1066,7 +1125,9 @@ class _EditStorageSheetState extends State<EditStorageSheet> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: isSelected ? StorageTokens.surface : StorageTokens.ink,
+                      color: isSelected
+                          ? StorageTokens.surface
+                          : StorageTokens.ink,
                     ),
                   ),
                   selected: isSelected,
@@ -1076,9 +1137,7 @@ class _EditStorageSheetState extends State<EditStorageSheet> {
                   backgroundColor: StorageTokens.pageBg,
                   selectedColor: StorageTokens.ink,
                   side: BorderSide(
-                    color: isSelected
-                        ? StorageTokens.ink
-                        : StorageTokens.line,
+                    color: isSelected ? StorageTokens.ink : StorageTokens.line,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),

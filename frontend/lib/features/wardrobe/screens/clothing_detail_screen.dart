@@ -279,8 +279,7 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
                     SliverToBoxAdapter(child: _buildDetailsCard(temp, weather)),
 
                     // ── Attributes ─────────────────────────────────────────
-                    if (attrs.isNotEmpty)
-                      SliverToBoxAdapter(child: _buildAttributes(attrs)),
+                    SliverToBoxAdapter(child: _buildAttributes(attrs)),
 
                     // ── Description ────────────────────────────────────────
                     SliverToBoxAdapter(child: _buildDescription()),
@@ -518,6 +517,23 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
   }
 
   Widget _buildDetailsCard(String temp, String weather) {
+    final dom = _tc(item!['dominant_color']);
+    final sec = _tc(item!['secondary_color']);
+    final storageRaw = item!['storage_unit'];
+    final storageName = storageRaw is Map ? _tc(storageRaw['name']) : '';
+    final added = _date(item!['created_at']);
+    final rows = <Map<String, String>>[
+      {'label': 'Category', 'value': _tc(item!['category'])},
+      {'label': 'Subcategory', 'value': _tc(item!['subcategory'])},
+      {'label': 'Occasion', 'value': _tc(item!['occasion'])},
+      {'label': 'Primary Color', 'value': dom},
+      {'label': 'Secondary Color', 'value': sec},
+      {'label': 'Temperature', 'value': temp},
+      {'label': 'Weather', 'value': weather},
+      {'label': 'Storage', 'value': storageName},
+      {'label': 'Added', 'value': added},
+    ];
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
       child: Column(
@@ -532,16 +548,17 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
               border: Border.all(color: ClothingDetailTokens.border),
             ),
             child: Column(
-              children: [
-                _InfoRow(label: 'Category', value: _tc(item!['category'])),
-                _InfoRow(
-                  label: 'Subcategory',
-                  value: _tc(item!['subcategory']),
-                ),
-                _InfoRow(label: 'Occasion', value: _tc(item!['occasion'])),
-                _InfoRow(label: 'Temperature', value: temp),
-                _InfoRow(label: 'Weather', value: weather, isLast: true),
-              ],
+              children: rows
+                  .asMap()
+                  .entries
+                  .map(
+                    (entry) => _InfoRow(
+                      label: entry.value['label'] ?? '',
+                      value: entry.value['value'] ?? '',
+                      isLast: entry.key == rows.length - 1,
+                    ),
+                  )
+                  .toList(),
             ),
           ),
         ],
@@ -550,6 +567,8 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
   }
 
   Widget _buildAttributes(List<String> attrs) {
+    final tags = attrs.map(_tc).where((entry) => entry.isNotEmpty).toList();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
       child: Column(
@@ -557,18 +576,35 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
         children: [
           _SectionLabel('Attributes'),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: attrs.map((a) => _AttrTag(a)).toList(),
-          ),
+          if (tags.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: ClothingDetailTokens.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: ClothingDetailTokens.border),
+              ),
+              child: const Text(
+                'No tags yet. Edit this item to add style attributes.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: ClothingDetailTokens.textMuted,
+                ),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: tags.map((tag) => _AttrTag(tag)).toList(),
+            ),
         ],
       ),
     );
   }
 
   Widget _buildDescription() {
-    final parts = <String>[];
     final cat = _tc(item!['category']);
     final sub = _tc(item!['subcategory']);
     final dom = _tc(item!['dominant_color']);
@@ -576,22 +612,26 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
     final occ = _tc(item!['occasion']);
     final tmp = _tc(item!['detected_temp']);
     final wth = _tc(item!['detected_weather']);
-    final atrs = _attrs();
-
-    if (sub.isNotEmpty || cat.isNotEmpty) {
-      parts.add([sub, cat].where((e) => e.isNotEmpty).first);
-    }
-    if (dom.isNotEmpty) {
-      parts.add(sec.isNotEmpty ? 'Colors: $dom & $sec' : 'Color: $dom');
-    }
-    if (occ.isNotEmpty) parts.add('Occasion: $occ');
-    if (tmp.isNotEmpty) parts.add('Temperature: $tmp');
-    if (wth.isNotEmpty) parts.add('Weather: $wth');
-    if (atrs.isNotEmpty) parts.add('Tags: ${atrs.join(', ')}');
-
-    final desc = parts.isEmpty
-        ? 'No description available.'
-        : parts.join(' · ');
+    final atrs = _attrs().map(_tc).where((entry) => entry.isNotEmpty).toList();
+    final storageRaw = item!['storage_unit'];
+    final storageName = storageRaw is Map ? _tc(storageRaw['name']) : '';
+    final title = sub.isNotEmpty
+        ? sub
+        : cat.isNotEmpty
+        ? cat
+        : 'Clothing Item';
+    final palette = dom.isNotEmpty
+        ? sec.isNotEmpty
+              ? '$dom with $sec accents'
+              : dom
+        : 'Unspecified palette';
+    final metaRows = <Map<String, String>>[
+      {'label': 'Best for', 'value': occ},
+      {'label': 'Temperature', 'value': tmp},
+      {'label': 'Weather', 'value': wth},
+      {'label': 'Stored in', 'value': storageName},
+      {'label': 'Tags', 'value': atrs.isEmpty ? 'No tags yet' : atrs.join(', ')},
+    ].where((row) => (row['value'] ?? '').isNotEmpty).toList();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
@@ -608,14 +648,36 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: ClothingDetailTokens.border),
             ),
-            child: Text(
-              desc,
-              style: const TextStyle(
-                fontSize: 14,
-                color: ClothingDetailTokens.textSub,
-                height: 1.8,
-                letterSpacing: 0.1,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: ClothingDetailTokens.text,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  palette,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: ClothingDetailTokens.textMuted,
+                  ),
+                ),
+                if (metaRows.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  ...metaRows.asMap().entries.map(
+                    (entry) => _buildAboutRow(
+                      entry.value['label'] ?? '',
+                      entry.value['value'] ?? '',
+                      isLast: entry.key == metaRows.length - 1,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -623,6 +685,47 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
     );
   }
 
+  Widget _buildAboutRow(String label, String value, {bool isLast = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: isLast
+          ? null
+          : const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: ClothingDetailTokens.border,
+                  width: 1,
+                ),
+              ),
+            ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: ClothingDetailTokens.textMuted,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: ClothingDetailTokens.textSub,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   Widget _buildActions() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
@@ -984,7 +1087,7 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
           Text(
-            empty ? '—' : value,
+            empty ? 'Not set' : value,
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -1384,3 +1487,4 @@ class _EditSheet extends StatelessWidget {
     ),
   );
 }
+

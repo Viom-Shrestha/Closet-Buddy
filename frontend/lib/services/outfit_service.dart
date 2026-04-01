@@ -63,9 +63,27 @@ class OutfitService {
     return Map<String, dynamic>.from(jsonDecode(res.body));
   }
 
-  Future<Map<String, dynamic>?> rateAi(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> rateAi(Map<String, dynamic> data) async {
     final res = await client.post('/outfits/ai-rate/', data);
-    if (res.statusCode != 200) return null;
-    return Map<String, dynamic>.from(jsonDecode(res.body));
+    if (res.statusCode == 200) {
+      return Map<String, dynamic>.from(jsonDecode(res.body));
+    }
+
+    String message = 'Failed to rate outfit';
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map && decoded['error'] != null) {
+        message = decoded['error'].toString();
+      } else if (decoded is Map && decoded.isNotEmpty) {
+        final first = decoded.entries.first.value;
+        if (first is List && first.isNotEmpty) {
+          message = first.first.toString();
+        } else if (first != null) {
+          message = first.toString();
+        }
+      }
+    } catch (_) {}
+
+    throw message;
   }
 }
