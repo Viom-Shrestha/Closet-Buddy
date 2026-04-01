@@ -6,6 +6,14 @@ from .models import (
     Outfit,
     StorageUnit,
 )
+from .metadata_normalization import (
+    coerce_temperature_label,
+    coerce_weather_label,
+    normalize_attributes,
+    normalize_color_label,
+    normalize_occasion_label,
+    to_display_label,
+)
 from django.contrib.auth.models import User
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -82,6 +90,25 @@ class ClothingItemUpdateSerializer(serializers.ModelSerializer):
             "fit_offset_x",
             "fit_offset_y",
         ]
+
+    def validate_occasion(self, value):
+        normalized = normalize_occasion_label(value)
+        return to_display_label(normalized)
+
+    def validate_attributes(self, value):
+        return normalize_attributes(value)
+
+    def validate_detected_temp(self, value):
+        return coerce_temperature_label(value, allow_unknown=True)
+
+    def validate_detected_weather(self, value):
+        return coerce_weather_label(value, allow_unknown=True)
+
+    def validate_dominant_color(self, value):
+        return normalize_color_label(value) or "Unknown"
+
+    def validate_secondary_color(self, value):
+        return normalize_color_label(value)
 
 
 # class ClothingItemCreateSerializer(serializers.ModelSerializer):

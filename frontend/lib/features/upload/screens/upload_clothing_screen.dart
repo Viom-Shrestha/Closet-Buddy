@@ -39,6 +39,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   String dominantColor = '';
   String secondaryColor = '';
   String occasion = '';
+  String detectedTemp = '';
+  String detectedWeather = '';
   List<String> attributes = [];
 
   late TextEditingController categoryController;
@@ -46,6 +48,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   late TextEditingController dominantColorController;
   late TextEditingController secondaryColorController;
   late TextEditingController occasionController;
+  late TextEditingController detectedTempController;
+  late TextEditingController detectedWeatherController;
   late TextEditingController attributesController;
 
   @override
@@ -57,6 +61,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     dominantColorController = TextEditingController();
     secondaryColorController = TextEditingController();
     occasionController = TextEditingController();
+    detectedTempController = TextEditingController();
+    detectedWeatherController = TextEditingController();
     attributesController = TextEditingController();
   }
 
@@ -67,6 +73,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     dominantColorController.dispose();
     secondaryColorController.dispose();
     occasionController.dispose();
+    detectedTempController.dispose();
+    detectedWeatherController.dispose();
     attributesController.dispose();
     super.dispose();
   }
@@ -203,12 +211,14 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       setState(() {
         segmentedUrl = result['segmented_image'];
 
-        category = result['category'];
-        subcategory = result['subcategory'];
-        dominantColor = result['dominant_color'];
-        secondaryColor = result['secondary_color'];
-        occasion = result['occasion'];
-        attributes = List<String>.from(result['attributes'] ?? const []);
+        category = _safeText(result['category']);
+        subcategory = _safeText(result['subcategory']);
+        dominantColor = _safeText(result['dominant_color']);
+        secondaryColor = _safeText(result['secondary_color']);
+        occasion = _safeText(result['occasion']);
+        detectedTemp = _safeText(result['detected_temp']);
+        detectedWeather = _safeText(result['detected_weather']);
+        attributes = _extractTags(result);
 
         // ✅ update controllers AFTER values exist
         categoryController.text = category;
@@ -216,6 +226,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         dominantColorController.text = dominantColor;
         secondaryColorController.text = secondaryColor;
         occasionController.text = occasion;
+        detectedTempController.text = detectedTemp;
+        detectedWeatherController.text = detectedWeather;
         attributesController.text = attributes.join(', ');
 
         isLoading = false;
@@ -255,6 +267,15 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
 
     setState(() => isLoading = true);
 
+    category = categoryController.text.trim();
+    subcategory = subcategoryController.text.trim();
+    dominantColor = dominantColorController.text.trim();
+    secondaryColor = secondaryColorController.text.trim();
+    occasion = occasionController.text.trim();
+    detectedTemp = detectedTempController.text.trim();
+    detectedWeather = detectedWeatherController.text.trim();
+    attributes = _normalizeTags(_splitAttributes(attributesController.text));
+
     final payload = {
       "storage_unit": widget.storageId,
       "segmented_image": segmentedUrl,
@@ -264,6 +285,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       "secondary_color": secondaryColor,
       "occasion": occasion,
       "attributes": attributes,
+      "detected_temp": detectedTemp,
+      "detected_weather": detectedWeather,
     };
 
     final success = await clothingService.save(payload);
@@ -304,6 +327,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       dominantColor = '';
       secondaryColor = '';
       occasion = '';
+      detectedTemp = '';
+      detectedWeather = '';
       attributes = [];
 
       categoryController.clear();
@@ -311,6 +336,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       dominantColorController.clear();
       secondaryColorController.clear();
       occasionController.clear();
+      detectedTempController.clear();
+      detectedWeatherController.clear();
       attributesController.clear();
 
       currentStep = UploadStep.selectImage;
@@ -679,6 +706,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                     ),
                   ),
                 SizedBox(height: 24),
+                _buildMetadataSummary(),
+                SizedBox(height: 16),
                 _buildTextField(
                   'Category',
                   categoryController,
@@ -710,10 +739,24 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                 ),
                 SizedBox(height: 16),
                 _buildTextField(
-                  'Attributes (comma separated)',
-                  attributesController,
-                  (val) => attributes = _splitAttributes(val),
+                  'Temperature',
+                  detectedTempController,
+                  (val) => detectedTemp = val.trim(),
                 ),
+                SizedBox(height: 16),
+                _buildTextField(
+                  'Weather',
+                  detectedWeatherController,
+                  (val) => detectedWeather = val.trim(),
+                ),
+                SizedBox(height: 16),
+                _buildTextField(
+                  'Tags (comma separated)',
+                  attributesController,
+                  _onAttributesChanged,
+                ),
+                SizedBox(height: 12),
+                _buildTagPreview(),
               ],
             ),
           ),
@@ -798,6 +841,193 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildMetadataSummary() {
+    final chips = <Widget>[
+      if (detectedTemp.trim().isNotEmpty)
+        _summaryChip(
+          icon: Icons.thermostat_rounded,
+          label: 'Temp',
+          value: _humanize(detectedTemp),
+        ),
+      if (detectedWeather.trim().isNotEmpty)
+        _summaryChip(
+          icon: Icons.wb_cloudy_rounded,
+          label: 'Weather',
+          value: _humanize(detectedWeather),
+        ),
+      if (attributes.isNotEmpty)
+        _summaryChip(
+          icon: Icons.sell_outlined,
+          label: 'Tags',
+          value: '${attributes.length} detected',
+        ),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: UploadTokens.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: UploadTokens.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Detected metadata',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: UploadTokens.ink,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Review and adjust before saving.',
+            style: TextStyle(fontSize: 12, color: UploadTokens.muted),
+          ),
+          if (chips.isNotEmpty) ...[
+            SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: chips),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryChip({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: UploadTokens.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: UploadTokens.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: UploadTokens.muted),
+          SizedBox(width: 6),
+          Text(
+            '$label: $value',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: UploadTokens.ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTagPreview() {
+    if (attributes.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: UploadTokens.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: UploadTokens.line),
+        ),
+        child: Text(
+          'No tags detected yet. Add comma separated tags above.',
+          style: TextStyle(fontSize: 12, color: UploadTokens.muted),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: attributes
+          .asMap()
+          .entries
+          .map(
+            (entry) => Chip(
+              label: Text(_humanize(entry.value)),
+              onDeleted: () => _removeTag(entry.key),
+              side: BorderSide(color: UploadTokens.line),
+              backgroundColor: UploadTokens.surface,
+              labelStyle: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: UploadTokens.ink,
+              ),
+              deleteIconColor: UploadTokens.muted,
+              visualDensity: VisualDensity.compact,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  void _removeTag(int index) {
+    if (index < 0 || index >= attributes.length) return;
+    setState(() {
+      final next = List<String>.from(attributes)..removeAt(index);
+      attributes = next;
+      attributesController.text = next.join(', ');
+      attributesController.selection = TextSelection.collapsed(
+        offset: attributesController.text.length,
+      );
+    });
+  }
+
+  void _onAttributesChanged(String value) {
+    setState(() {
+      attributes = _normalizeTags(_splitAttributes(value));
+    });
+  }
+
+  String _safeText(dynamic value) {
+    return (value ?? '').toString().trim();
+  }
+
+  List<String> _extractTags(Map<String, dynamic> result) {
+    final raw = result['attributes'] ?? result['tags'];
+    if (raw is List) {
+      return _normalizeTags(raw.map((entry) => _safeText(entry)).toList());
+    }
+    if (raw is String) {
+      return _normalizeTags(_splitAttributes(raw));
+    }
+    return const [];
+  }
+
+  List<String> _normalizeTags(List<String> values) {
+    final seen = <String>{};
+    final normalized = <String>[];
+    for (final value in values) {
+      final clean = _safeText(value);
+      if (clean.isEmpty) continue;
+      final key = clean.toLowerCase();
+      if (seen.add(key)) {
+        normalized.add(clean);
+      }
+    }
+    return normalized;
+  }
+
+  String _humanize(String value) {
+    final normalized = value.trim().replaceAll(RegExp(r'[_-]+'), ' ');
+    if (normalized.isEmpty) return '';
+    return normalized
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .map(
+          (part) =>
+              '${part[0].toUpperCase()}${part.length > 1 ? part.substring(1).toLowerCase() : ''}',
+        )
+        .join(' ');
   }
 
   String _getLoadingMessage() {

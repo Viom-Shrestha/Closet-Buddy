@@ -2,16 +2,16 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from ..metadata_normalization import (
+    ALLOWED_TEMPERATURES,
+    ALLOWED_WEATHER,
+    coerce_temperature_label,
+    coerce_weather_label,
+)
 from ..recommend.engine import recommend_outfits
 
 
-ALLOWED_TEMPERATURES = {"freezing", "cold", "cool", "warm", "hot"}
-ALLOWED_WEATHER = {"rainy", "snowy", "windy", "humid", "dry"}
 RECOMMENDATION_LIMIT = 3
-
-
-def _normalize_text(value):
-    return (value or "").strip().lower()
 
 
 @api_view(["POST"])
@@ -20,8 +20,8 @@ def recommend_outfits_view(request):
     payload = request.data or {}
     weather = payload.get("weather") or {}
 
-    temperature = _normalize_text(weather.get("temperature"))
-    condition = _normalize_text(weather.get("weather"))
+    temperature = coerce_temperature_label(weather.get("temperature"), allow_unknown=True) or ""
+    condition = coerce_weather_label(weather.get("weather"), allow_unknown=True) or ""
 
     if temperature and temperature not in ALLOWED_TEMPERATURES:
         return Response({"error": "Invalid temperature label."}, status=400)
@@ -33,12 +33,36 @@ def recommend_outfits_view(request):
     occasion = payload.get("occasion")
     prompt = payload.get("prompt")
 
-    results = recommend_outfits(
+    data = recommend_outfits(
         user=request.user,
         weather={"temperature": temperature, "weather": condition},
         occasion=occasion,
         prompt=prompt,
         limit=RECOMMENDATION_LIMIT,
     )
+    available_occasions = data.get("available_occasions") or []
 
-    return Response(results, status=200)
+    response_body = {
+        "outfits": data["results"],
+        "fallback_used": data["fallback_used"],
+        "occasion_fallback_used": data.get("occasion_fallback_used", False),
+        "metadata": {
+            "temperature": temperature,
+            "weather": condition,
+            "available_occasions": available_occasions,
+            "occasion_applied": data.get("occasion_applied") or "",
+        },
+    }
+    warnings = []
+    if data.get("occasion_fallback_used") and (occasion or "").strip():
+        warnings.append(
+            "Not enough items match that occasion right now. Showing best available outfits based on weather and overall style match."
+        )
+    if data["fallback_used"]:
+        warnings.append(
+            "Not enough weather-appropriate items found. Showing best available matches."
+        )
+    if warnings:
+        response_body["warning"] = " ".join(warnings)
+
+    return Response(response_body, status=200)

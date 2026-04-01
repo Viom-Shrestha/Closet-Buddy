@@ -22,6 +22,14 @@ from ai_models.classification.occasion import predict_occasion
 from ai_models.classification.weather import classify_clothing_weather
 
 from ..models import ClothingItem, StorageUnit
+from ..metadata_normalization import (
+    coerce_temperature_label,
+    coerce_weather_label,
+    normalize_attributes,
+    normalize_color_label,
+    normalize_occasion_label,
+    to_display_label,
+)
 from ..serializer import ClothingItemSerializer, ClothingItemUpdateSerializer
 
 from ai_models.segmentation.segmentation_utill import segment_image
@@ -94,6 +102,16 @@ def _extract_fit_values(data, category: str, subcategory: str) -> Dict[str, floa
         "fit_offset_x": _coerce_float(data.get("fit_offset_x"), defaults["fit_offset_x"], -1.0, 1.0),
         "fit_offset_y": _coerce_float(data.get("fit_offset_y"), defaults["fit_offset_y"], -1.0, 1.0),
     }
+
+
+def _normalize_update_payload(payload: Dict) -> Dict:
+    normalized: Dict = {}
+    for key, value in payload.items():
+        if key == "attributes":
+            normalized[key] = _coerce_attributes(value)
+        else:
+            normalized[key] = _first_value(value)
+    return normalized
 
 
 def _normalize_segmented_image(image_path: Path) -> ContentFile:
@@ -206,22 +224,36 @@ def _classify_clothing_safe(image_path: Path) -> Tuple[str, str, List[str]]:
 
 
 def _coerce_attributes(raw_attributes) -> List:
-    if isinstance(raw_attributes, list):
-        return raw_attributes
-    return []
+    return normalize_attributes(raw_attributes)
+
+
+def _coerce_temp_label(raw_label):
+    candidate = _first_value(raw_label)
+    return coerce_temperature_label(candidate, allow_unknown=True)
 
 
 def _coerce_weather_label(raw_label):
     candidate = _first_value(raw_label)
-    if candidate is None:
-        return None
-    text = str(candidate).strip()
-    return text or None
+    return coerce_weather_label(candidate, allow_unknown=True)
 
 
-def _classify_weather_safe(image_path: Path) -> Tuple[Optional[str], Optional[str]]:
+def _coerce_occasion_label(raw_label):
+    candidate = _first_value(raw_label)
+    normalized = normalize_occasion_label(candidate)
+    return to_display_label(normalized)
+
+
+def _classify_weather_safe(
+    image_path: Path,
+    category: Optional[str] = None,
+    subcategory: Optional[str] = None,
+) -> Tuple[Optional[str], Optional[str]]:
     try:
-        result = classify_clothing_weather(str(image_path))
+        result = classify_clothing_weather(
+            str(image_path),
+            category=category,
+            subcategory=subcategory,
+        )
         return result.get("temperature"), result.get("weather")
     except Exception:
         return None, None
@@ -270,12 +302,24 @@ def clothing_process(request):
         category, subcategory, attributes = _classify_clothing_safe(image_path)
 
     # -------- WEATHER LABELS --------
-    detected_temp, detected_weather = _classify_weather_safe(image_path)
+    detected_temp, detected_weather = _classify_weather_safe(
+        image_path,
+        category=category,
+        subcategory=subcategory,
+    )
+    attributes = normalize_attributes(attributes)
+    occasion = _coerce_occasion_label(occasion) or DEFAULT_OCCASION
+    detected_temp = coerce_temperature_label(detected_temp, allow_unknown=True)
+    detected_weather = coerce_weather_label(detected_weather, allow_unknown=True)
 
     result = {
         "segmented_image": segmented_url,
-        "dominant_color": colors.get("dominant_color", UNKNOWN_COLORS["dominant_color"]),
-        "secondary_color": colors.get("secondary_color", UNKNOWN_COLORS["secondary_color"]),
+        "dominant_color": normalize_color_label(
+            colors.get("dominant_color", UNKNOWN_COLORS["dominant_color"])
+        ) or UNKNOWN_COLORS["dominant_color"],
+        "secondary_color": normalize_color_label(
+            colors.get("secondary_color", UNKNOWN_COLORS["secondary_color"])
+        ) or UNKNOWN_COLORS["secondary_color"],
         "category": category,
         "subcategory": subcategory,
         "occasion": occasion,
@@ -315,8 +359,11 @@ def clothing_save(request):
 
     attributes = _coerce_attributes(data.get("attributes", []))
     fit_values = _extract_fit_values(data, data["category"], data["subcategory"])
-    detected_temp = _coerce_weather_label(data.get("detected_temp"))
+    detected_temp = _coerce_temp_label(data.get("detected_temp"))
     detected_weather = _coerce_weather_label(data.get("detected_weather"))
+    occasion = _coerce_occasion_label(data.get("occasion"))
+    dominant_color = normalize_color_label(data.get("dominant_color")) or UNKNOWN_COLORS["dominant_color"]
+    secondary_color = normalize_color_label(data.get("secondary_color"))
 
     normalized_image = _normalize_segmented_image(image_path)
 
@@ -324,11 +371,11 @@ def clothing_save(request):
         user=request.user,
         storage_unit=storage,
         image=File(normalized_image, name=normalized_image.name),
-        dominant_color=data["dominant_color"],
-        secondary_color=data.get("secondary_color"),
+        dominant_color=dominant_color,
+        secondary_color=secondary_color,
         category=data["category"],
         subcategory=data["subcategory"],
-        occasion=data.get("occasion"),
+        occasion=occasion,
         attributes=attributes,
         detected_temp=detected_temp,
         detected_weather=detected_weather,
@@ -337,9 +384,13 @@ def clothing_save(request):
         fit_offset_y=fit_values["fit_offset_y"],
     )
     if not detected_temp or not detected_weather:
-        detected_temp, detected_weather = _classify_weather_safe(Path(clothing.image.path))
-        clothing.detected_temp = detected_temp
-        clothing.detected_weather = detected_weather
+        detected_temp, detected_weather = _classify_weather_safe(
+            Path(clothing.image.path),
+            category=clothing.category,
+            subcategory=clothing.subcategory,
+        )
+        clothing.detected_temp = coerce_temperature_label(detected_temp, allow_unknown=True)
+        clothing.detected_weather = coerce_weather_label(detected_weather, allow_unknown=True)
         clothing.save(update_fields=["detected_temp", "detected_weather"])
     try:
         os.remove(image_path)
@@ -449,6 +500,8 @@ def update_clothing(request, pk):
 
         item.storage_unit = storage
         item.save(update_fields=["storage_unit"])
+
+    payload = _normalize_update_payload(payload)
 
     if not payload:
         serializer = ClothingItemSerializer(item, context={"request": request})
