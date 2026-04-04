@@ -4,6 +4,7 @@ import 'package:frontend/services/auth_service.dart';
 import 'package:frontend/features/home/screens/home_screen.dart';
 import 'package:frontend/features/auth/screens/register_screen.dart';
 import 'package:frontend/theme/app_theme.dart';
+import 'package:frontend/widgets/app_logo.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -126,10 +127,7 @@ class _LoginScreenState extends State<LoginScreen>
                     Column(
                       children: [
                         Container(
-                          width: 72,
-                          height: 72,
                           decoration: BoxDecoration(
-                            color: AuthTokens.ink,
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
@@ -139,10 +137,10 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                             ],
                           ),
-                          child: Icon(
-                            Icons.checkroom_rounded,
-                            size: 36,
-                            color: AuthTokens.surface,
+                          child: AppLogo(
+                            size: 72,
+                            borderRadius: 20,
+                            darkBackground: true,
                           ),
                         ),
 
