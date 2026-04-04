@@ -33,6 +33,10 @@ class _AuthGateState extends State<AuthGate> {
       return;
     }
 
+    try {
+      await _services.recommendationService.primeOccasionCatalog();
+    } catch (_) {}
+
     final profile = await _services.profileService.fetchProfile();
     if (!mounted) return;
 

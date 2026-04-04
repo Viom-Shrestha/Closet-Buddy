@@ -60,48 +60,10 @@ def _infer_category(subcategory):
     return map_category_from_subcategory(subcategory)
 
 
-def _is_shoe_label(category: str, subcategory: str) -> bool:
-    text = f"{category} {subcategory}".lower()
-    keys = ["shoe", "sneaker", "boot", "heel", "footwear", "slipper", "sandal", "loafer"]
-    return any(key in text for key in keys)
-
-
-def _is_bottom_label(category: str, subcategory: str) -> bool:
-    text = f"{category} {subcategory}".lower()
-    keys = ["pant", "trouser", "jean", "short", "skirt", "bottom", "jogger", "legging", "cargo"]
-    return any(key in text for key in keys)
-
-
 def _first_value(raw):
     if isinstance(raw, list):
         return raw[0] if raw else None
     return raw
-
-
-def _coerce_float(raw, fallback: float, min_value: float, max_value: float) -> float:
-    candidate = _first_value(raw)
-    try:
-        parsed = float(candidate)
-    except (TypeError, ValueError):
-        parsed = fallback
-    return max(min(parsed, max_value), min_value)
-
-
-def _default_fit_values(category: str, subcategory: str) -> Dict[str, float]:
-    if _is_shoe_label(category, subcategory):
-        return {"fit_scale": 1.08, "fit_offset_x": 0.0, "fit_offset_y": -0.03}
-    if _is_bottom_label(category, subcategory):
-        return {"fit_scale": 1.12, "fit_offset_x": 0.0, "fit_offset_y": -0.05}
-    return {"fit_scale": 1.0, "fit_offset_x": 0.0, "fit_offset_y": 0.0}
-
-
-def _extract_fit_values(data, category: str, subcategory: str) -> Dict[str, float]:
-    defaults = _default_fit_values(category, subcategory)
-    return {
-        "fit_scale": _coerce_float(data.get("fit_scale"), defaults["fit_scale"], 0.5, 2.0),
-        "fit_offset_x": _coerce_float(data.get("fit_offset_x"), defaults["fit_offset_x"], -1.0, 1.0),
-        "fit_offset_y": _coerce_float(data.get("fit_offset_y"), defaults["fit_offset_y"], -1.0, 1.0),
-    }
 
 
 def _normalize_update_payload(payload: Dict) -> Dict:
@@ -358,7 +320,6 @@ def clothing_save(request):
         return Response({"error": f"Missing fields: {', '.join(missing_fields)}"}, status=400)
 
     attributes = _coerce_attributes(data.get("attributes", []))
-    fit_values = _extract_fit_values(data, data["category"], data["subcategory"])
     detected_temp = _coerce_temp_label(data.get("detected_temp"))
     detected_weather = _coerce_weather_label(data.get("detected_weather"))
     occasion = _coerce_occasion_label(data.get("occasion"))
@@ -379,9 +340,6 @@ def clothing_save(request):
         attributes=attributes,
         detected_temp=detected_temp,
         detected_weather=detected_weather,
-        fit_scale=fit_values["fit_scale"],
-        fit_offset_x=fit_values["fit_offset_x"],
-        fit_offset_y=fit_values["fit_offset_y"],
     )
     if not detected_temp or not detected_weather:
         detected_temp, detected_weather = _classify_weather_safe(

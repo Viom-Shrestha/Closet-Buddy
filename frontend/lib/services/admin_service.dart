@@ -29,18 +29,6 @@ class AdminService {
         .toList();
   }
 
-  Future<List<Map<String, dynamic>>> fetchActivity({int limit = 60}) async {
-    final res = await _client.get('/admin/activity/?limit=$limit');
-    if (res.statusCode != 200) return const [];
-
-    final decoded = jsonDecode(res.body);
-    final results = (decoded['results'] as List?) ?? const [];
-    return results
-        .whereType<Map>()
-        .map((row) => Map<String, dynamic>.from(row))
-        .toList();
-  }
-
   Future<bool> setUserActive(int userId, bool isActive) async {
     final res = await _client.post('/admin/users/$userId/active/', {
       'is_active': isActive,

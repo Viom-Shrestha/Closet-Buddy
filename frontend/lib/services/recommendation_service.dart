@@ -6,6 +6,67 @@ class RecommendationService {
   RecommendationService({ApiClient? client}) : _client = client ?? ApiClient();
 
   final ApiClient _client;
+  Map<String, dynamic>? _occasionCatalogCache;
+
+  Future<void> primeOccasionCatalog() async {
+    await fetchOccasionCatalog();
+  }
+
+  Future<Map<String, dynamic>> fetchOccasionCatalog({
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _occasionCatalogCache != null) {
+      return _occasionCatalogCache!;
+    }
+
+    final res = await _client.get('/occasions/');
+    if (res.statusCode != 200) {
+      return _occasionCatalogCache ?? const {
+        'aliases': <String, String>{},
+        'canonical_occasions': <String>[],
+        'attribute_signals': <String>[],
+        'sort_order': <String>[],
+      };
+    }
+
+    final decoded = jsonDecode(res.body);
+    if (decoded is! Map) {
+      return _occasionCatalogCache ?? const {
+        'aliases': <String, String>{},
+        'canonical_occasions': <String>[],
+        'attribute_signals': <String>[],
+        'sort_order': <String>[],
+      };
+    }
+
+    final aliasesRaw = decoded['aliases'];
+    final aliases = <String, String>{};
+    if (aliasesRaw is Map) {
+      aliasesRaw.forEach((key, value) {
+        final alias = key.toString().trim();
+        if (alias.isEmpty) return;
+        aliases[alias] = value?.toString() ?? '';
+      });
+    }
+
+    List<String> stringList(dynamic raw) {
+      if (raw is! List) return const [];
+      return raw
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+
+    final catalog = <String, dynamic>{
+      'aliases': aliases,
+      'canonical_occasions': stringList(decoded['canonical_occasions']),
+      'attribute_signals': stringList(decoded['attribute_signals']),
+      'sort_order': stringList(decoded['sort_order']),
+    };
+
+    _occasionCatalogCache = catalog;
+    return catalog;
+  }
 
   Future<Map<String, dynamic>> recommend({
     required String temperature,
