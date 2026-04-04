@@ -3,10 +3,12 @@ import io
 from pathlib import Path
 from urllib.parse import urlparse
 from typing import Dict, List, Optional, Tuple
+from uuid import uuid4
 
 from django.conf import settings
 from django.core.files import File
 from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from PIL import Image
 
 from rest_framework.decorators import api_view, permission_classes
@@ -131,6 +133,29 @@ def _resolve_segmented_path(segmented_url: str) -> Path:
     return Path(settings.MEDIA_ROOT) / relative
 
 
+def _persist_original_upload(image_file, request) -> Tuple[str, Path]:
+    original_name = getattr(image_file, "name", "") or ""
+    extension = Path(original_name).suffix.lower()
+    if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+        extension = ".jpg"
+
+    relative_path = f"clothing/review/{uuid4().hex}{extension}"
+    try:
+        image_file.seek(0)
+    except Exception:
+        pass
+    saved_path = default_storage.save(relative_path, image_file)
+    try:
+        image_file.seek(0)
+    except Exception:
+        pass
+
+    normalized_relative = saved_path.replace("\\", "/")
+    original_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{normalized_relative}")
+    original_path = Path(settings.MEDIA_ROOT) / normalized_relative
+    return original_url, original_path
+
+
 def _extract_colors_safe(image_path: Path) -> Dict[str, str]:
     try:
         return extract_colors_with_names(str(image_path))
@@ -238,18 +263,38 @@ def clothing_process(request):
         return Response(auth_error, status=400)
 
 
-    # -------- SEGMENT --------
     try:
+        original_url, original_path = _persist_original_upload(image, request)
+    except Exception:
+        return Response({"error": "Failed to persist upload"}, status=500)
+
+    # -------- SEGMENT --------
+    segmented_url = None
+    segmentation_failed = False
+    segmentation_message = ""
+    try:
+        try:
+            image.seek(0)
+        except Exception:
+            pass
         segmented_path = segment_image(image)
         segmented_url = request.build_absolute_uri(segmented_path)
-
     except Exception:
-        return Response({"error": "Segmentation failed"}, status=500)
+        segmentation_failed = True
+        segmentation_message = "Segmentation failed. You can continue without segmentation."
 
-    image_path = _resolve_segmented_path(segmented_url)
-    
+    if segmented_url:
+        image_path = _resolve_segmented_path(segmented_url)
+        if not image_path.exists():
+            segmentation_failed = True
+            segmentation_message = "Segmented file missing. You can continue without segmentation."
+            segmented_url = None
+            image_path = original_path
+    else:
+        image_path = original_path
+
     if not image_path.exists():
-        return Response({"error": "Segmented file missing"}, status=500)
+        return Response({"error": "Image missing"}, status=500)
 
     # -------- COLORS --------
     colors = _extract_colors_safe(image_path)
@@ -275,7 +320,9 @@ def clothing_process(request):
     detected_weather = coerce_weather_label(detected_weather, allow_unknown=True)
 
     result = {
+        "original_image": original_url,
         "segmented_image": segmented_url,
+        "segmentation_failed": segmentation_failed,
         "dominant_color": normalize_color_label(
             colors.get("dominant_color", UNKNOWN_COLORS["dominant_color"])
         ) or UNKNOWN_COLORS["dominant_color"],
@@ -291,6 +338,8 @@ def clothing_process(request):
         "detected_weather": detected_weather,
         "is_shoe": is_shoe,
     }
+    if segmentation_message:
+        result["segmentation_message"] = segmentation_message
 
     return Response(result, status=200)
 
@@ -300,12 +349,18 @@ def clothing_save(request):
     data = request.data
 
     segmented_url = data.get("segmented_image")
+    original_url = data.get("original_image")
+    use_segmentation = _as_bool(data.get("use_segmentation", True))
     storage_id = data.get("storage_unit")
 
-    if not segmented_url or not storage_id:
-        return Response({"error": "segmented_image and storage_unit required"}, status=400)
+    if use_segmentation and not segmented_url and original_url:
+        use_segmentation = False
 
-    image_path = _resolve_segmented_path(segmented_url)
+    source_url = segmented_url if use_segmentation else (original_url or segmented_url)
+    if not source_url or not storage_id:
+        return Response({"error": "image source and storage_unit required"}, status=400)
+
+    image_path = _resolve_segmented_path(source_url)
 
     if not image_path.exists():
         return Response({"error": "Image missing"}, status=400)
@@ -325,13 +380,16 @@ def clothing_save(request):
     occasion = _coerce_occasion_label(data.get("occasion"))
     dominant_color = normalize_color_label(data.get("dominant_color")) or UNKNOWN_COLORS["dominant_color"]
     secondary_color = normalize_color_label(data.get("secondary_color"))
-
-    normalized_image = _normalize_segmented_image(image_path)
+    if use_segmentation:
+        image_content = _normalize_segmented_image(image_path)
+    else:
+        image_content = ContentFile(image_path.read_bytes())
+        image_content.name = image_path.name
 
     clothing = ClothingItem.objects.create(
         user=request.user,
         storage_unit=storage,
-        image=File(normalized_image, name=normalized_image.name),
+        image=File(image_content, name=image_content.name),
         dominant_color=dominant_color,
         secondary_color=secondary_color,
         category=data["category"],
@@ -350,10 +408,17 @@ def clothing_save(request):
         clothing.detected_temp = coerce_temperature_label(detected_temp, allow_unknown=True)
         clothing.detected_weather = coerce_weather_label(detected_weather, allow_unknown=True)
         clothing.save(update_fields=["detected_temp", "detected_weather"])
-    try:
-        os.remove(image_path)
-    except Exception as e:
-        print("Cleanup failed:", e)
+
+    cleanup_urls = [segmented_url, original_url]
+    for cleanup_url in cleanup_urls:
+        if not cleanup_url:
+            continue
+        try:
+            cleanup_path = _resolve_segmented_path(cleanup_url)
+            if cleanup_path.exists() and cleanup_path != Path(clothing.image.path):
+                os.remove(cleanup_path)
+        except Exception as e:
+            print("Cleanup failed:", e)
     
     return Response({"id": clothing.id}, status=201)
 
