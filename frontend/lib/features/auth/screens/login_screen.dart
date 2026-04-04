@@ -69,22 +69,13 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isLoading = false); // Stop loading regardless of outcome
 
     if (success) {
-      // if (_rememberMe) {
-      // await api.saveTokens(token);
-      // }
-      // 1. Success Message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful! Redirecting...'),
-          backgroundColor: AuthTokens.ink,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      // 2. Navigation Logic
-      // pushReplacement removes the current screen (LoginScreen) from the stack
+      // pushReplacement removes the current screen (LoginScreen) from the stack.
+      // Show success toast on Home screen so it stays visible after navigation.
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(
+          builder: (context) =>
+              const HomeScreen(startupMessage: 'Login successful!'),
+        ),
       );
     } else {
       // Failure Message
