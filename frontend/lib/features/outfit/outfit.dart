@@ -1,4 +1,3 @@
-export 'screens/outfit_preview_screen.dart';
 export 'screens/outfit_screen.dart';
 export '../../services/accessory_service.dart';
 export '../../services/outfit_service.dart';

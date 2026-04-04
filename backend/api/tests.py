@@ -216,3 +216,14 @@ class RecommendationApiTests(APITestCase):
         self.assertEqual(res.data["occasion_fallback_used"], True)
         self.assertIn("warning", res.data)
         self.assertIn("Not enough items match that occasion", res.data["warning"])
+
+    def test_occasions_catalog_endpoint(self):
+        res = self.client.get("/api/occasions/")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("aliases", res.data)
+        self.assertIn("canonical_occasions", res.data)
+        self.assertIn("attribute_signals", res.data)
+        self.assertIn("sort_order", res.data)
+        self.assertEqual(res.data["aliases"].get("date night"), "date")
+        self.assertEqual(res.data["aliases"].get("any"), "")

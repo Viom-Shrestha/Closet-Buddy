@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 
-from ..models import StorageUnit
+from ..models import StorageUnit, ClothingItem, NonClothingItem
 from ..serializer import StorageUnitSerializer
 
 
@@ -105,8 +105,6 @@ def storage_detail(request, pk):
         return Response({"error": e.message_dict if hasattr(e, "message_dict") else e.messages}, status=400)
 
     return Response(StorageUnitSerializer(storage).data)
-
-from ..models import ClothingItem, NonClothingItem
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

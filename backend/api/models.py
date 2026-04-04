@@ -106,19 +106,6 @@ class ClothingItem(models.Model):
     attributes = models.JSONField(default=list, blank=True)
     detected_temp = models.CharField(max_length=30, null=True, blank=True)
     detected_weather = models.CharField(max_length=30, null=True, blank=True)
-    # Per-item render tuning used by outfit overlays.
-    fit_scale = models.FloatField(
-        default=1.0,
-        validators=[MinValueValidator(0.5), MaxValueValidator(2.0)],
-    )
-    fit_offset_x = models.FloatField(
-        default=0.0,
-        validators=[MinValueValidator(-1.0), MaxValueValidator(1.0)],
-    )
-    fit_offset_y = models.FloatField(
-        default=0.0,
-        validators=[MinValueValidator(-1.0), MaxValueValidator(1.0)],
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     is_favourite = models.BooleanField(default=False)
 

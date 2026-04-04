@@ -9,6 +9,7 @@ import 'package:frontend/theme/app_theme.dart';
 import 'package:frontend/widgets/editable_outfit_canvas.dart';
 import 'package:frontend/widgets/outfit_canvas.dart';
 import 'package:frontend/features/home/screens/add_item_screen.dart';
+import 'package:frontend/features/storage/screens/storage_detail_screen.dart';
 import 'package:frontend/features/recommendation/screens/recommendation_screen.dart';
 import 'package:frontend/utils/outfit_slot_rules.dart';
 
@@ -238,7 +239,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
                         }, childCount: _outfits.length),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
-                          childAspectRatio: 0.5,
+                          childAspectRatio: 0.46,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),
@@ -253,7 +254,8 @@ class _OutfitsPageState extends State<OutfitsPage> {
           Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
-              minimum: const EdgeInsets.all(16),
+              top: false,
+              minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -2982,6 +2984,7 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
     final previewTransforms = outfit == null
         ? const <String, EditableCanvasTransform>{}
         : _layoutToTransforms(_previewLayout(outfit));
+    final storageRows = _clothingStorageRows(outfit);
 
     return Scaffold(
       backgroundColor: OutfitTokens.bg,
@@ -3150,6 +3153,26 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
                         wearCount == 0 ? 'Not yet' : '$wearCount times',
                       ),
                       _InfoRow('Created', createdAt),
+                      if (storageRows.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Where to Find Pieces',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: OutfitTokens.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        for (final row in storageRows)
+                          _StorageInfoRow(
+                            label: row.label,
+                            value: row.value,
+                            onTap: row.storageId == null
+                                ? null
+                                : () => _openStorageDetail(row.storageId!),
+                          ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         children: [
@@ -3253,6 +3276,107 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
           .toList();
     }
     return [];
+  }
+
+  Future<void> _openStorageDetail(int storageId) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StorageDetailScreen(storageId: storageId),
+      ),
+    );
+  }
+
+  List<_StorageLocationRow> _clothingStorageRows(
+    Map<String, dynamic>? outfit,
+  ) {
+    if (outfit == null) return [];
+
+    final rows = <_StorageLocationRow>[];
+
+    void addRow(String label, String key, {bool optional = false}) {
+      final item = _slot(outfit, key);
+      if (item == null) {
+        if (!optional) {
+          rows.add(_StorageLocationRow(label: label, value: 'Not selected'));
+        }
+        return;
+      }
+      final itemName = _clothingDisplayName(item);
+      final storage = _storageUnitMap(item['storage_unit']);
+      final storagePath = _storagePath(storage);
+      final storageId = _asInt(storage?['id']);
+      rows.add(
+        _StorageLocationRow(
+          label: label,
+          value: '$itemName - $storagePath',
+          storageId: storageId,
+        ),
+      );
+    }
+
+    addRow('Topwear', 'topwear_item');
+    addRow('Bottomwear', 'bottomwear_item');
+    addRow('Shoes', 'shoes_item');
+    addRow('Outerwear', 'outerwear_item', optional: true);
+
+    return rows;
+  }
+
+  String _clothingDisplayName(Map<String, dynamic> item) {
+    final subcategory = (item['subcategory'] ?? '').toString().trim();
+    if (subcategory.isNotEmpty) return subcategory;
+    final category = (item['category'] ?? '').toString().trim();
+    if (category.isNotEmpty) return category;
+    return 'Item';
+  }
+
+  Map<String, dynamic>? _storageUnitMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
+  }
+
+  String _storagePath(Map<String, dynamic>? storage) {
+    if (storage == null) return 'Storage unknown';
+
+    final parts = <String>[];
+    final seenIds = <int>{};
+    Map<String, dynamic>? current = storage;
+
+    while (current != null) {
+      final id = _asInt(current['id']);
+      if (id != null && !seenIds.add(id)) break;
+      final label = _storageNodeLabel(current);
+      if (label.isNotEmpty) {
+        parts.add(label);
+      }
+      current = _storageUnitMap(current['parent_storage']);
+    }
+
+    if (parts.isEmpty) return 'Storage unknown';
+    return parts.reversed.join(' > ');
+  }
+
+  String _storageNodeLabel(Map<String, dynamic> storage) {
+    final name = (storage['name'] ?? '').toString().trim();
+    final type = _humanizeStorageType((storage['type'] ?? '').toString());
+    if (name.isEmpty) return type;
+    if (type.isEmpty) return name;
+    return '$name ($type)';
+  }
+
+  String _humanizeStorageType(String raw) {
+    final cleaned = raw.replaceAll('_', ' ').trim();
+    if (cleaned.isEmpty) return '';
+    return cleaned
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .map(
+          (part) =>
+              '${part.substring(0, 1).toUpperCase()}${part.substring(1).toLowerCase()}',
+        )
+        .join(' ');
   }
 
   Map<String, dynamic> _previewLayout(Map<String, dynamic> outfit) {
@@ -3642,6 +3766,78 @@ class _AiRatingCard extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _StorageLocationRow {
+  final String label;
+  final String value;
+  final int? storageId;
+
+  const _StorageLocationRow({
+    required this.label,
+    required this.value,
+    this.storageId,
+  });
+}
+
+class _StorageInfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final VoidCallback? onTap;
+
+  const _StorageInfoRow({
+    required this.label,
+    required this.value,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final valueStyle = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      color: onTap == null ? OutfitTokens.ink : OutfitTokens.accent,
+      decoration: onTap == null
+          ? TextDecoration.none
+          : TextDecoration.underline,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            children: [
+              Text(
+                '$label: ',
+                style: const TextStyle(
+                  color: OutfitTokens.muted,
+                  fontSize: 13,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  value,
+                  style: valueStyle,
+                ),
+              ),
+              if (onTap != null) ...[
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.open_in_new_rounded,
+                  size: 14,
+                  color: OutfitTokens.accent,
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -59,9 +59,6 @@ class ClothingItemSerializer(serializers.ModelSerializer):
             "attributes",
             "detected_temp",
             "detected_weather",
-            "fit_scale",
-            "fit_offset_x",
-            "fit_offset_y",
             "is_favourite",
             "created_at",
             "storage_unit",
@@ -86,9 +83,6 @@ class ClothingItemUpdateSerializer(serializers.ModelSerializer):
             "attributes",
             "detected_temp",
             "detected_weather",
-            "fit_scale",
-            "fit_offset_x",
-            "fit_offset_y",
         ]
 
     def validate_occasion(self, value):
@@ -271,6 +265,7 @@ def _is_outerwear(item: ClothingItem) -> bool:
 
 class OutfitSlotItemSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
+    storage_unit = serializers.SerializerMethodField()
 
     class Meta:
         model = ClothingItem
@@ -280,9 +275,7 @@ class OutfitSlotItemSerializer(serializers.ModelSerializer):
             "category",
             "subcategory",
             "dominant_color",
-            "fit_scale",
-            "fit_offset_x",
-            "fit_offset_y",
+            "storage_unit",
             "is_favourite",
         ]
 
@@ -293,6 +286,22 @@ class OutfitSlotItemSerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(obj.image.url)
         return obj.image.url
+
+    def _serialize_storage_unit(self, storage):
+        if not storage:
+            return None
+
+        parent = getattr(storage, "parent_storage", None)
+        return {
+            "id": storage.id,
+            "name": storage.name,
+            "type": storage.type,
+            "parent_storage": self._serialize_storage_unit(parent) if parent else None,
+        }
+
+    def get_storage_unit(self, obj):
+        storage = getattr(obj, "storage_unit", None)
+        return self._serialize_storage_unit(storage)
 
 
 class OutfitAccessoryItemSerializer(serializers.ModelSerializer):

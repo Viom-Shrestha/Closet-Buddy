@@ -1,7 +1,7 @@
 import os
 import logging
 from functools import lru_cache
-from typing import Iterable, Optional
+from typing import Optional
 
 import numpy as np
 import torch
@@ -85,15 +85,6 @@ def get_image_embedding(image_path: str) -> Optional[np.ndarray]:
     except Exception:
         mtime = 0
     return _cached_image_embedding(image_path, mtime)
-
-
-def average_embeddings(embeddings: Iterable[Optional[np.ndarray]]) -> Optional[np.ndarray]:
-    vectors = [vec for vec in embeddings if vec is not None]
-    if not vectors:
-        return None
-    stacked = np.stack(vectors, axis=0)
-    avg = np.mean(stacked, axis=0)
-    return _normalize(avg.astype(np.float32))
 
 
 def cosine_similarity(vec_a: Optional[np.ndarray], vec_b: Optional[np.ndarray]) -> float:

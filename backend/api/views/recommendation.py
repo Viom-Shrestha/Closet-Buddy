@@ -5,9 +5,11 @@ from rest_framework.response import Response
 from ..metadata_normalization import (
     ALLOWED_TEMPERATURES,
     ALLOWED_WEATHER,
+    OCCASION_ALIASES,
     coerce_temperature_label,
     coerce_weather_label,
 )
+from ..recommend import filters
 from ..recommend.engine import recommend_outfits
 
 
@@ -66,3 +68,26 @@ def recommend_outfits_view(request):
         response_body["warning"] = " ".join(warnings)
 
     return Response(response_body, status=200)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def occasion_catalog_view(request):
+    aliases = {
+        alias: canonical
+        for alias, canonical in OCCASION_ALIASES.items()
+        if alias
+    }
+    canonical_order = [
+        name for name in filters.OCCASION_SORT_ORDER if name in filters.CANONICAL_OCCASIONS
+    ]
+    extras = sorted(filters.CANONICAL_OCCASIONS.difference(canonical_order))
+    return Response(
+        {
+            "aliases": aliases,
+            "canonical_occasions": [*canonical_order, *extras],
+            "attribute_signals": sorted(filters.OCCASION_ATTRIBUTE_SIGNALS),
+            "sort_order": list(filters.OCCASION_SORT_ORDER),
+        },
+        status=200,
+    )
