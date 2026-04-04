@@ -7,7 +7,7 @@ class AuthService {
 
   final ApiClient client;
 
-  Future<bool> register(
+  Future<Map<String, dynamic>> register(
     String username,
     String email,
     String password,
@@ -28,7 +28,57 @@ class AuthService {
       }),
     );
 
-    return res.statusCode == 201;
+    if (res.statusCode == 201) {
+      return {'success': true, 'errors': <String, String>{}};
+    }
+
+    dynamic decoded;
+    try {
+      decoded = res.body.isNotEmpty ? jsonDecode(res.body) : null;
+    } catch (_) {
+      decoded = null;
+    }
+
+    String flattenError(dynamic value) {
+      if (value == null) return '';
+      if (value is String) return value.trim();
+      if (value is List) {
+        return value
+            .map(flattenError)
+            .where((part) => part.isNotEmpty)
+            .join(' ')
+            .trim();
+      }
+      if (value is Map) {
+        return value.values
+            .map(flattenError)
+            .where((part) => part.isNotEmpty)
+            .join(' ')
+            .trim();
+      }
+      return value.toString().trim();
+    }
+
+    final errors = <String, String>{};
+    if (decoded is Map) {
+      decoded.forEach((key, value) {
+        final text = flattenError(value);
+        if (text.isNotEmpty) {
+          errors[key.toString()] = text;
+        }
+      });
+    } else {
+      final text = flattenError(decoded);
+      if (text.isNotEmpty) {
+        errors['non_field_errors'] = text;
+      }
+    }
+
+    if (errors.isEmpty) {
+      errors['non_field_errors'] = 'Registration failed. Please try again.';
+    }
+
+    return {'success': false, 'errors': errors};
   }
 
   Future<bool> login(String username, String password) async {
