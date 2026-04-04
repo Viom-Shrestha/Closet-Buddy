@@ -26,6 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   bool _agreeToTerms = false;
+  final Map<String, String> _backendErrors = {};
 
   static const String _termsAndConditionsText = '''
 Terms and Conditions for Closet Buddy
@@ -159,50 +160,94 @@ Email: closetbuddy.app@gmail.com
   }
 
   void register() async {
-    if (_formKey.currentState!.validate()) {
-      if (!_agreeToTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Please agree to the Terms and Conditions'),
-            backgroundColor: AuthTokens.danger,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        return;
-      }
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-      setState(() => _isLoading = true);
-
-      final success = await authService.register(
-        _username.text,
-        _email.text,
-        _password.text,
-        _confirmPassword.text,
-        _first.text,
-        _last.text,
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please agree to the Terms and Conditions'),
+          backgroundColor: AuthTokens.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
+      return;
+    }
 
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+    setState(() {
+      _isLoading = true;
+      _backendErrors.clear();
+    });
 
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Account created successfully!'),
-            backgroundColor: AuthTokens.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Registration failed. Please try again.'),
-            backgroundColor: AuthTokens.danger,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+    final result = await authService.register(
+      _username.text.trim(),
+      _email.text.trim(),
+      _password.text,
+      _confirmPassword.text,
+      _first.text.trim(),
+      _last.text.trim(),
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    final success = result['success'] == true;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Account created successfully!'),
+          backgroundColor: AuthTokens.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.pop(context);
+      return;
+    }
+
+    final dynamic rawErrors = result['errors'];
+    final errors = <String, String>{};
+    if (rawErrors is Map) {
+      rawErrors.forEach((key, value) {
+        final text = (value ?? '').toString().trim();
+        if (text.isNotEmpty) {
+          errors[key.toString()] = text;
+        }
+      });
+    }
+
+    setState(() {
+      _backendErrors
+        ..clear()
+        ..addAll(errors);
+    });
+    _formKey.currentState?.validate();
+
+    final globalMessage =
+        errors['non_field_errors'] ??
+        errors['detail'] ??
+        errors['error'] ??
+        (errors.isNotEmpty ? errors.values.first : 'Registration failed. Please try again.');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(globalMessage),
+        backgroundColor: AuthTokens.danger,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  String? _withBackendError(String key, String? localError) {
+    if (localError != null) return localError;
+    return _backendErrors[key];
+  }
+
+  void _clearBackendError(String key) {
+    if (_backendErrors.containsKey(key)) {
+      setState(() {
+        _backendErrors.remove(key);
+      });
     }
   }
 
@@ -345,11 +390,15 @@ Email: closetbuddy.app@gmail.com
                                   label: 'First Name',
                                   controller: _first,
                                   icon: Icons.person_outline,
+                                  onChanged: (_) => _clearBackendError('first_name'),
                                   validator: (value) {
+                                    String? localError;
                                     if (value == null || value.isEmpty) {
-                                      return 'Required';
+                                      localError = 'Required';
+                                    } else if (value.length > 30) {
+                                      localError = 'Max 30 characters';
                                     }
-                                    return null;
+                                    return _withBackendError('first_name', localError);
                                   },
                                 ),
                               ),
@@ -359,11 +408,15 @@ Email: closetbuddy.app@gmail.com
                                   label: 'Last Name',
                                   controller: _last,
                                   icon: Icons.person_outline,
+                                  onChanged: (_) => _clearBackendError('last_name'),
                                   validator: (value) {
+                                    String? localError;
                                     if (value == null || value.isEmpty) {
-                                      return 'Required';
+                                      localError = 'Required';
+                                    } else if (value.length > 30) {
+                                      localError = 'Max 30 characters';
                                     }
-                                    return null;
+                                    return _withBackendError('last_name', localError);
                                   },
                                 ),
                               ),
@@ -377,14 +430,15 @@ Email: closetbuddy.app@gmail.com
                             label: 'Username',
                             controller: _username,
                             icon: Icons.alternate_email,
+                            onChanged: (_) => _clearBackendError('username'),
                             validator: (value) {
+                              String? localError;
                               if (value == null || value.isEmpty) {
-                                return 'Please enter a username';
+                                localError = 'Please enter a username';
+                              } else if (value.length < 3) {
+                                localError = 'Username must be at least 3 characters';
                               }
-                              if (value.length < 3) {
-                                return 'Username must be at least 3 characters';
-                              }
-                              return null;
+                              return _withBackendError('username', localError);
                             },
                           ),
 
@@ -396,15 +450,16 @@ Email: closetbuddy.app@gmail.com
                             controller: _email,
                             icon: Icons.email_outlined,
                             keyboardType: TextInputType.emailAddress,
+                            onChanged: (_) => _clearBackendError('email'),
                             validator: (value) {
+                              String? localError;
                               if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!value.contains('@') ||
+                                localError = 'Please enter your email';
+                              } else if (!value.contains('@') ||
                                   !value.contains('.')) {
-                                return 'Please enter a valid email';
+                                localError = 'Please enter a valid email';
                               }
-                              return null;
+                              return _withBackendError('email', localError);
                             },
                           ),
 
@@ -417,19 +472,23 @@ Email: closetbuddy.app@gmail.com
                             icon: Icons.lock_outline,
                             isPassword: true,
                             obscureText: _obscurePassword,
+                            onChanged: (_) {
+                              _clearBackendError('password');
+                              _clearBackendError('confirm_password');
+                            },
                             onToggleVisibility: () {
                               setState(() {
                                 _obscurePassword = !_obscurePassword;
                               });
                             },
                             validator: (value) {
+                              String? localError;
                               if (value == null || value.isEmpty) {
-                                return 'Please enter a password';
+                                localError = 'Please enter a password';
+                              } else if (value.length < 8) {
+                                localError = 'Password must be at least 8 characters';
                               }
-                              if (value.length < 8) {
-                                return 'Password must be at least 8 characters';
-                              }
-                              return null;
+                              return _withBackendError('password', localError);
                             },
                           ),
 
@@ -442,6 +501,7 @@ Email: closetbuddy.app@gmail.com
                             icon: Icons.lock_outline,
                             isPassword: true,
                             obscureText: _obscureConfirmPassword,
+                            onChanged: (_) => _clearBackendError('confirm_password'),
                             onToggleVisibility: () {
                               setState(() {
                                 _obscureConfirmPassword =
@@ -449,13 +509,13 @@ Email: closetbuddy.app@gmail.com
                               });
                             },
                             validator: (value) {
+                              String? localError;
                               if (value == null || value.isEmpty) {
-                                return 'Please confirm your password';
+                                localError = 'Please confirm your password';
+                              } else if (value != _password.text) {
+                                localError = 'Passwords do not match';
                               }
-                              if (value != _password.text) {
-                                return 'Passwords do not match';
-                              }
-                              return null;
+                              return _withBackendError('confirm_password', localError);
                             },
                           ),
 
@@ -534,8 +594,9 @@ Email: closetbuddy.app@gmail.com
                           SizedBox(
                             height: 52,
                             child: ElevatedButton(
-                              onPressed:
-                                  (_isLoading || !_agreeToTerms) ? null : register,
+                              onPressed: (_isLoading || !_agreeToTerms)
+                                  ? null
+                                  : register,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AuthTokens.ink,
                                 foregroundColor: AuthTokens.surface,
@@ -622,6 +683,7 @@ Email: closetbuddy.app@gmail.com
     bool isPassword = false,
     bool obscureText = false,
     VoidCallback? onToggleVisibility,
+    ValueChanged<String>? onChanged,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
@@ -654,6 +716,7 @@ Email: closetbuddy.app@gmail.com
             controller: controller,
             obscureText: obscureText,
             keyboardType: keyboardType,
+            onChanged: onChanged,
             style: TextStyle(fontSize: 15, color: AuthTokens.ink),
             decoration: InputDecoration(
               hintText: 'Enter $label',
