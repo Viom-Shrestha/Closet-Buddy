@@ -35,16 +35,6 @@ class ClothingService {
       throw {"type": "not_clothing", "confidence": decoded["confidence"]};
     }
 
-    final errorText = decoded is Map ? (decoded['error'] ?? '').toString() : '';
-    if (errorText.toLowerCase().contains('segmentation failed') ||
-        errorText.toLowerCase().contains('segmented file missing')) {
-      throw {
-        "type": "segmentation_failed",
-        "message": errorText,
-        "original_image": decoded is Map ? decoded['original_image'] : null,
-      };
-    }
-
     // Other backend errors
     throw decoded is Map ? (decoded['error'] ?? "Processing failed") : "Processing failed";
   }
