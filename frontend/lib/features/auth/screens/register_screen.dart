@@ -77,6 +77,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         _username.text,
         _email.text,
         _password.text,
+        _confirmPassword.text,
         _first.text,
         _last.text,
       );
