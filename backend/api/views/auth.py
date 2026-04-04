@@ -4,6 +4,8 @@ from rest_framework.decorators import api_view, parser_classes, permission_class
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..models import UserProfile
@@ -73,10 +75,14 @@ def profile(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout(request):
+    refresh_token = request.data.get("refresh")
+    if not refresh_token:
+        return Response({"detail": "Refresh token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
-        refresh_token = request.data.get("refresh")
         token = RefreshToken(refresh_token)
         token.blacklist()
-    except Exception:
-        pass
-    return Response({"detail": "Logged out"})
+    except TokenError:
+        return Response({"detail": "Invalid refresh token."}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({"detail": "Logged out"}, status=status.HTTP_200_OK)

@@ -18,6 +18,17 @@ class ApiClient {
     prefs.setString('refresh_token', refresh);
   }
 
+  Future<String?> refreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('refresh_token');
+  }
+
+  Future<void> clearTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('access_token');
+    await prefs.remove('refresh_token');
+  }
+
   Future<bool> refresh() async {
     final prefs = await SharedPreferences.getInstance();
     final refresh = prefs.getString('refresh_token');

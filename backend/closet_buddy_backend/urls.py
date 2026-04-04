@@ -25,7 +25,6 @@ urlpatterns = [
     path('auth/', include('django.contrib.auth.urls')),
     path("api/", include("api.urls")),
 
-    # 2. Add Swagger/Docs Routes
     # This downloads the actual schema file
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     # This renders the Swagger UI
