@@ -538,6 +538,18 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   }
 
   Widget _buildImageSelector() {
+    final guidance = <String>[
+      'Use bright, even lighting. Avoid dark shadows and heavy color tints.',
+      'Lay the item on a flat, plain surface with good contrast from the clothing.',
+      'Position the camera straight-on so the item is centered and properly aligned.',
+      'Capture the full item in frame from top to bottom without cropping edges.',
+      if (widget.isShoe)
+        'Show the full shoe clearly (front/side visible), not covered by hands or objects.'
+      else
+        'Keep full sleeves or pant legs visible and facing the camera. Do not fold or tuck them.',
+      'Avoid wrinkles, clutter, overlapping items, blur, and tilted shots.',
+    ];
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -593,18 +605,54 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                 color: UploadTokens.info.withValues(alpha: 0.2),
               ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.lightbulb_outline,
-                  color: UploadTokens.info,
-                  size: 20,
+                Row(
+                  children: [
+                    Icon(
+                      Icons.lightbulb_outline,
+                      color: UploadTokens.info,
+                      size: 20,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Photo Guidelines',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: UploadTokens.ink,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'For best results, use a clear photo with good lighting and plain background',
-                    style: TextStyle(fontSize: 13, color: UploadTokens.ink),
+                SizedBox(height: 10),
+                ...guidance.map(
+                  (line) => Padding(
+                    padding: const EdgeInsets.only(bottom: 7),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline_rounded,
+                          color: UploadTokens.info,
+                          size: 16,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            line,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.3,
+                              color: UploadTokens.ink,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -858,6 +906,26 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                 Text(
                   'AI has extracted these details. You can edit them.',
                   style: TextStyle(fontSize: 15, color: UploadTokens.muted),
+                ),
+                SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: UploadTokens.info.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: UploadTokens.info.withValues(alpha: 0.28),
+                    ),
+                  ),
+                  child: Text(
+                    'Please review and correct AI-extracted details. Accurate data is important for better recommendations and overall performance.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: UploadTokens.ink,
+                    ),
+                  ),
                 ),
                 SizedBox(height: 24),
                 _buildProcessedPreview(height: 220),
@@ -1120,7 +1188,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
           ),
           SizedBox(height: 6),
           Text(
-            'Review and adjust before saving.',
+            'Review and correct before saving. Accurate data improves AI performance.',
             style: TextStyle(fontSize: 12, color: UploadTokens.muted),
           ),
           if (chips.isNotEmpty) ...[
