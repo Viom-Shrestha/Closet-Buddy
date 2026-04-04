@@ -290,39 +290,6 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         return;
       }
 
-      if (e is Map && e["type"] == "segmentation_failed") {
-        final original = _safeText(e["original_image"]);
-        setState(() {
-          segmentedUrl = null;
-          originalImageUrl = original.isNotEmpty ? original : originalImageUrl;
-          segmentationFailed = true;
-          useOriginalImage = true;
-          segmentationNotice =
-              _safeText(e["message"]).isNotEmpty
-              ? _safeText(e["message"])
-              : 'Segmentation failed. You can continue without segmentation.';
-          category = '';
-          subcategory = '';
-          dominantColor = '';
-          secondaryColor = '';
-          occasion = '';
-          detectedTemp = '';
-          detectedWeather = '';
-          attributes = [];
-          categoryController.clear();
-          subcategoryController.clear();
-          dominantColorController.clear();
-          secondaryColorController.clear();
-          occasionController.clear();
-          detectedTempController.clear();
-          detectedWeatherController.clear();
-          attributesController.clear();
-          isLoading = false;
-          currentStep = UploadStep.reviewing;
-        });
-        return;
-      }
-
       setState(() {
         isLoading = false;
         currentStep = UploadStep.selectImage;
@@ -423,13 +390,26 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     }
   }
 
+  Future<void> _cleanupTemporaryImages() async {
+    final cleanupUrls = <String>{};
+    if (segmentedUrl != null && segmentedUrl!.trim().isNotEmpty) {
+      cleanupUrls.add(segmentedUrl!);
+    }
+    if (originalImageUrl != null && originalImageUrl!.trim().isNotEmpty) {
+      cleanupUrls.add(originalImageUrl!);
+    }
+
+    for (final url in cleanupUrls) {
+      try {
+        await clothingService.deleteSegmented(url);
+      } catch (_) {
+        // Cleanup is best-effort; don't block navigation if delete fails.
+      }
+    }
+  }
+
   Future<void> _retakePhoto() async {
-    if (segmentedUrl != null) {
-      await clothingService.deleteSegmented(segmentedUrl!);
-    }
-    if (originalImageUrl != null && originalImageUrl != segmentedUrl) {
-      await clothingService.deleteSegmented(originalImageUrl!);
-    }
+    await _cleanupTemporaryImages();
     setState(() {
       selectedImage = null;
       segmentedUrl = null;
@@ -466,62 +446,75 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       await _retakePhoto();
       return;
     }
+    if (currentStep == UploadStep.editing) {
+      await _cleanupTemporaryImages();
+      if (!mounted) return;
+      Navigator.pop(context);
+      return;
+    }
     Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: UploadTokens.pageBg,
-      appBar: AppBar(
-        backgroundColor: UploadTokens.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: UploadTokens.ink),
-          onPressed: _handleBackPressed,
-        ),
-        title: Text(
-          widget.isShoe ? 'Upload Shoes' : 'Upload Clothing',
-          style: TextStyle(
-            color: UploadTokens.ink,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBackPressed();
+      },
+      child: Scaffold(
+        backgroundColor: UploadTokens.pageBg,
+        appBar: AppBar(
+          backgroundColor: UploadTokens.surface,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: UploadTokens.ink),
+            onPressed: _handleBackPressed,
+          ),
+          title: Text(
+            widget.isShoe ? 'Upload Shoes' : 'Upload Clothing',
+            style: TextStyle(
+              color: UploadTokens.ink,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Container(height: 1, color: UploadTokens.line),
           ),
         ),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Container(height: 1, color: UploadTokens.line),
-        ),
-      ),
-      body: Stack(
-        children: [
-          _buildCurrentStep(),
-          if (isLoading)
-            Container(
-              color: UploadTokens.black.withValues(alpha: 0.54),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        UploadTokens.surface,
+        body: Stack(
+          children: [
+            _buildCurrentStep(),
+            if (isLoading)
+              Container(
+                color: UploadTokens.black.withValues(alpha: 0.54),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          UploadTokens.surface,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      _getLoadingMessage(),
-                      style: TextStyle(
-                        color: UploadTokens.surface,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                      SizedBox(height: 16),
+                      Text(
+                        _getLoadingMessage(),
+                        style: TextStyle(
+                          color: UploadTokens.surface,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -550,7 +543,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       'Avoid wrinkles, clutter, overlapping items, blur, and tilted shots.',
     ];
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -595,7 +588,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
               _pickImage(ImageSource.camera);
             },
           ),
-          Spacer(),
+          SizedBox(height: 24),
           Container(
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(

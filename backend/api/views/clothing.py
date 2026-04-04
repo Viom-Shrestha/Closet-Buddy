@@ -1,7 +1,7 @@
 import os
 import io
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 
@@ -127,10 +127,48 @@ def _authenticate_item(image_file, is_shoe: bool) -> Optional[Dict]:
     }
 
 
-def _resolve_segmented_path(segmented_url: str) -> Path:
-    parsed = urlparse(segmented_url)
-    relative = parsed.path.replace(settings.MEDIA_URL, "")
-    return Path(settings.MEDIA_ROOT) / relative
+def _resolve_media_path_safe(source_url: str) -> Optional[Path]:
+    raw = str(source_url or "").strip()
+    if not raw:
+        return None
+
+    parsed = urlparse(raw)
+    media_url = str(getattr(settings, "MEDIA_URL", "/media/") or "/media/")
+    media_parsed = urlparse(media_url)
+    media_path = unquote(media_parsed.path or "/media/")
+    if not media_path.startswith("/"):
+        media_path = f"/{media_path}"
+    if not media_path.endswith("/"):
+        media_path = f"{media_path}/"
+
+    source_path = unquote(parsed.path or raw)
+    if not source_path:
+        return None
+
+    if (parsed.scheme or parsed.netloc) and media_parsed.netloc:
+        if parsed.netloc.lower() != media_parsed.netloc.lower():
+            return None
+
+    if (parsed.scheme or parsed.netloc) and media_parsed.scheme and parsed.scheme:
+        if parsed.scheme.lower() != media_parsed.scheme.lower():
+            return None
+
+    if not source_path.startswith("/"):
+        source_path = f"/{source_path.lstrip('/')}"
+    if not source_path.startswith(media_path):
+        return None
+
+    relative = source_path[len(media_path) :].replace("\\", "/").lstrip("/")
+    if not relative:
+        return None
+
+    media_root = Path(settings.MEDIA_ROOT).resolve()
+    candidate = (media_root / relative).resolve()
+    try:
+        candidate.relative_to(media_root)
+    except ValueError:
+        return None
+    return candidate
 
 
 def _persist_original_upload(image_file, request) -> Tuple[str, Path]:
@@ -284,12 +322,14 @@ def clothing_process(request):
         segmentation_message = "Segmentation failed. You can continue without segmentation."
 
     if segmented_url:
-        image_path = _resolve_segmented_path(segmented_url)
-        if not image_path.exists():
+        resolved_segmented = _resolve_media_path_safe(segmented_url)
+        if not resolved_segmented or not resolved_segmented.exists():
             segmentation_failed = True
             segmentation_message = "Segmented file missing. You can continue without segmentation."
             segmented_url = None
             image_path = original_path
+        else:
+            image_path = resolved_segmented
     else:
         image_path = original_path
 
@@ -360,7 +400,9 @@ def clothing_save(request):
     if not source_url or not storage_id:
         return Response({"error": "image source and storage_unit required"}, status=400)
 
-    image_path = _resolve_segmented_path(source_url)
+    image_path = _resolve_media_path_safe(source_url)
+    if image_path is None:
+        return Response({"error": "Invalid image source"}, status=400)
 
     if not image_path.exists():
         return Response({"error": "Image missing"}, status=400)
@@ -414,8 +456,8 @@ def clothing_save(request):
         if not cleanup_url:
             continue
         try:
-            cleanup_path = _resolve_segmented_path(cleanup_url)
-            if cleanup_path.exists() and cleanup_path != Path(clothing.image.path):
+            cleanup_path = _resolve_media_path_safe(cleanup_url)
+            if cleanup_path and cleanup_path.exists() and cleanup_path != Path(clothing.image.path):
                 os.remove(cleanup_path)
         except Exception as e:
             print("Cleanup failed:", e)
@@ -430,13 +472,11 @@ def delete_segmented_image(request):
     if not segmented_url:
         return Response({"detail": "URL not provided."}, status=400)
 
+    file_path = _resolve_media_path_safe(segmented_url)
+    if file_path is None:
+        return Response({"detail": "Invalid media URL/path."}, status=400)
+
     try:
-        parsed = urlparse(segmented_url)
-        relative_path = parsed.path.replace(settings.MEDIA_URL, "")
-        file_path = Path(settings.MEDIA_ROOT) / relative_path
-
-        print(f"DEBUG: Attempting to delete file at: {file_path}")
-
         if file_path.exists():
             file_path.unlink()
             return Response({"detail": "File deleted successfully."}, status=200)
@@ -444,7 +484,6 @@ def delete_segmented_image(request):
             return Response({"detail": "File not found on server."}, status=404)
 
     except Exception as e:
-        print(f"DEBUG: Deletion Error: {str(e)}")
         return Response({"detail": f"Error: {str(e)}"}, status=500)
 
 
