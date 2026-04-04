@@ -18,10 +18,11 @@ from django.contrib.auth.models import User
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
+    confirm_password = serializers.CharField(write_only=True, min_length=6)
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'password', 'first_name', 'last_name')
+        fields = ('username', 'email', 'password', 'confirm_password', 'first_name', 'last_name')
 
     def validate_email(self, value):
         email = (value or "").strip().lower()
@@ -29,7 +30,13 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Email is already registered.")
         return email
 
+    def validate(self, attrs):
+        if attrs.get("password") != attrs.get("confirm_password"):
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        return attrs
+
     def create(self, validated_data):
+        validated_data.pop("confirm_password", None)
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
