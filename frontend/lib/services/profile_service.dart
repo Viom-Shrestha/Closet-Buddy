@@ -9,6 +9,10 @@ class ProfileService {
   final ApiClient client;
 
   Future<Map<String, dynamic>?> fetchProfile() async {
+    final token = await client.token();
+    if (token == null || token.trim().isEmpty) {
+      return null;
+    }
     final res = await client.get('/profile/');
     return res.statusCode == 200 ? jsonDecode(res.body) : null;
   }
