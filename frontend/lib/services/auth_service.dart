@@ -97,6 +97,15 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    await client.post('/auth/logout/', {});
+    final refresh = await client.refreshToken();
+    try {
+      await client.post('/auth/logout/', {
+        if (refresh != null && refresh.trim().isNotEmpty) 'refresh': refresh.trim(),
+      });
+    } catch (_) {
+      // Even if server-side logout fails, clear local session to log user out.
+    } finally {
+      await client.clearTokens();
+    }
   }
 }
