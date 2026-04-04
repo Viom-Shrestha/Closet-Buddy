@@ -30,7 +30,9 @@ import 'package:frontend/theme/app_theme.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String? startupMessage;
+
+  const HomeScreen({super.key, this.startupMessage});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -73,6 +75,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     ThemeService.instance.themeMode.addListener(_onThemeModeChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final message = widget.startupMessage?.trim();
+      if (message != null && message.isNotEmpty) {
+        _toast(message);
+      }
+    });
     _enterCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
