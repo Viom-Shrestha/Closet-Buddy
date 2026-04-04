@@ -14,8 +14,8 @@ class ApiClient {
 
   Future<void> saveTokens(String access, String refresh) async {
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('access_token', access);
-    prefs.setString('refresh_token', refresh);
+    await prefs.setString('access_token', access);
+    await prefs.setString('refresh_token', refresh);
   }
 
   Future<String?> refreshToken() async {
@@ -41,7 +41,7 @@ class ApiClient {
     );
 
     if (res.statusCode == 200) {
-      prefs.setString('access_token', jsonDecode(res.body)['access']);
+      await prefs.setString('access_token', jsonDecode(res.body)['access']);
       return true;
     }
     return false;
