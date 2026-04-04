@@ -18,7 +18,11 @@ from ..models import (
     StorageUnit,
     UserProfile,
 )
-from ..serializer import ClothingItemSerializer, OutfitReadSerializer
+from ..serializer import (
+    ClothingItemSerializer,
+    NonClothingItemSerializer,
+    OutfitReadSerializer,
+)
 
 
 def _as_bool(value):
@@ -319,84 +323,6 @@ def admin_users(request):
 
     return Response({"results": results, "query": query, "limit": limit})
 
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def admin_activity(request):
-    denied = _require_admin(request)
-    if denied:
-        return denied
-
-    limit_raw = request.GET.get("limit") or "60"
-    try:
-        limit = max(10, min(int(limit_raw), 200))
-    except ValueError:
-        limit = 60
-
-    activity = []
-
-    for user in User.objects.order_by("-date_joined")[:limit]:
-        activity.append(
-            {
-                "type": "user_signup",
-                "title": f"New user joined: {user.username}",
-                "subtitle": user.email,
-                "username": user.username,
-                "created_at": user.date_joined,
-            }
-        )
-
-    for item in ClothingItem.objects.select_related("user").order_by("-created_at")[:limit]:
-        activity.append(
-            {
-                "type": "clothing_upload",
-                "title": f"Clothing uploaded: {item.subcategory}",
-                "subtitle": f"{item.category} • {item.dominant_color}",
-                "username": item.user.username,
-                "created_at": item.created_at,
-            }
-        )
-
-    for item in AccessoryItem.objects.select_related("user").order_by("-created_at")[:limit]:
-        activity.append(
-            {
-                "type": "accessory_upload",
-                "title": f"Accessory uploaded: {item.name}",
-                "subtitle": item.dominant_color,
-                "username": item.user.username,
-                "created_at": item.created_at,
-            }
-        )
-
-    for outfit in Outfit.objects.select_related("user").order_by("-created_at")[:limit]:
-        activity.append(
-            {
-                "type": "outfit_saved",
-                "title": f"Outfit saved: {outfit.name}",
-                "subtitle": outfit.occasion or "No occasion",
-                "username": outfit.user.username,
-                "created_at": outfit.created_at,
-            }
-        )
-
-    for storage in StorageUnit.objects.select_related("user").order_by("-created_at")[:limit]:
-        activity.append(
-            {
-                "type": "storage_created",
-                "title": f"Storage created: {storage.name}",
-                "subtitle": storage.type,
-                "username": storage.user.username,
-                "created_at": storage.created_at,
-            }
-        )
-
-    activity.sort(key=lambda item: item["created_at"], reverse=True)
-    trimmed = activity[:limit]
-
-    for item in trimmed:
-        item["created_at"] = item["created_at"].isoformat()
-
-    return Response({"results": trimmed, "limit": limit})
 
 
 @api_view(["POST"])
@@ -722,6 +648,46 @@ def admin_outfit_detail(request, outfit_id):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def admin_non_clothing_list(request):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    limit, offset = _parse_limit_offset(request, default_limit=40)
+    qs = NonClothingItem.objects.select_related("user", "storage_unit").order_by("-created_at")
+
+    user_id = request.GET.get("user_id")
+    if user_id:
+        qs = qs.filter(user_id=user_id)
+
+    query = (request.GET.get("q") or "").strip()
+    if query:
+        qs = qs.filter(
+            Q(name__icontains=query)
+            | Q(description__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(user__email__icontains=query)
+            | Q(storage_unit__name__icontains=query)
+            | Q(storage_unit__type__icontains=query)
+        )
+
+    total = qs.count()
+    items = qs[offset : offset + limit]
+    results = []
+    for item in items:
+        payload = NonClothingItemSerializer(item, context={"request": request}).data
+        payload["user"] = {
+            "id": item.user_id,
+            "username": item.user.username,
+            "email": item.user.email,
+        }
+        results.append(payload)
+
+    return Response({"results": results, "total": total, "limit": limit, "offset": offset})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def admin_feedback_list(request):
     denied = _require_admin(request)
     if denied:
@@ -765,3 +731,4 @@ def admin_feedback_mark_read(request, feedback_id):
     feedback.is_read = _as_bool(request.data.get("is_read", True))
     feedback.save(update_fields=["is_read"])
     return Response({"id": feedback.id, "is_read": feedback.is_read})
+

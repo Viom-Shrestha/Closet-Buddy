@@ -204,13 +204,13 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     }
 
     final colors = <Color>[
-      StorageTokens.blueStrong,
-      StorageTokens.success,
+      HomeTokens.accent,
+      HomeTokens.sage,
+      HomeTokens.gold,
+      HomeTokens.sky,
+      HomeTokens.rose,
       StorageTokens.warning,
-      StorageTokens.pink,
-      StorageTokens.danger,
-      StorageTokens.purple,
-      StorageTokens.teal,
+      StorageTokens.success,
       StorageTokens.steel,
     ];
 
@@ -229,7 +229,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
           titleStyle: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            color: StorageTokens.surface,
+            color: HomeTokens.white,
           ),
         ),
       );
@@ -240,7 +240,11 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
       children: [
         const Text(
           'Item Distribution',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: HomeTokens.ink,
+          ),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -788,9 +792,16 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: StorageTokens.surface,
-        border: Border.all(color: StorageTokens.lineSoft),
+        borderRadius: BorderRadius.circular(16),
+        color: HomeTokens.card,
+        border: Border.all(color: HomeTokens.rule),
+        boxShadow: [
+          BoxShadow(
+            color: HomeTokens.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: child,
     );
@@ -800,12 +811,17 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: StorageTokens.surfaceTint,
+        color: HomeTokens.parchment,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: HomeTokens.rule),
       ),
       child: Text(
         '$label: $value',
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: HomeTokens.inkSub,
+        ),
       ),
     );
   }
@@ -1012,12 +1028,28 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: HomeTokens.cream,
+        body: Center(
+          child: CircularProgressIndicator(color: HomeTokens.accent),
+        ),
+      );
     }
 
     if (data == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Storage Details')),
+        backgroundColor: HomeTokens.cream,
+        appBar: AppBar(
+          backgroundColor: HomeTokens.cream,
+          surfaceTintColor: HomeTokens.transparent,
+          title: const Text(
+            'Storage Details',
+            style: TextStyle(
+              color: HomeTokens.ink,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
         body: Center(
           child: ElevatedButton.icon(
             onPressed: () {
@@ -1026,6 +1058,10 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
             },
             icon: const Icon(Icons.refresh),
             label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: WidgetTokens.accent,
+              foregroundColor: HomeTokens.white,
+            ),
           ),
         ),
       );
@@ -1059,8 +1095,17 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
         Navigator.pop(context, hasChanges);
       },
       child: Scaffold(
+        backgroundColor: HomeTokens.cream,
         appBar: AppBar(
+          backgroundColor: HomeTokens.cream,
+          surfaceTintColor: HomeTokens.transparent,
+          iconTheme: const IconThemeData(color: HomeTokens.ink),
           title: Text((storage['name'] ?? 'Storage').toString()),
+          titleTextStyle: const TextStyle(
+            color: HomeTokens.ink,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+          ),
           actions: [
             PopupMenuButton<String>(
               itemBuilder: (_) => const [
@@ -1078,8 +1123,9 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
           children: [
             RefreshIndicator(
               onRefresh: _load,
+              color: HomeTokens.accent,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
                 children: [
                   if (_breadcrumbChain.length > 1) ...[
                     _sectionCard(
@@ -1087,15 +1133,24 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                         spacing: 4,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          const Icon(Icons.account_tree_outlined, size: 18),
+                          const Icon(
+                            Icons.account_tree_outlined,
+                            size: 18,
+                            color: HomeTokens.inkSub,
+                          ),
                           for (int i = 0; i < _breadcrumbChain.length; i++) ...[
                             if (i > 0)
-                              const Icon(Icons.chevron_right, size: 18),
+                              const Icon(
+                                Icons.chevron_right,
+                                size: 18,
+                                color: HomeTokens.inkMuted,
+                              ),
                             if (i == _breadcrumbChain.length - 1)
                               Text(
                                 (_breadcrumbChain[i]['name'] ?? '').toString(),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
+                                  color: HomeTokens.ink,
                                 ),
                               )
                             else
@@ -1112,7 +1167,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                     (_breadcrumbChain[i]['name'] ?? '')
                                         .toString(),
                                     style: const TextStyle(
-                                      color: StorageTokens.blue,
+                                      color: HomeTokens.accent,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -1173,7 +1228,10 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                       children: [
                         const Text(
                           'Sub Storages',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: HomeTokens.ink,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         if (subStorages.isEmpty)
@@ -1196,9 +1254,9 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: StorageTokens.lineLight,
+                                        color: HomeTokens.rule,
                                       ),
-                                      color: StorageTokens.surfaceAlt,
+                                      color: HomeTokens.parchment,
                                     ),
                                     child: Column(
                                       crossAxisAlignment:
@@ -1209,7 +1267,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                             Container(
                                               padding: const EdgeInsets.all(6),
                                               decoration: BoxDecoration(
-                                                color: StorageTokens.surface,
+                                                color: HomeTokens.card,
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                               ),
@@ -1218,6 +1276,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                                   s['type']?.toString(),
                                                 ),
                                                 size: 16,
+                                                color: HomeTokens.inkSub,
                                               ),
                                             ),
                                             const Spacer(),
@@ -1225,7 +1284,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                               const Icon(
                                                 Icons.check_circle,
                                                 size: 16,
-                                                color: StorageTokens.green,
+                                                color: HomeTokens.sage,
                                               ),
                                           ],
                                         ),
@@ -1236,12 +1295,16 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
                                             fontWeight: FontWeight.w600,
+                                            color: HomeTokens.ink,
                                           ),
                                         ),
                                         const Spacer(),
                                         Text(
                                           '${_asInt(s['item_count'])} items',
-                                          style: const TextStyle(fontSize: 12),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: HomeTokens.inkSub,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -1262,7 +1325,10 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                           children: [
                             const Text(
                               'Clothing',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: HomeTokens.ink,
+                              ),
                             ),
                             const Spacer(),
                             if (_selectionMode) ...[
@@ -1306,7 +1372,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                       'Smart search: "black casual shirt", "winter jacket"',
                                   prefixIcon: const Icon(Icons.search),
                                   filled: true,
-                                  fillColor: StorageTokens.surfaceTint,
+                                  fillColor: HomeTokens.parchment,
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     borderSide: BorderSide.none,
@@ -1325,10 +1391,10 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                   horizontal: 10,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: StorageTokens.surfaceTint,
+                                  color: HomeTokens.parchment,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: StorageTokens.lineLight,
+                                    color: HomeTokens.rule,
                                   ),
                                 ),
                                 child: Row(
@@ -1342,7 +1408,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: StorageTokens.inkStrong,
+                                          color: HomeTokens.accent,
                                           borderRadius: BorderRadius.circular(
                                             999,
                                           ),
@@ -1350,7 +1416,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                         child: Text(
                                           '${_storageActiveFilterCount()}',
                                           style: const TextStyle(
-                                            color: StorageTokens.surface,
+                                            color: HomeTokens.white,
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
                                           ),
@@ -1411,11 +1477,11 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
                                       color: isSelected
-                                          ? StorageTokens.blue
-                                          : StorageTokens.lineLight,
+                                          ? HomeTokens.accent
+                                          : HomeTokens.rule,
                                       width: isSelected ? 2 : 1,
                                     ),
-                                    color: StorageTokens.surfaceAlt,
+                                    color: HomeTokens.parchment,
                                   ),
                                   child: Column(
                                     children: [
@@ -1457,8 +1523,8 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                                           .radio_button_unchecked,
                                                 size: 14,
                                                 color: isSelected
-                                                    ? StorageTokens.blue
-                                                    : StorageTokens.gray,
+                                                    ? HomeTokens.accent
+                                                    : HomeTokens.inkMuted,
                                               ),
                                               const SizedBox(width: 4),
                                             ],
@@ -1517,7 +1583,10 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                       children: [
                         const Text(
                           'Other Items',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: HomeTokens.ink,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         if (nonClothes.isEmpty)
@@ -1639,9 +1708,19 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
       children: [
         Text(
           value.toString(),
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: HomeTokens.ink,
+          ),
         ),
-        Text(label),
+        Text(
+          label,
+          style: const TextStyle(
+            color: HomeTokens.inkSub,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }

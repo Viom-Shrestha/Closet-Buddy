@@ -1,13 +1,13 @@
 from django.urls import path
 
 from ..views.admin import (
-    admin_activity,
     admin_clothing_detail,
     admin_clothing_list,
     admin_clothing_reclassify,
     admin_dashboard,
     admin_feedback_list,
     admin_feedback_mark_read,
+    admin_non_clothing_list,
     admin_outfit_detail,
     admin_outfits_list,
     admin_send_password_reset,
@@ -22,7 +22,6 @@ from ..views.admin import (
 urlpatterns = [
     path("dashboard/", admin_dashboard, name="admin_dashboard"),
     path("users/", admin_users, name="admin_users"),
-    path("activity/", admin_activity, name="admin_activity"),
     path("users/<int:user_id>/active/", admin_set_user_active, name="admin_set_user_active"),
     path("users/<int:user_id>/staff/", admin_set_user_staff, name="admin_set_user_staff"),
     path("users/<int:user_id>/", admin_user_summary, name="admin_user_summary"),
@@ -34,6 +33,7 @@ urlpatterns = [
     path("clothing/reclassify/", admin_clothing_reclassify, name="admin_clothing_reclassify"),
     path("outfits/", admin_outfits_list, name="admin_outfits_list"),
     path("outfits/<int:outfit_id>/", admin_outfit_detail, name="admin_outfit_detail"),
+    path("non-clothing/", admin_non_clothing_list, name="admin_non_clothing_list"),
     path("feedback/", admin_feedback_list, name="admin_feedback_list"),
     path("feedback/<int:feedback_id>/read/", admin_feedback_mark_read, name="admin_feedback_mark_read"),
 ]

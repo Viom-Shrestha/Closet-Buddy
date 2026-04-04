@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/core/core.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/services/admin_service.dart';
+import 'package:frontend/services/misc_service.dart';
 import 'package:frontend/services/profile_service.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/theme/app_theme.dart';
@@ -20,6 +21,7 @@ class _AdminScreenState extends State<AdminScreen>
     with TickerProviderStateMixin {
   final ProfileService _profileService = ServiceRegistry.instance.profileService;
   final AdminService _adminService = ServiceRegistry.instance.adminService;
+  final MiscService _miscService = ServiceRegistry.instance.miscService;
 
   bool get _isDarkTheme => ThemeService.instance.isDark;
 
@@ -39,6 +41,7 @@ class _AdminScreenState extends State<AdminScreen>
   bool _loadingOverview = false;
   bool _loadingUsers = false;
   bool _loadingCatalog = false;
+  bool _loadingNonClothing = false;
   bool _loadingOutfits = false;
   bool _loadingFeedback = false;
 
@@ -46,6 +49,7 @@ class _AdminScreenState extends State<AdminScreen>
   Map<String, dynamic>? _dashboard;
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _catalogItems = [];
+  List<Map<String, dynamic>> _nonClothingItems = [];
   List<int> _selectedCatalogIds = [];
   List<Map<String, dynamic>> _adminOutfits = [];
   List<Map<String, dynamic>> _feedback = [];
@@ -115,7 +119,7 @@ class _AdminScreenState extends State<AdminScreen>
     _loadProfile(),
     _loadDashboard(),
     _loadUsers(),
-    _loadCatalog(),
+    _refreshCatalogData(),
     _loadOutfits(),
     _loadFeedback(),
   ]);
@@ -155,6 +159,23 @@ class _AdminScreenState extends State<AdminScreen>
       _selectedCatalogIds = [];
       _loadingCatalog = false;
     });
+  }
+
+  Future<void> _loadNonClothing() async {
+    setState(() => _loadingNonClothing = true);
+    final data = await _miscService.fetchNonClothingItems(
+      query: _catalogSearchCtrl.text,
+      userId: _catalogUserCtrl.text,
+    );
+    if (!mounted) return;
+    setState(() {
+      _nonClothingItems = List<Map<String, dynamic>>.from(data['results'] ?? []);
+      _loadingNonClothing = false;
+    });
+  }
+
+  Future<void> _refreshCatalogData() async {
+    await Future.wait([_loadCatalog(), _loadNonClothing()]);
   }
 
   Future<void> _loadOutfits() async {
@@ -849,13 +870,14 @@ class _AdminScreenState extends State<AdminScreen>
         _SearchBar(
           controller: _catalogSearchCtrl,
           hint: 'Search catalog…',
-          onSearch: _loadCatalog,
+          onSearch: _refreshCatalogData,
           trailing: _DarkChipButton(
             label: 'Filters',
             icon: Icons.tune_rounded,
             onTap: _showCatalogFilters,
           ),
         ),
+        _buildNonClothingPanel(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: Row(
@@ -900,7 +922,7 @@ class _AdminScreenState extends State<AdminScreen>
         ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _loadCatalog,
+            onRefresh: _refreshCatalogData,
             color: kAdminAccent,
             backgroundColor: kAdminSurface,
             child: _loadingCatalog && _catalogItems.isEmpty
@@ -935,6 +957,168 @@ class _AdminScreenState extends State<AdminScreen>
   }
 
   // ── Outfits tab ──────────────────────────────────────────────────────────────
+
+  Widget _buildNonClothingPanel() {
+    final previewRows = _nonClothingItems.take(6).toList();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: kAdminSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kAdminBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.inventory_2_outlined, size: 14, color: kAdminAccent),
+              const SizedBox(width: 6),
+              const Text(
+                'Non-clothing Inventory',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: kAdminText,
+                ),
+              ),
+              const Spacer(),
+              if (_loadingNonClothing)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Text(
+                  '${_nonClothingItems.length} item${_nonClothingItems.length == 1 ? '' : 's'}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: kAdminTextMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_loadingNonClothing && _nonClothingItems.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else if (_nonClothingItems.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 4),
+              child: Text(
+                'No non-clothing items found.',
+                style: TextStyle(fontSize: 11, color: kAdminTextMuted),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowHeight: 30,
+                dataRowMinHeight: 34,
+                dataRowMaxHeight: 44,
+                columnSpacing: 18,
+                horizontalMargin: 10,
+                dividerThickness: 0.5,
+                columns: const [
+                  DataColumn(
+                    label: Text(
+                      'Name',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: kAdminTextMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  DataColumn(
+                    label: Text(
+                      'Storage',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: kAdminTextMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  DataColumn(
+                    label: Text(
+                      'Owner',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: kAdminTextMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  DataColumn(
+                    label: Text(
+                      'Created',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: kAdminTextMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+                rows: previewRows.map((item) {
+                  final storage = _map(item['storage_unit']);
+                  final user = _map(item['user']);
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        Text(
+                          _truncateText(item['name'], max: 24),
+                          style: const TextStyle(fontSize: 12, color: kAdminText),
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          _truncateText(storage['name'], max: 20),
+                          style: const TextStyle(fontSize: 12, color: kAdminTextMuted),
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          _truncateText(user['username'], max: 18),
+                          style: const TextStyle(fontSize: 12, color: kAdminTextMuted),
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          _formatShortDate(item['created_at']),
+                          style: const TextStyle(fontSize: 12, color: kAdminTextMuted),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          if (_nonClothingItems.length > previewRows.length)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Showing latest ${previewRows.length} items.',
+                style: const TextStyle(fontSize: 10, color: kAdminTextDim),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildOutfitsTab() {
     return RefreshIndicator(
@@ -1278,7 +1462,7 @@ class _AdminScreenState extends State<AdminScreen>
       ],
       confirmLabel: 'Apply',
     );
-    if (confirmed == true) await _loadCatalog();
+    if (confirmed == true) await _refreshCatalogData();
   }
 
   ThemeData _buildAdminTheme() {
@@ -1362,6 +1546,21 @@ class _AdminScreenState extends State<AdminScreen>
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
     if (url.startsWith('/')) return '${ApiClient.host}$url';
     return '${ApiClient.host}/$url';
+  }
+
+  String _truncateText(dynamic raw, {int max = 24}) {
+    final text = (raw ?? '').toString().trim();
+    if (text.length <= max) return text;
+    return '${text.substring(0, max - 1)}…';
+  }
+
+  String _formatShortDate(dynamic raw) {
+    final value = (raw ?? '').toString().trim();
+    if (value.isEmpty) return '-';
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return value;
+    final local = parsed.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
   }
 
   double _toDouble(dynamic v) {

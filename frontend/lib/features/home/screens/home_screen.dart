@@ -21,7 +21,6 @@ import 'package:frontend/features/wardrobe/screens/clothing_detail_screen.dart';
 import 'package:frontend/features/outfit/screens/outfit_screen.dart';
 import 'package:frontend/features/profile/screens/profile_screen.dart';
 import 'package:frontend/features/recommendation/screens/recommendation_screen.dart';
-import 'package:frontend/features/storage/screens/storage_detail_screen.dart';
 import 'package:frontend/features/storage/screens/storage_space_screen.dart';
 import 'package:frontend/features/wardrobe/screens/wardrobe_screen.dart';
 import 'package:frontend/theme/app_theme.dart';
@@ -554,7 +553,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
     final tabLabel = _activeTabLabel();
     final tabIcon = _activeTabIcon();
-    final showContextChip = MediaQuery.of(context).size.width >= 390;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 12, 12),
@@ -619,39 +617,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-          if (showContextChip) ...[
-            const SizedBox(width: 10),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: Container(
-                key: ValueKey('tab_chip_$_selectedIndex'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: HomeTokens.parchment,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: HomeTokens.rule),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(tabIcon, size: 13, color: HomeTokens.accent),
-                    const SizedBox(width: 4),
-                    Text(
-                      tabLabel,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: HomeTokens.accent,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
           const Spacer(),
           _AppBarBtn(
             icon: ThemeService.instance.isDark
@@ -1294,162 +1259,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Storage ────────────────────────────────────────────────────────────────
 
-  // ignore: unused_element
-  Widget _buildStorageOverview() {
-    final topLevel = storages
-        .where((s) => s['parent_storage'] == null)
-        .toList();
-    final previewed = topLevel.take(8).toList();
-
-    if (topLevel.isEmpty) {
-      return _buildEmptyState(
-        'No storage yet',
-        'Create your first closet or drawer',
-        Icons.inventory_2_outlined,
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(child: _SectionHeader(title: 'Your Storage')),
-            GestureDetector(
-              onTap: () async {
-                final r = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const StorageListScreen()),
-                );
-                if (r == true) fetchHomeData();
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: HomeTokens.parchment,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'View all',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: HomeTokens.inkSub,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth = (constraints.maxWidth * 0.56).clamp(160.0, 220.0);
-            return SizedBox(
-              height: 120,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: previewed.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (_, i) => _storageCard(previewed[i], cardWidth),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  // ignore: unused_element
-  Widget _storageCard(Map<String, dynamic> storage, double width) {
-    final name = (storage['name'] ?? 'Storage').toString();
-    final count = storage['item_count'] is num
-        ? (storage['item_count'] as num).toInt()
-        : int.tryParse(storage['item_count']?.toString() ?? '0') ?? 0;
-    final type = (storage['type'] ?? 'storage').toString();
-    final label = type.isNotEmpty
-        ? '${type[0].toUpperCase()}${type.substring(1)}'
-        : type;
-
-    return HoverClickable(
-      onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => StorageDetailScreen(storageId: storage['id']),
-          ),
-        );
-        fetchHomeData();
-      },
-      child: Container(
-        width: width,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: HomeTokens.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: HomeTokens.rule),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.inventory_2_outlined,
-                  size: 18,
-                  color: HomeTokens.inkSub,
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: HomeTokens.parchment,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: HomeTokens.inkSub,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: HomeTokens.ink,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '$label · $count items',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: HomeTokens.inkMuted, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Recent clothing ────────────────────────────────────────────────────────
-
   Widget _buildRecentClothing() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2070,15 +1879,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return double.tryParse(raw?.toString() ?? '');
   }
 
-  // ignore: unused_element
-  List<String> _stringList(dynamic raw) {
-    if (raw is! List) return [];
-    return raw
-        .map((item) => item.toString().trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
-  }
-
   bool _isWornToday(Map<String, dynamic>? outfit) {
     final raw = outfit?['last_worn_at'];
     if (raw == null) return false;
@@ -2356,3 +2156,4 @@ class _QuickActionTile extends StatelessWidget {
     ),
   );
 }
+

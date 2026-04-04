@@ -35,9 +35,4 @@ class ProfileService {
     }
     return null;
   }
-
-  Future<Map<String, dynamic>?> fetchAdminDashboard() async {
-    final res = await client.get('/admin/dashboard/');
-    return res.statusCode == 200 ? jsonDecode(res.body) : null;
-  }
 }

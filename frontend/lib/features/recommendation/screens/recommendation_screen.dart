@@ -53,111 +53,10 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     'dry',
   ];
   final List<String> _occasionOptions = [''];
-  static const Set<String> _canonicalOccasions = {
-    'casual',
-    'formal',
-    'office',
-    'party',
-    'date',
-    'traditional',
-    'sport',
-    'home',
-    'travel',
-    'beach',
-    'street',
-    'outdoor',
-    'workout',
-  };
-  static const Set<String> _occasionAttributeSignals = {
-    'casual',
-    'formal',
-    'sport',
-    'sporty',
-    'street',
-    'streetwear',
-    'vintage',
-    'office',
-    'party',
-    'date',
-    'traditional',
-    'outdoor',
-    'home',
-    'travel',
-    'beach',
-    'workout',
-    'active',
-    'athletic',
-    'gym',
-    'fitness',
-  };
-  static const Map<String, String> _occasionAliases = {
-    'casual': 'casual',
-    'formal': 'formal',
-    'office': 'office',
-    'party': 'party',
-    'date': 'date',
-    'traditional': 'traditional',
-    'sport': 'sport',
-    'home': 'home',
-    'travel': 'travel',
-    'beach': 'beach',
-    'street': 'street',
-    'sporty': 'sport',
-    'sports': 'sport',
-    'formal shoes': 'formal',
-    'casual shoes': 'casual',
-    'sports shoes': 'sport',
-    'athletic': 'sport',
-    'gym': 'sport',
-    'active': 'workout',
-    'workout': 'workout',
-    'fitness': 'workout',
-    'work': 'office',
-    'workwear': 'office',
-    'business': 'office',
-    'business casual': 'office',
-    'professional': 'office',
-    'corporate': 'office',
-    'dating': 'date',
-    'date night': 'date',
-    'romantic': 'date',
-    'streetwear': 'street',
-    'street style': 'street',
-    'urban': 'street',
-    'night out': 'party',
-    'cocktail': 'party',
-    'going out': 'party',
-    'club': 'party',
-    'smart casual': 'casual',
-    'weekend': 'casual',
-    'everyday': 'casual',
-    'relaxed': 'casual',
-    'brunch': 'casual',
-    'outdoor': 'outdoor',
-    'hiking': 'outdoor',
-    'camping': 'outdoor',
-    'festival': 'casual',
-    'vacation': 'beach',
-    'black tie': 'formal',
-    'gala': 'formal',
-    'wedding': 'formal',
-    'any': '',
-  };
-  static const List<String> _occasionOrder = [
-    'casual',
-    'formal',
-    'office',
-    'party',
-    'date',
-    'sport',
-    'travel',
-    'street',
-    'beach',
-    'home',
-    'outdoor',
-    'traditional',
-    'workout',
-  ];
+  final Set<String> _canonicalOccasions = {};
+  final Set<String> _occasionAttributeSignals = {};
+  final Map<String, String> _occasionAliases = {};
+  final List<String> _occasionOrder = [];
 
   String _temperature = 'cool';
   String _weather = 'dry';
@@ -171,6 +70,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   String? _processingWarning;
   String? _processedTemperature;
   String? _processedWeather;
+  bool _occasionFallbackUsed = false;
 
   // Interaction state
   Map<int, Map<String, dynamic>> _clothingById = {};
@@ -184,6 +84,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   void initState() {
     super.initState();
     _seedWeatherLabels();
+    _loadOccasionCatalog();
     _loadClothing();
   }
 
@@ -253,6 +154,53 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     });
   }
 
+  Future<void> _loadOccasionCatalog() async {
+    final catalog = await _service.fetchOccasionCatalog();
+    if (!mounted) return;
+
+    List<String> toStringList(dynamic raw) {
+      if (raw is! List) return const [];
+      return raw
+          .map((item) => item.toString().trim().toLowerCase())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+
+    final aliasesRaw = catalog['aliases'];
+    final nextAliases = <String, String>{};
+    if (aliasesRaw is Map) {
+      aliasesRaw.forEach((key, value) {
+        final alias = _normalizeToken(key);
+        if (alias.isEmpty) return;
+        nextAliases[alias] = _normalizeToken(value);
+      });
+    }
+
+    final nextCanonical = toStringList(
+      catalog['canonical_occasions'],
+    ).toSet();
+    final nextAttributeSignals = toStringList(
+      catalog['attribute_signals'],
+    ).toSet();
+    final nextOrder = toStringList(catalog['sort_order']);
+
+    setState(() {
+      _occasionAliases
+        ..clear()
+        ..addAll(nextAliases);
+      _canonicalOccasions
+        ..clear()
+        ..addAll(nextCanonical);
+      _occasionAttributeSignals
+        ..clear()
+        ..addAll(nextAttributeSignals);
+      _occasionOrder
+        ..clear()
+        ..addAll(nextOrder);
+      _rebuildOccasionOptions();
+    });
+  }
+
   Future<void> _generate() async {
     final selectedOccasion = _occasionCtrl.text.trim();
     if (selectedOccasion.isNotEmpty &&
@@ -270,6 +218,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       _loading = true;
       _error = null;
       _showResults = true;
+      _occasionFallbackUsed = false;
     });
 
     try {
@@ -311,6 +260,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         _compare.clear();
         _overrides.clear();
         _processingWarning = data['warning']?.toString();
+        _occasionFallbackUsed = data['occasion_fallback_used'] == true;
         _processedTemperature = _coerceOption(
           metadata['temperature'],
           _temperatureOptions,
@@ -327,6 +277,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       setState(() {
         _error = e.toString();
         _processingWarning = null;
+        _occasionFallbackUsed = false;
       });
     } finally {
       if (mounted) {
@@ -365,10 +316,14 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     return _occasionAliases[token] ?? token;
   }
 
-  String _canonicalOccasion(dynamic raw) {
+  String _canonicalOccasion(dynamic raw, {bool allowUnknown = false}) {
     final normalized = _normalizeOccasion(raw);
     if (normalized.isEmpty) return '';
+    if (_canonicalOccasions.isEmpty) {
+      return allowUnknown ? normalized : '';
+    }
     if (_canonicalOccasions.contains(normalized)) return normalized;
+    if (allowUnknown) return normalized;
     return '';
   }
 
@@ -393,9 +348,16 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   Set<String> _occasionSignalsForItem(Map<String, dynamic> item) {
     final signals = <String>{};
 
-    final direct = _canonicalOccasion(item['occasion']);
+    final direct = _canonicalOccasion(
+      item['occasion'],
+      allowUnknown: _canonicalOccasions.isEmpty,
+    );
     if (direct.isNotEmpty) {
       signals.add(direct);
+    }
+
+    if (_occasionAttributeSignals.isEmpty) {
+      return signals;
     }
 
     for (final attr in _attributeTokens(item['attributes'])) {
@@ -1103,6 +1065,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                       header: _buildResultsHeader(),
                       error: _error,
                       warning: _processingWarning,
+                      occasionFallbackUsed: _occasionFallbackUsed,
                       loading: _loading,
                       emptyState: _buildEmptyState(),
                       children: _buildResultCards(),
@@ -1274,7 +1237,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     if (_promptCtrl.text.trim().isNotEmpty) {
       chips.add(_chip('Prompt: ${_promptCtrl.text.trim()}'));
     }
-    if ((_processingWarning ?? '').isNotEmpty) {
+    if ((_processingWarning ?? '').isNotEmpty || _occasionFallbackUsed) {
       chips.add(_chip('Fallback mode'));
     }
     return chips;
@@ -1795,6 +1758,7 @@ class _ResultsSection extends StatelessWidget {
   final Widget header;
   final String? error;
   final String? warning;
+  final bool occasionFallbackUsed;
   final bool loading;
   final Widget emptyState;
   final List<Widget> children;
@@ -1804,6 +1768,7 @@ class _ResultsSection extends StatelessWidget {
     required this.header,
     required this.error,
     required this.warning,
+    required this.occasionFallbackUsed,
     required this.loading,
     required this.emptyState,
     required this.children,
@@ -1830,6 +1795,25 @@ class _ResultsSection extends StatelessWidget {
             ),
           ),
         if (error != null) const SizedBox(height: 12),
+        if (occasionFallbackUsed)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: RecommendationTokens.surfaceSoft,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: RecommendationTokens.line,
+              ),
+            ),
+            child: const Text(
+              'Limited items matched your selected occasion, so these results include the best available alternatives.',
+              style: TextStyle(
+                color: RecommendationTokens.inkStrong,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        if (occasionFallbackUsed) const SizedBox(height: 12),
         if (warning != null && warning!.trim().isNotEmpty)
           Container(
             padding: const EdgeInsets.all(12),
