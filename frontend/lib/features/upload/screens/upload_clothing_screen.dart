@@ -31,6 +31,10 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   UploadStep currentStep = UploadStep.selectImage;
   File? selectedImage;
   String? segmentedUrl;
+  String? originalImageUrl;
+  bool useOriginalImage = false;
+  bool segmentationFailed = false;
+  String? segmentationNotice;
   bool isLoading = false;
 
   // Extracted metadata
@@ -92,6 +96,11 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
 
     setState(() {
       selectedImage = selected;
+      segmentedUrl = null;
+      originalImageUrl = null;
+      useOriginalImage = false;
+      segmentationFailed = false;
+      segmentationNotice = null;
       isLoading = true;
     });
 
@@ -208,8 +217,24 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       if (result == null) throw "Processing failed";
       if (!mounted) return;
 
+      final parsedSegmented = _safeText(result['segmented_image']);
+      final parsedOriginal = _safeText(result['original_image']);
+      final hasSegmented = parsedSegmented.isNotEmpty;
+      final hasOriginal = parsedOriginal.isNotEmpty;
+      final failedFromApi = result['segmentation_failed'] == true;
+      final fallbackToOriginal = failedFromApi || (!hasSegmented && hasOriginal);
+      final segmentationMessage = _safeText(result['segmentation_message']);
+
       setState(() {
-        segmentedUrl = result['segmented_image'];
+        segmentedUrl = hasSegmented ? parsedSegmented : null;
+        originalImageUrl = hasOriginal ? parsedOriginal : null;
+        segmentationFailed = fallbackToOriginal;
+        useOriginalImage = fallbackToOriginal;
+        segmentationNotice = fallbackToOriginal
+            ? (segmentationMessage.isNotEmpty
+                  ? segmentationMessage
+                  : 'Segmentation failed. You can continue without segmentation.')
+            : null;
 
         category = _safeText(result['category']);
         subcategory = _safeText(result['subcategory']);
@@ -233,15 +258,24 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         isLoading = false;
         currentStep = UploadStep.reviewing;
       });
+
+      if (fallbackToOriginal && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Segmentation failed. Showing original image.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        isLoading = false;
-        currentStep = UploadStep.selectImage;
-        selectedImage = null;
-      });
 
       if (e is Map && e["type"] == "not_clothing") {
+        setState(() {
+          isLoading = false;
+          currentStep = UploadStep.selectImage;
+          selectedImage = null;
+        });
         final confidence = (e["confidence"] * 100).toStringAsFixed(1);
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -256,14 +290,87 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         return;
       }
 
+      if (e is Map && e["type"] == "segmentation_failed") {
+        final original = _safeText(e["original_image"]);
+        setState(() {
+          segmentedUrl = null;
+          originalImageUrl = original.isNotEmpty ? original : originalImageUrl;
+          segmentationFailed = true;
+          useOriginalImage = true;
+          segmentationNotice =
+              _safeText(e["message"]).isNotEmpty
+              ? _safeText(e["message"])
+              : 'Segmentation failed. You can continue without segmentation.';
+          category = '';
+          subcategory = '';
+          dominantColor = '';
+          secondaryColor = '';
+          occasion = '';
+          detectedTemp = '';
+          detectedWeather = '';
+          attributes = [];
+          categoryController.clear();
+          subcategoryController.clear();
+          dominantColorController.clear();
+          secondaryColorController.clear();
+          occasionController.clear();
+          detectedTempController.clear();
+          detectedWeatherController.clear();
+          attributesController.clear();
+          isLoading = false;
+          currentStep = UploadStep.reviewing;
+        });
+        return;
+      }
+
+      setState(() {
+        isLoading = false;
+        currentStep = UploadStep.selectImage;
+        selectedImage = null;
+      });
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Processing failed")));
     }
   }
 
+  void _confirmSegmentationReview() {
+    setState(() {
+      if (segmentedUrl == null) {
+        useOriginalImage = true;
+      }
+      currentStep = UploadStep.editing;
+    });
+  }
+
+  void _continueWithoutSegmentation() {
+    setState(() {
+      useOriginalImage = true;
+      currentStep = UploadStep.editing;
+    });
+  }
+
+  Future<void> _redoSegmentation() async {
+    if (selectedImage == null) return;
+    setState(() {
+      isLoading = true;
+      segmentationNotice = null;
+      segmentationFailed = false;
+      useOriginalImage = false;
+    });
+    await _processImage();
+  }
+
   Future<void> _saveClothing() async {
-    if (segmentedUrl == null) return;
+    final useSegmentation = !useOriginalImage && segmentedUrl != null;
+    final sourceUrl = useSegmentation ? segmentedUrl : (originalImageUrl ?? segmentedUrl);
+    if (sourceUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No processed image available to save')),
+      );
+      return;
+    }
 
     setState(() => isLoading = true);
 
@@ -278,7 +385,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
 
     final payload = {
       "storage_unit": widget.storageId,
-      "segmented_image": segmentedUrl,
+      "segmented_image": sourceUrl,
+      "original_image": originalImageUrl,
+      "use_segmentation": useSegmentation,
       "category": category,
       "subcategory": subcategory,
       "dominant_color": dominantColor,
@@ -318,9 +427,16 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     if (segmentedUrl != null) {
       await clothingService.deleteSegmented(segmentedUrl!);
     }
+    if (originalImageUrl != null && originalImageUrl != segmentedUrl) {
+      await clothingService.deleteSegmented(originalImageUrl!);
+    }
     setState(() {
       selectedImage = null;
       segmentedUrl = null;
+      originalImageUrl = null;
+      useOriginalImage = false;
+      segmentationFailed = false;
+      segmentationNotice = null;
 
       category = '';
       subcategory = '';
@@ -344,6 +460,15 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     });
   }
 
+  Future<void> _handleBackPressed() async {
+    if (isLoading) return;
+    if (currentStep == UploadStep.reviewing) {
+      await _retakePhoto();
+      return;
+    }
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -353,7 +478,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: UploadTokens.ink),
-          onPressed: () => Navigator.pop(context),
+          onPressed: _handleBackPressed,
         ),
         title: Text(
           widget.isShoe ? 'Upload Shoes' : 'Upload Clothing',
@@ -556,6 +681,10 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   }
 
   Widget _buildReviewSegmentation() {
+    final previewingOriginal = useOriginalImage || segmentedUrl == null;
+    final canContinueWithoutSegmentation =
+        originalImageUrl != null || selectedImage != null;
+
     return Column(
       children: [
         Expanded(
@@ -575,28 +704,48 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'AI has isolated the clothing item',
+                  previewingOriginal
+                      ? 'Previewing original image'
+                      : 'AI has isolated the clothing item',
                   style: TextStyle(fontSize: 15, color: UploadTokens.muted),
                 ),
-                SizedBox(height: 24),
-                if (segmentedUrl != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      segmentedUrl!,
-                      width: double.infinity,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        height: 300,
-                        color: UploadTokens.surfaceSoft,
-                        child: Icon(
-                          Icons.error_outline,
-                          size: 48,
-                          color: UploadTokens.mutedSoft,
-                        ),
+                if (segmentationFailed && segmentationNotice != null) ...[
+                  SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: UploadTokens.dangerStrong.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: UploadTokens.dangerStrong.withValues(alpha: 0.35),
                       ),
                     ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: UploadTokens.dangerStrong,
+                          size: 18,
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            segmentationNotice!,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: UploadTokens.ink,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ],
+                SizedBox(height: 24),
+                _buildProcessedPreview(height: 320),
               ],
             ),
           ),
@@ -621,9 +770,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: () {
-                      setState(() => currentStep = UploadStep.editing);
-                    },
+                    onPressed: _confirmSegmentationReview,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: UploadTokens.ink,
                       foregroundColor: UploadTokens.surface,
@@ -633,7 +780,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                       elevation: 0,
                     ),
                     child: Text(
-                      'Looks Good',
+                      'Confirm',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -646,7 +793,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton(
-                    onPressed: _retakePhoto,
+                    onPressed: canContinueWithoutSegmentation
+                        ? _continueWithoutSegmentation
+                        : null,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: UploadTokens.ink,
                       side: BorderSide(color: UploadTokens.line),
@@ -655,9 +804,25 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                       ),
                     ),
                     child: Text(
-                      'Retake Photo',
+                      'Continue Without Segmentation',
                       style: TextStyle(
                         fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: TextButton.icon(
+                    onPressed: _redoSegmentation,
+                    icon: Icon(Icons.refresh_rounded, size: 18),
+                    label: Text(
+                      'Redo Segmentation',
+                      style: TextStyle(
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -695,16 +860,29 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                   style: TextStyle(fontSize: 15, color: UploadTokens.muted),
                 ),
                 SizedBox(height: 24),
-                if (segmentedUrl != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      segmentedUrl!,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.contain,
+                _buildProcessedPreview(height: 220),
+                if (useOriginalImage) ...[
+                  SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: UploadTokens.info.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: UploadTokens.info.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      'Using original image without segmentation.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: UploadTokens.ink,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
+                ],
                 SizedBox(height: 24),
                 _buildMetadataSummary(),
                 SizedBox(height: 16),
@@ -797,6 +975,62 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  String? _previewImageUrl() {
+    if (useOriginalImage || segmentedUrl == null) {
+      return originalImageUrl ?? segmentedUrl;
+    }
+    return segmentedUrl;
+  }
+
+  Widget _buildProcessedPreview({double height = 300}) {
+    final previewUrl = _previewImageUrl();
+
+    if (previewUrl != null && previewUrl.trim().isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.network(
+          previewUrl,
+          height: height,
+          width: double.infinity,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) =>
+              _buildPreviewFallback(height),
+        ),
+      );
+    }
+
+    return _buildPreviewFallback(height);
+  }
+
+  Widget _buildPreviewFallback(double height) {
+    if (selectedImage != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.file(
+          selectedImage!,
+          height: height,
+          width: double.infinity,
+          fit: BoxFit.contain,
+        ),
+      );
+    }
+
+    return Container(
+      height: height,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: UploadTokens.surfaceSoft,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: UploadTokens.line),
+      ),
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        size: 48,
+        color: UploadTokens.mutedSoft,
+      ),
     );
   }
 
