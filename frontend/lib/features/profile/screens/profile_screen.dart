@@ -416,7 +416,24 @@ class _ProfileScreenState extends State<ProfileScreen>
                               color: ProfileTokens.danger,
                             ),
 
-                            const SizedBox(height: 52),
+                            const SizedBox(height: 36),
+
+                            // ── Footer ───────────────────────────────────────
+                            Center(
+                              child: Text(
+                                'Closet Buddy · Beta',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: ProfileTokens.inkMuted.withValues(
+                                    alpha: 0.45,
+                                  ),
+                                  letterSpacing: 1.8,
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 32),
                           ],
                         ),
                       ),
@@ -501,15 +518,22 @@ class _ProfileScreenState extends State<ProfileScreen>
                   clipBehavior: Clip.none,
                   children: [
                     Container(
-                      width: 76,
-                      height: 76,
+                      width: 88,
+                      height: 88,
                       decoration: BoxDecoration(
                         color: ProfileTokens.accentBg,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: ProfileTokens.accent.withValues(alpha: 0.25),
-                          width: 2,
+                          color: ProfileTokens.accent.withValues(alpha: 0.3),
+                          width: 2.5,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: ProfileTokens.accent.withValues(alpha: 0.12),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                         image: resolvedAvatar.isNotEmpty
                             ? DecorationImage(
                                 image: NetworkImage(resolvedAvatar),
@@ -523,7 +547,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               child: Text(
                                 '${_initial(firstName)}${_initial(lastName)}',
                                 style: const TextStyle(
-                                  fontSize: 26,
+                                  fontSize: 30,
                                   fontWeight: FontWeight.w900,
                                   color: ProfileTokens.accent,
                                   letterSpacing: -0.5,
@@ -537,16 +561,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                       child: GestureDetector(
                         onTap: _uploadingAvatar ? null : _pickAvatar,
                         child: Container(
-                          width: 28,
-                          height: 28,
+                          width: 30,
+                          height: 30,
                           decoration: BoxDecoration(
-                            color: ProfileTokens.card,
+                            color: ProfileTokens.accent,
                             shape: BoxShape.circle,
-                            border: Border.all(color: ProfileTokens.rule),
                             boxShadow: [
                               BoxShadow(
-                                color: ProfileTokens.black.withValues(alpha: 0.08),
-                                blurRadius: 6,
+                                color: ProfileTokens.accent.withValues(alpha: 0.35),
+                                blurRadius: 8,
                                 offset: const Offset(0, 3),
                               ),
                             ],
@@ -556,13 +579,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   padding: EdgeInsets.all(6),
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: ProfileTokens.accent,
+                                    color: ProfileTokens.white,
                                   ),
                                 )
                               : const Icon(
-                                  Icons.photo_camera_outlined,
-                                  size: 14,
-                                  color: ProfileTokens.inkSub,
+                                  Icons.photo_camera_rounded,
+                                  size: 15,
+                                  color: ProfileTokens.white,
                                 ),
                         ),
                       ),
@@ -614,8 +637,21 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
 
-          // Bottom rule
-          const Divider(height: 1, thickness: 1, color: ProfileTokens.rule),
+          // Bottom rule — fades out at edges for a softer look
+          Container(
+            height: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 0),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  ProfileTokens.rule.withValues(alpha: 0.0),
+                  ProfileTokens.rule,
+                  ProfileTokens.rule.withValues(alpha: 0.0),
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -853,52 +889,64 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Rating (optional)',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: ProfileTokens.inkMuted,
-              letterSpacing: 1.2,
-            ),
+          Row(
+            children: [
+              const Text(
+                'RATING',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: ProfileTokens.inkMuted,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _feedbackRating == null
+                    ? 'optional'
+                    : _feedbackRating! <= 2
+                        ? 'needs work'
+                        : _feedbackRating! == 3
+                            ? 'okay'
+                            : _feedbackRating! == 4
+                                ? 'good'
+                                : 'love it!',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _feedbackRating == null
+                      ? ProfileTokens.inkMuted.withValues(alpha: 0.5)
+                      : ProfileTokens.gold,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           Row(
             children: List.generate(5, (i) {
               final val = i + 1;
-              final selected = _feedbackRating == val;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () =>
-                      setState(() => _feedbackRating = selected ? null : val),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? ProfileTokens.gold
-                          : ProfileTokens.parchment,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: selected
-                            ? ProfileTokens.gold
-                            : ProfileTokens.rule,
-                        width: selected ? 2 : 1,
-                      ),
+              final filled = _feedbackRating != null && val <= _feedbackRating!;
+              return GestureDetector(
+                onTap: () => setState(
+                  () => _feedbackRating = _feedbackRating == val ? null : val,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    transitionBuilder: (child, anim) => ScaleTransition(
+                      scale: anim,
+                      child: child,
                     ),
-                    child: Center(
-                      child: Text(
-                        '$val',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: selected
-                              ? ProfileTokens.white
-                              : ProfileTokens.inkMuted,
-                        ),
-                      ),
+                    child: Icon(
+                      filled
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      key: ValueKey(filled),
+                      size: 38,
+                      color: filled
+                          ? ProfileTokens.gold
+                          : ProfileTokens.rule,
                     ),
                   ),
                 ),
@@ -965,6 +1013,13 @@ class _StatCard extends StatelessWidget {
       color: ProfileTokens.card,
       borderRadius: BorderRadius.circular(18),
       border: Border.all(color: ProfileTokens.rule),
+      boxShadow: [
+        BoxShadow(
+          color: ProfileTokens.black.withValues(alpha: 0.04),
+          blurRadius: 10,
+          offset: const Offset(0, 3),
+        ),
+      ],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -984,7 +1039,7 @@ class _StatCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w900,
-            color: ProfileTokens.ink,
+            color: accent,
             letterSpacing: -1.0,
             height: 1,
           ),
@@ -1030,6 +1085,13 @@ class _SectionCard extends StatelessWidget {
       color: ProfileTokens.card,
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: ProfileTokens.rule),
+      boxShadow: [
+        BoxShadow(
+          color: ProfileTokens.black.withValues(alpha: 0.04),
+          blurRadius: 12,
+          offset: const Offset(0, 3),
+        ),
+      ],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1101,11 +1163,16 @@ class _InfoField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canEdit = isEditing && controller != null;
+    final isLocked = controller == null;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       decoration: BoxDecoration(
-        color: canEdit ? ProfileTokens.accentBg : ProfileTokens.parchment,
+        color: canEdit
+            ? ProfileTokens.accentBg
+            : isLocked
+                ? ProfileTokens.parchment.withValues(alpha: 0.6)
+                : ProfileTokens.parchment,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: canEdit
@@ -1117,9 +1184,17 @@ class _InfoField extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            icon,
+            canEdit
+                ? icon
+                : isLocked
+                    ? Icons.lock_outline_rounded
+                    : icon,
             size: 17,
-            color: canEdit ? ProfileTokens.accent : ProfileTokens.inkMuted,
+            color: canEdit
+                ? ProfileTokens.accent
+                : isLocked
+                    ? ProfileTokens.inkMuted.withValues(alpha: 0.55)
+                    : ProfileTokens.inkMuted,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1159,7 +1234,9 @@ class _InfoField extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           color: value.isEmpty
                               ? ProfileTokens.inkMuted
-                              : ProfileTokens.ink,
+                              : isLocked
+                                  ? ProfileTokens.inkSub
+                                  : ProfileTokens.ink,
                         ),
                       ),
               ],
