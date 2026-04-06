@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..models import UserProfile
@@ -71,18 +72,23 @@ def profile(request):
         status=200,
     )
 
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout(request):
     refresh_token = request.data.get("refresh")
-    if not refresh_token:
-        return Response({"detail": "Refresh token is required."}, status=status.HTTP_400_BAD_REQUEST)
+    if refresh_token:
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except TokenError:
+            return Response({"detail": "Invalid refresh token."}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        token = RefreshToken(refresh_token)
-        token.blacklist()
-    except TokenError:
-        return Response({"detail": "Invalid refresh token."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "Logged out"}, status=status.HTTP_200_OK)
+
+    # Swagger users often authorize with only an access token and do not send
+    # refresh in the request body. In that case, revoke all outstanding
+    # refresh tokens for this authenticated user.
+    for outstanding_token in OutstandingToken.objects.filter(user=request.user):
+        BlacklistedToken.objects.get_or_create(token=outstanding_token)
 
     return Response({"detail": "Logged out"}, status=status.HTTP_200_OK)
