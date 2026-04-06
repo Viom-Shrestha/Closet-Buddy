@@ -486,6 +486,188 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     }
   }
 
+  Future<void> _moveSelectedClothing() async {
+    if (_selectedClothingIds.isEmpty) return;
+
+    final all = await storageService.getAll();
+    if (!mounted) return;
+
+    final storages = List<Map<String, dynamic>>.from(all)
+      ..sort(
+        (a, b) => (a['name'] ?? '').toString().compareTo(
+          (b['name'] ?? '').toString(),
+        ),
+      );
+
+    if (storages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No storage spaces available')),
+      );
+      return;
+    }
+
+    final count = _selectedClothingIds.length;
+    final target = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                'Move $count item${count == 1 ? '' : 's'} to…',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text('Choose destination storage'),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: storages.length,
+                itemBuilder: (context, i) {
+                  final s = storages[i];
+                  final id = _asInt(s['id']);
+                  final isCurrent = id == widget.storageId;
+
+                  return ListTile(
+                    enabled: !isCurrent,
+                    leading: Icon(_storageTypeIcon(s['type']?.toString())),
+                    title: Text((s['name'] ?? 'Storage').toString()),
+                    subtitle: Text((s['type'] ?? 'other').toString()),
+                    trailing: isCurrent
+                        ? const Text('Current')
+                        : const Icon(Icons.chevron_right),
+                    onTap: isCurrent ? null : () => Navigator.pop(context, s),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (target == null) return;
+
+    setState(() => _movingItem = true);
+
+    int successCount = 0;
+    for (final id in _selectedClothingIds) {
+      final ok = await clothingService.moveToStorage(id, _asInt(target['id']));
+      if (ok) successCount++;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _movingItem = false;
+      _selectionMode = false;
+      _selectedClothingIds.clear();
+    });
+
+    if (successCount > 0) {
+      hasChanges = true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Moved $successCount item${successCount == 1 ? '' : 's'} to ${target['name'] ?? 'storage'}',
+          ),
+        ),
+      );
+      _load();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to move selected items')),
+      );
+    }
+  }
+
+  Future<void> _moveNonClothingItem(Map<String, dynamic> item) async {
+    final all = await storageService.getAll();
+    if (!mounted) return;
+
+    final storages = List<Map<String, dynamic>>.from(all)
+      ..sort(
+        (a, b) => (a['name'] ?? '').toString().compareTo(
+          (b['name'] ?? '').toString(),
+        ),
+      );
+
+    if (storages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No storage spaces available')),
+      );
+      return;
+    }
+
+    final target = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'Move to Storage',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text('Choose destination storage'),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: storages.length,
+                itemBuilder: (context, i) {
+                  final s = storages[i];
+                  final id = _asInt(s['id']);
+                  final isCurrent = id == widget.storageId;
+
+                  return ListTile(
+                    enabled: !isCurrent,
+                    leading: Icon(_storageTypeIcon(s['type']?.toString())),
+                    title: Text((s['name'] ?? 'Storage').toString()),
+                    subtitle: Text((s['type'] ?? 'other').toString()),
+                    trailing: isCurrent
+                        ? const Text('Current')
+                        : const Icon(Icons.chevron_right),
+                    onTap: isCurrent ? null : () => Navigator.pop(context, s),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (target == null) return;
+
+    setState(() => _movingItem = true);
+
+    final ok = await miscService.moveToStorage(
+      _asInt(item['id']),
+      _asInt(target['id']),
+    );
+
+    if (!mounted) return;
+    setState(() => _movingItem = false);
+
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to move item')),
+      );
+      return;
+    }
+
+    hasChanges = true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Moved to ${target['name'] ?? 'storage'}'),
+      ),
+    );
+    _load();
+  }
+
   Future<void> _editNonClothingItem(Map<String, dynamic> item) async {
     final nameController = TextEditingController(
       text: (item['name'] ?? '').toString(),
@@ -1340,6 +1522,22 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                               FilledButton.icon(
                                 onPressed: _selectedClothingIds.isEmpty
                                     ? null
+                                    : _moveSelectedClothing,
+                                icon: const Icon(
+                                  Icons.drive_file_move_outline,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  'Move (${_selectedClothingIds.length})',
+                                ),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: HomeTokens.accent,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              FilledButton.icon(
+                                onPressed: _selectedClothingIds.isEmpty
+                                    ? null
                                     : _deleteSelectedClothing,
                                 icon: const Icon(
                                   Icons.delete_outline,
@@ -1604,25 +1802,38 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                               ),
                               trailing: PopupMenuButton<String>(
                                 onSelected: (value) {
-                                  if (value == 'edit') {
-                                    _editNonClothingItem(
-                                      Map<String, dynamic>.from(n as Map),
-                                    );
-                                  }
-                                  if (value == 'delete') {
-                                    _deleteNonClothingItem(
-                                      Map<String, dynamic>.from(n as Map),
-                                    );
-                                  }
+                                  final item = Map<String, dynamic>.from(n as Map);
+                                  if (value == 'edit') _editNonClothingItem(item);
+                                  if (value == 'move') _moveNonClothingItem(item);
+                                  if (value == 'delete') _deleteNonClothingItem(item);
                                 },
                                 itemBuilder: (_) => const [
                                   PopupMenuItem(
                                     value: 'edit',
-                                    child: Text('Edit'),
+                                    child: ListTile(
+                                      leading: Icon(Icons.edit_outlined, size: 20),
+                                      title: Text('Edit'),
+                                      contentPadding: EdgeInsets.zero,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'move',
+                                    child: ListTile(
+                                      leading: Icon(Icons.drive_file_move_outline, size: 20),
+                                      title: Text('Move'),
+                                      contentPadding: EdgeInsets.zero,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
                                   ),
                                   PopupMenuItem(
                                     value: 'delete',
-                                    child: Text('Delete'),
+                                    child: ListTile(
+                                      leading: Icon(Icons.delete_outline, size: 20),
+                                      title: Text('Delete'),
+                                      contentPadding: EdgeInsets.zero,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
                                   ),
                                 ],
                               ),
