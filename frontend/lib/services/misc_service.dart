@@ -22,6 +22,13 @@ class MiscService {
     return res.statusCode == 204;
   }
 
+  Future<bool> moveToStorage(int id, int storageId) async {
+    final res = await client.put('/non-clothing/$id/', {
+      'storage_unit': storageId,
+    });
+    return res.statusCode == 200;
+  }
+
   Future<Map<String, dynamic>> fetchNonClothingItems({
     String query = '',
     String userId = '',

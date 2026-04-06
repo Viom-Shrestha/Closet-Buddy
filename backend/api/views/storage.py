@@ -1,10 +1,42 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import serializers
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from django.core.exceptions import ValidationError
 
 from ..models import StorageUnit, ClothingItem, NonClothingItem
 from ..serializer import StorageUnitSerializer
+
+
+
+
+STORAGE_TYPE_CHOICES = [choice for choice, _ in StorageUnit.STORAGE_TYPE_CHOICES]
+
+
+class StorageUnitCreateRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=100)
+    type = serializers.ChoiceField(choices=STORAGE_TYPE_CHOICES)
+    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    parent_storage = serializers.IntegerField(required=False, allow_null=True)
+    is_put_away = serializers.BooleanField(required=False, default=False)
+
+
+class StorageUnitUpdateRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    type = serializers.ChoiceField(choices=STORAGE_TYPE_CHOICES, required=False)
+    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    parent_storage = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Use storage id, null, or empty string to clear parent.",
+    )
+    is_put_away = serializers.BooleanField(required=False)
+
+
+class ErrorResponseSerializer(serializers.Serializer):
+    error = serializers.JSONField()
 
 
 def _as_bool(value):
@@ -23,6 +55,17 @@ def get_recursive_storage_ids(storage):
     return ids
 
 
+@extend_schema_view(
+    get=extend_schema(
+        summary="List storage units",
+        responses={200: StorageUnitSerializer(many=True)},
+    ),
+    post=extend_schema(
+        summary="Create storage unit",
+        request=StorageUnitCreateRequestSerializer,
+        responses={201: StorageUnitSerializer, 400: ErrorResponseSerializer},
+    ),
+)
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def list_storage_units(request):
@@ -58,6 +101,17 @@ def list_storage_units(request):
     return Response(serializer.data)
 
 
+@extend_schema_view(
+    put=extend_schema(
+        summary="Update storage unit",
+        request=StorageUnitUpdateRequestSerializer,
+        responses={200: StorageUnitSerializer, 400: ErrorResponseSerializer, 404: ErrorResponseSerializer},
+    ),
+    delete=extend_schema(
+        summary="Delete storage unit",
+        responses={204: None, 400: ErrorResponseSerializer, 404: ErrorResponseSerializer},
+    ),
+)
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def storage_detail(request, pk):
