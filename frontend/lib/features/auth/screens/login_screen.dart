@@ -62,7 +62,11 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isLoading = true);
 
     // Attempt login and get the token (or false on failure)
-    final success = await authService.login(_username.text, _password.text);
+    final success = await authService.login(
+      _username.text,
+      _password.text,
+      rememberMe: _rememberMe,
+    );
 
     if (!mounted) return;
 

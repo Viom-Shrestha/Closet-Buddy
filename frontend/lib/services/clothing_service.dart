@@ -30,9 +30,15 @@ class ClothingService {
       return decoded;
     }
 
-    // Not clothing
-    if (res.statusCode == 400 && decoded['error'] == "Not a clothing item") {
-      throw {"type": "not_clothing", "confidence": decoded["confidence"]};
+    // Authentication failures with confidence payload.
+    if (res.statusCode == 400 && decoded is Map) {
+      final error = decoded['error']?.toString();
+      if (error == 'Not a clothing item' || error == 'Not a shoe item') {
+        throw {
+          'type': error == 'Not a shoe item' ? 'not_shoe' : 'not_clothing',
+          'confidence': decoded['confidence'],
+        };
+      }
     }
 
     // Other backend errors

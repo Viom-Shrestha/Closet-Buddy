@@ -22,7 +22,6 @@ class UploadClothingScreen extends StatefulWidget {
   @override
   State<UploadClothingScreen> createState() => _UploadClothingScreenState();
 }
-
 class _UploadClothingScreenState extends State<UploadClothingScreen> {
   final ClothingService clothingService =
       ServiceRegistry.instance.clothingService;
@@ -270,18 +269,26 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      if (e is Map && e["type"] == "not_clothing") {
+      if (e is Map &&
+          (e["type"] == "not_clothing" || e["type"] == "not_shoe")) {
         setState(() {
           isLoading = false;
           currentStep = UploadStep.selectImage;
           selectedImage = null;
         });
-        final confidence = (e["confidence"] * 100).toStringAsFixed(1);
+        final rawConfidence = e["confidence"];
+        final confidenceValue = rawConfidence is num
+            ? rawConfidence.toDouble()
+            : double.tryParse(rawConfidence?.toString() ?? "") ?? 0.0;
+        final confidence = (confidenceValue * 100).toStringAsFixed(1);
+        final isShoeError = e["type"] == "not_shoe";
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              "This doesn’t look like clothing.\nAI confidence: $confidence%",
+              isShoeError
+                  ? "This doesn't look like shoes.\nAI confidence: $confidence%"
+                  : "This doesn't look like clothing.\nAI confidence: $confidence%",
             ),
             backgroundColor: UploadTokens.dangerStrong,
             behavior: SnackBarBehavior.floating,
@@ -1337,3 +1344,4 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         .toList();
   }
 }
+

@@ -37,13 +37,13 @@ class StorageUnit(models.Model):
         ("other", "Other"),
     ]
     ALLOWED_CHILDREN = {
-    "closet": ["shelf", "drawer", "box"],
-    "wardrobe": ["shelf", "drawer", "box"],
-    "cupboard": ["shelf", "box", "drawer"],
-    "shelf": ["box"],
-    "drawer": [],
-    "box": [],
-    "other": []
+    "closet": ["shelf", "drawer", "box", "other"],
+    "wardrobe": ["shelf", "drawer", "box","other"],
+    "cupboard": ["shelf", "box", "drawer","other"],
+    "shelf": ["box","other"],
+    "drawer": ["box","other"],
+    "box": ['box', "other"],
+    "other": ["box", "other", "shelf", "drawer", "closet", "wardrobe", "cupboard" ], # "other" can contain anything including itself
     }
 
     user = models.ForeignKey(User, on_delete=models.CASCADE,related_name="storage_units")
