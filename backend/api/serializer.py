@@ -114,29 +114,6 @@ class ClothingItemUpdateSerializer(serializers.ModelSerializer):
     def validate_secondary_color(self, value):
         return normalize_color_label(value)
 
-
-# class ClothingItemCreateSerializer(serializers.ModelSerializer):
-#     storage_id = serializers.PrimaryKeyRelatedField(
-#         queryset=StorageUnit.objects.all(),
-#         source="storage_unit",
-#         write_only=True
-#     )
-#     class Meta:
-#         model = ClothingItem
-#         fields = [
-#             "storage_id",
-#             "image",
-#             "category",
-#             "subcategory",
-#             "occasion",
-#             "dominant_color",
-#             "secondary_color",
-#         ]
-
-#     def create(self, validated_data):
-#         user = self.context["request"].user
-#         return ClothingItem.objects.create(user=user, **validated_data)
-
 class StorageUnitSerializer(serializers.ModelSerializer):
     parent_storage = serializers.SerializerMethodField()
     sub_storages = serializers.SerializerMethodField()

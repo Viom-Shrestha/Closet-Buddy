@@ -81,11 +81,19 @@ class AuthService {
     return {'success': false, 'errors': errors};
   }
 
-  Future<bool> login(String username, String password) async {
+  Future<bool> login(
+    String username,
+    String password, {
+    bool rememberMe = false,
+  }) async {
     final res = await http.post(
       Uri.parse('${ApiClient.baseUrl}/auth/login/'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'username': username, 'password': password}),
+      body: jsonEncode({
+        'username': username,
+        'password': password,
+        'remember_me': rememberMe,
+      }),
     );
 
     if (res.statusCode == 200) {
