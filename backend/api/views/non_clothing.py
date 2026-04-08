@@ -16,6 +16,7 @@ from ..serializer import NonClothingItemSerializer
 )
 class NonClothingViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = NonClothingItemSerializer
 
     def get_queryset(self):
         return NonClothingItem.objects.filter(user=self.request.user)

@@ -11,8 +11,8 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from PIL import Image
 
-from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import viewsets
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -53,6 +53,11 @@ SHOE_SLOT_KEYS = [
     "loafer",
     "flip flop",
 ]
+
+
+class ClothingProcessRequestSerializer(serializers.Serializer):
+    image = serializers.ImageField(required=True)
+    is_shoe = serializers.BooleanField(required=False, default=False)
 
 
 def _as_bool(value):
@@ -587,44 +592,46 @@ def clothing_detail(request, pk):
     return Response(serializer.data)
 
 
-@extend_schema_view(
-    process=extend_schema(summary="Process clothing image"),
-    save=extend_schema(summary="Save processed clothing"),
-    delete_segmented=extend_schema(summary="Delete segmented preview image"),
-    recent=extend_schema(summary="List recent clothing"),
-    all=extend_schema(summary="List all clothing"),
-    toggle_favourite=extend_schema(summary="Toggle clothing favourite"),
-    detail=extend_schema(summary="Get clothing detail"),
-    delete_item=extend_schema(summary="Delete clothing"),
-    update_item=extend_schema(summary="Update clothing"),
-)
 class ClothingViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = ClothingItemSerializer
 
+    @extend_schema(
+        summary="Process clothing image",
+        request={"multipart/form-data": ClothingProcessRequestSerializer},
+    )
     def process(self, request):
         return clothing_process(request)
 
+    @extend_schema(summary="Save processed clothing")
     def save(self, request):
         return clothing_save(request)
 
+    @extend_schema(summary="Delete segmented preview image")
     def delete_segmented(self, request):
         return delete_segmented_image(request)
 
+    @extend_schema(summary="List recent clothing")
     def recent(self, request):
         return recent_clothes(request)
 
+    @extend_schema(summary="List all clothing")
     def all(self, request):
         return all_clothes(request)
 
+    @extend_schema(summary="Toggle clothing favourite", request=None)
     def toggle_favourite(self, request, pk=None):
         return toggle_favourite(request, pk)
 
+    @extend_schema(summary="Get clothing detail")
     def detail(self, request, pk=None):
         return clothing_detail(request, pk)
 
+    @extend_schema(summary="Delete clothing")
     def delete_item(self, request, pk=None):
         return delete_clothing(request, pk)
 
+    @extend_schema(summary="Update clothing")
     def update_item(self, request, pk=None):
         return update_clothing(request, pk)
 

@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from ..models import ClothingItem, NonClothingItem, StorageUnit
 from ..serializer import StorageUnitSerializer
 
-STORAGE_TYPE_CHOICES = [choice for choice, _ in StorageUnit.STORAGE_TYPE_CHOICES]
+STORAGE_TYPE_CHOICES = StorageUnit.STORAGE_TYPE_CHOICES
 
 
 class StorageUnitCreateRequestSerializer(serializers.Serializer):
@@ -52,29 +52,9 @@ def get_recursive_storage_ids(storage):
     return ids
 
 
-@extend_schema_view(
-    list=extend_schema(
-        summary="List storage units",
-        responses={200: StorageUnitSerializer(many=True)},
-    ),
-    create=extend_schema(
-        summary="Create storage unit",
-        request=StorageUnitCreateRequestSerializer,
-        responses={201: StorageUnitSerializer, 400: ErrorResponseSerializer},
-    ),
-    update=extend_schema(
-        summary="Update storage unit",
-        request=StorageUnitUpdateRequestSerializer,
-        responses={200: StorageUnitSerializer, 400: ErrorResponseSerializer, 404: ErrorResponseSerializer},
-    ),
-    destroy=extend_schema(
-        summary="Delete storage unit",
-        responses={204: None, 400: ErrorResponseSerializer, 404: ErrorResponseSerializer},
-    ),
-    view=extend_schema(summary="View storage contents"),
-)
 class StorageUnitViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = StorageUnitSerializer
 
     def get_queryset(self):
         return StorageUnit.objects.filter(user=self.request.user)
@@ -85,11 +65,20 @@ class StorageUnitViewSet(viewsets.ViewSet):
         except StorageUnit.DoesNotExist:
             return None
 
+    @extend_schema(
+        summary="List storage units",
+        responses={200: StorageUnitSerializer(many=True)},
+    )
     def list(self, request):
         storages = self.get_queryset()
         serializer = StorageUnitSerializer(storages, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        summary="Create storage unit",
+        request=StorageUnitCreateRequestSerializer,
+        responses={201: StorageUnitSerializer, 400: ErrorResponseSerializer},
+    )
     def create(self, request):
         parent_id = request.data.get("parent_storage")
         parent = None
@@ -117,6 +106,11 @@ class StorageUnitViewSet(viewsets.ViewSet):
         serializer = StorageUnitSerializer(storage, context={"request": request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(
+        summary="Update storage unit",
+        request=StorageUnitUpdateRequestSerializer,
+        responses={200: StorageUnitSerializer, 400: ErrorResponseSerializer, 404: ErrorResponseSerializer},
+    )
     def update(self, request, pk=None):
         storage = self._get_storage(pk)
         if not storage:
@@ -155,6 +149,10 @@ class StorageUnitViewSet(viewsets.ViewSet):
         serializer = StorageUnitSerializer(storage, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        summary="Delete storage unit",
+        responses={204: None, 400: ErrorResponseSerializer, 404: ErrorResponseSerializer},
+    )
     def destroy(self, request, pk=None):
         storage = self._get_storage(pk)
         if not storage:
@@ -169,6 +167,7 @@ class StorageUnitViewSet(viewsets.ViewSet):
         storage.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(summary="View storage contents")
     def view(self, request, pk=None):
         storage = self._get_storage(pk)
         if not storage:

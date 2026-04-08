@@ -1,6 +1,6 @@
 from django.db.models import F
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -59,19 +59,9 @@ def _get_user_accessories_or_error(user, accessory_ids):
     return found
 
 
-@extend_schema_view(
-    list=extend_schema(summary="List outfits"),
-    create=extend_schema(summary="Create outfit"),
-    retrieve=extend_schema(summary="Get outfit detail"),
-    update=extend_schema(summary="Update outfit"),
-    partial_update=extend_schema(summary="Partially update outfit"),
-    destroy=extend_schema(summary="Delete outfit"),
-    ai_rate=extend_schema(summary="Rate outfit using AI"),
-    toggle_favourite=extend_schema(summary="Toggle outfit favourite"),
-    wear=extend_schema(summary="Mark outfit as worn"),
-)
 class OutfitViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = OutfitReadSerializer
 
     def get_queryset(self):
         return Outfit.objects.filter(user=self.request.user)
@@ -79,6 +69,7 @@ class OutfitViewSet(viewsets.ViewSet):
     def _get_outfit(self, pk):
         return _get_user_outfit_or_none(self.request.user, pk)
 
+    @extend_schema(summary="List outfits", operation_id="outfits_list")
     def list(self, request):
         queryset = self.get_queryset()
         favourite = request.GET.get("is_favourite")
@@ -95,6 +86,7 @@ class OutfitViewSet(viewsets.ViewSet):
         serializer = OutfitReadSerializer(queryset, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(summary="Create outfit", request=OutfitWriteSerializer)
     def create(self, request):
         serializer = OutfitWriteSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
@@ -104,6 +96,7 @@ class OutfitViewSet(viewsets.ViewSet):
         read_serializer = OutfitReadSerializer(outfit, context={"request": request})
         return Response(read_serializer.data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(summary="Get outfit detail", operation_id="outfits_detail")
     def retrieve(self, request, pk=None):
         outfit = self._get_outfit(pk)
         if not outfit:
@@ -112,6 +105,7 @@ class OutfitViewSet(viewsets.ViewSet):
         serializer = OutfitReadSerializer(outfit, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(summary="Update outfit", request=OutfitWriteSerializer)
     def update(self, request, pk=None):
         outfit = self._get_outfit(pk)
         if not outfit:
@@ -130,6 +124,7 @@ class OutfitViewSet(viewsets.ViewSet):
         read_serializer = OutfitReadSerializer(saved, context={"request": request})
         return Response(read_serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(summary="Partially update outfit", request=OutfitWriteSerializer)
     def partial_update(self, request, pk=None):
         outfit = self._get_outfit(pk)
         if not outfit:
@@ -148,6 +143,7 @@ class OutfitViewSet(viewsets.ViewSet):
         read_serializer = OutfitReadSerializer(saved, context={"request": request})
         return Response(read_serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(summary="Delete outfit")
     def destroy(self, request, pk=None):
         outfit = self._get_outfit(pk)
         if not outfit:
@@ -156,6 +152,7 @@ class OutfitViewSet(viewsets.ViewSet):
         outfit.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(summary="Toggle outfit favourite", request=None)
     def toggle_favourite(self, request, pk=None):
         outfit = self._get_outfit(pk)
         if not outfit:
@@ -167,6 +164,7 @@ class OutfitViewSet(viewsets.ViewSet):
         serializer = OutfitReadSerializer(outfit, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(summary="Rate outfit using AI")
     def ai_rate(self, request):
         data = request.data or {}
 
@@ -240,6 +238,7 @@ class OutfitViewSet(viewsets.ViewSet):
 
         return Response(ai_snapshot, status=status.HTTP_200_OK)
 
+    @extend_schema(summary="Mark outfit as worn", request=None)
     def wear(self, request, pk=None):
         outfit = self._get_outfit(pk)
         if not outfit:

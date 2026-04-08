@@ -5,7 +5,8 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordResetForm
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
-from rest_framework import viewsets
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -23,6 +24,10 @@ from ..serializer import (
     NonClothingItemSerializer,
     OutfitReadSerializer,
 )
+
+
+class AdminSchemaSerializer(serializers.Serializer):
+    """Schema placeholder for function-backed admin endpoints."""
 
 
 def _as_bool(value):
@@ -703,10 +708,12 @@ def admin_feedback_mark_read(request, feedback_id):
 
 class AdminViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = AdminSchemaSerializer
 
     def dashboard(self, request):
         return admin_dashboard(request)
 
+    @extend_schema(operation_id="admin_users_list")
     def users(self, request):
         return admin_users(request)
 
@@ -716,6 +723,7 @@ class AdminViewSet(viewsets.ViewSet):
     def set_user_staff(self, request, user_id=None):
         return admin_set_user_staff(request, user_id)
 
+    @extend_schema(operation_id="admin_user_summary")
     def user_summary(self, request, user_id=None):
         return admin_user_summary(request, user_id)
 
@@ -728,9 +736,11 @@ class AdminViewSet(viewsets.ViewSet):
     def send_password_reset(self, request, user_id=None):
         return admin_send_password_reset(request, user_id)
 
+    @extend_schema(operation_id="admin_clothing_list")
     def clothing_list(self, request):
         return admin_clothing_list(request)
 
+    @extend_schema(operation_id="admin_clothing_detail")
     def clothing_detail(self, request, item_id=None):
         return admin_clothing_detail(request, item_id)
 
@@ -740,9 +750,11 @@ class AdminViewSet(viewsets.ViewSet):
     def clothing_reclassify(self, request):
         return admin_clothing_reclassify(request)
 
+    @extend_schema(operation_id="admin_outfits_list")
     def outfits_list(self, request):
         return admin_outfits_list(request)
 
+    @extend_schema(operation_id="admin_outfit_detail")
     def outfit_detail(self, request, outfit_id=None):
         return admin_outfit_detail(request, outfit_id)
 
