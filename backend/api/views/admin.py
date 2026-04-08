@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordResetForm
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -141,8 +141,6 @@ def _engagement_from_profiles(today, week_start):
     return dau, wau, total_sessions, total_seconds
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def admin_dashboard(request):
     denied = _require_admin(request)
     if denied:
@@ -283,8 +281,6 @@ def admin_dashboard(request):
     )
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def admin_users(request):
     denied = _require_admin(request)
     if denied:
@@ -325,8 +321,6 @@ def admin_users(request):
 
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 def admin_set_user_active(request, user_id):
     denied = _require_admin(request)
     if denied:
@@ -346,8 +340,6 @@ def admin_set_user_active(request, user_id):
     return Response({"id": target.id, "is_active": target.is_active})
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 def admin_set_user_staff(request, user_id):
     denied = _require_admin(request)
     if denied:
@@ -367,8 +359,6 @@ def admin_set_user_staff(request, user_id):
     return Response({"id": target.id, "is_staff": target.is_staff})
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def admin_user_summary(request, user_id):
     denied = _require_admin(request)
     if denied:
@@ -412,8 +402,6 @@ def admin_user_summary(request, user_id):
     )
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def admin_user_clothing(request, user_id):
     denied = _require_admin(request)
     if denied:
@@ -432,8 +420,6 @@ def admin_user_clothing(request, user_id):
     return Response({"results": serializer.data, "total": total, "limit": limit, "offset": offset})
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def admin_user_outfits(request, user_id):
     denied = _require_admin(request)
     if denied:
@@ -452,8 +438,6 @@ def admin_user_outfits(request, user_id):
     return Response({"results": serializer.data, "total": total, "limit": limit, "offset": offset})
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 def admin_send_password_reset(request, user_id):
     denied = _require_admin(request)
     if denied:
@@ -478,8 +462,6 @@ def admin_send_password_reset(request, user_id):
     return Response({"detail": "Password reset email sent."})
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def admin_clothing_list(request):
     denied = _require_admin(request)
     if denied:
@@ -528,8 +510,6 @@ def admin_clothing_list(request):
     return Response({"results": data, "total": total, "limit": limit, "offset": offset})
 
 
-@api_view(["GET", "DELETE"])
-@permission_classes([IsAuthenticated])
 def admin_clothing_detail(request, item_id):
     denied = _require_admin(request)
     if denied:
@@ -554,8 +534,6 @@ def admin_clothing_detail(request, item_id):
     return Response(payload)
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 def admin_clothing_reclassify(request):
     denied = _require_admin(request)
     if denied:
@@ -581,8 +559,6 @@ def admin_clothing_reclassify(request):
     return Response({"updated": updated})
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def admin_outfits_list(request):
     denied = _require_admin(request)
     if denied:
@@ -625,8 +601,6 @@ def admin_outfits_list(request):
     return Response({"results": data, "total": total, "limit": limit, "offset": offset})
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def admin_outfit_detail(request, outfit_id):
     denied = _require_admin(request)
     if denied:
@@ -646,8 +620,6 @@ def admin_outfit_detail(request, outfit_id):
     return Response(payload)
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def admin_non_clothing_list(request):
     denied = _require_admin(request)
     if denied:
@@ -686,8 +658,6 @@ def admin_non_clothing_list(request):
     return Response({"results": results, "total": total, "limit": limit, "offset": offset})
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def admin_feedback_list(request):
     denied = _require_admin(request)
     if denied:
@@ -716,8 +686,6 @@ def admin_feedback_list(request):
     return Response({"results": results, "total": total, "limit": limit, "offset": offset})
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 def admin_feedback_mark_read(request, feedback_id):
     denied = _require_admin(request)
     if denied:
@@ -731,4 +699,59 @@ def admin_feedback_mark_read(request, feedback_id):
     feedback.is_read = _as_bool(request.data.get("is_read", True))
     feedback.save(update_fields=["is_read"])
     return Response({"id": feedback.id, "is_read": feedback.is_read})
+
+
+class AdminViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def dashboard(self, request):
+        return admin_dashboard(request)
+
+    def users(self, request):
+        return admin_users(request)
+
+    def set_user_active(self, request, user_id=None):
+        return admin_set_user_active(request, user_id)
+
+    def set_user_staff(self, request, user_id=None):
+        return admin_set_user_staff(request, user_id)
+
+    def user_summary(self, request, user_id=None):
+        return admin_user_summary(request, user_id)
+
+    def user_clothing(self, request, user_id=None):
+        return admin_user_clothing(request, user_id)
+
+    def user_outfits(self, request, user_id=None):
+        return admin_user_outfits(request, user_id)
+
+    def send_password_reset(self, request, user_id=None):
+        return admin_send_password_reset(request, user_id)
+
+    def clothing_list(self, request):
+        return admin_clothing_list(request)
+
+    def clothing_detail(self, request, item_id=None):
+        return admin_clothing_detail(request, item_id)
+
+    def clothing_delete(self, request, item_id=None):
+        return admin_clothing_detail(request, item_id)
+
+    def clothing_reclassify(self, request):
+        return admin_clothing_reclassify(request)
+
+    def outfits_list(self, request):
+        return admin_outfits_list(request)
+
+    def outfit_detail(self, request, outfit_id=None):
+        return admin_outfit_detail(request, outfit_id)
+
+    def non_clothing_list(self, request):
+        return admin_non_clothing_list(request)
+
+    def feedback_list(self, request):
+        return admin_feedback_list(request)
+
+    def feedback_mark_read(self, request, feedback_id=None):
+        return admin_feedback_mark_read(request, feedback_id)
 

@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view, permission_classes
+from drf_spectacular.utils import extend_schema, extend_schema_view
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -15,8 +16,6 @@ from ..recommend.engine import recommend_outfits
 RECOMMENDATION_LIMIT = 3
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 def recommend_outfits_view(request):
     payload = request.data or {}
     weather = payload.get("weather") or {}
@@ -69,8 +68,6 @@ def recommend_outfits_view(request):
     return Response(response_body, status=200)
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def occasion_catalog_view(request):
     canonical_order = [
         name for name in filters.OCCASION_SORT_ORDER if name in filters.CANONICAL_OCCASIONS
@@ -84,3 +81,17 @@ def occasion_catalog_view(request):
         },
         status=200,
     )
+
+
+@extend_schema_view(
+    recommend=extend_schema(summary="Recommend outfits"),
+    occasions=extend_schema(summary="Get occasion catalog"),
+)
+class RecommendationViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def recommend(self, request):
+        return recommend_outfits_view(request)
+
+    def occasions(self, request):
+        return occasion_catalog_view(request)

@@ -1,12 +1,13 @@
 from datetime import timedelta
 
 from django.contrib.auth.models import User, update_last_login
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics
 from rest_framework import status
-from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import viewsets
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import (
     TokenObtainPairSerializer,
@@ -61,9 +62,6 @@ class RememberMeTokenObtainPairView(TokenObtainPairView):
     serializer_class = RememberMeTokenObtainPairSerializer
 
 
-@api_view(["GET", "PUT"])
-@permission_classes([IsAuthenticated])
-@parser_classes([MultiPartParser, FormParser, JSONParser])
 def profile(request):
     user = request.user
     profile_obj, _ = UserProfile.objects.get_or_create(user=user)
@@ -115,8 +113,6 @@ def profile(request):
         status=200,
     )
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 def logout(request):
     refresh_token = request.data.get("refresh")
     if refresh_token:
@@ -135,3 +131,18 @@ def logout(request):
         BlacklistedToken.objects.get_or_create(token=outstanding_token)
 
     return Response({"detail": "Logged out"}, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    profile=extend_schema(summary="Get/update profile"),
+    logout=extend_schema(summary="Logout"),
+)
+class AuthViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def profile(self, request):
+        return profile(request)
+
+    def logout(self, request):
+        return logout(request)

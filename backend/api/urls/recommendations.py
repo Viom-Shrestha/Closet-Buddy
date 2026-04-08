@@ -1,8 +1,9 @@
 from django.urls import path
 
-from ..views.recommendation import recommend_outfits_view
+from ..views.recommendation import RecommendationViewSet
 
+recommend_outfits = RecommendationViewSet.as_view({"post": "recommend"})
 
 urlpatterns = [
-    path("", recommend_outfits_view),
+    path("", recommend_outfits),
 ]

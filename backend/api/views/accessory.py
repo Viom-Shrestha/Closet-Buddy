@@ -7,8 +7,8 @@ from django.conf import settings
 from django.core.files import File
 from django.core.files.base import ContentFile
 from PIL import Image
-
-from rest_framework.decorators import api_view, permission_classes
+from drf_spectacular.utils import extend_schema, extend_schema_view
+from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -62,131 +62,144 @@ def _normalize_segmented_image(image_path: Path) -> ContentFile:
     return output
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def accessory_process(request):
-    image = request.FILES.get("image")
-    if not image:
-        return Response({"error": "Image required"}, status=400)
+@extend_schema_view(
+    process=extend_schema(summary="Process accessory image"),
+    save=extend_schema(summary="Save processed accessory"),
+    all=extend_schema(summary="List all accessories"),
+    retrieve=extend_schema(summary="Get accessory detail"),
+    update=extend_schema(summary="Update accessory"),
+    destroy=extend_schema(summary="Delete accessory"),
+    toggle_favourite=extend_schema(summary="Toggle accessory favourite"),
+)
+class AccessoryViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
 
-    try:
-        segmented_path = segment_image(image)
-        segmented_url = request.build_absolute_uri(segmented_path)
-    except Exception:
-        return Response({"error": "Segmentation failed"}, status=500)
+    def get_queryset(self):
+        return AccessoryItem.objects.filter(user=self.request.user)
 
-    image_path = _resolve_segmented_path(segmented_url)
-    if not image_path.exists():
-        return Response({"error": "Segmented file missing"}, status=500)
+    def _get_item(self, pk):
+        try:
+            return self.get_queryset().get(id=pk)
+        except AccessoryItem.DoesNotExist:
+            return None
 
-    colors = _extract_colors_safe(image_path)
-    return Response(
-        {
-            "segmented_image": segmented_url,
-            "dominant_color": colors.get("dominant_color", UNKNOWN_COLORS["dominant_color"]),
-            "secondary_color": colors.get("secondary_color", UNKNOWN_COLORS["secondary_color"]),
-        },
-        status=200,
-    )
+    def process(self, request):
+        image = request.FILES.get("image")
+        if not image:
+            return Response({"error": "Image required"}, status=status.HTTP_400_BAD_REQUEST)
 
+        try:
+            segmented_path = segment_image(image)
+            segmented_url = request.build_absolute_uri(segmented_path)
+        except Exception:
+            return Response({"error": "Segmentation failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def accessory_save(request):
-    data = request.data
-    segmented_url = data.get("segmented_image")
-    storage_id = data.get("storage_unit")
+        image_path = _resolve_segmented_path(segmented_url)
+        if not image_path.exists():
+            return Response({"error": "Segmented file missing"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    if not segmented_url or not storage_id:
-        return Response({"error": "segmented_image and storage_unit required"}, status=400)
+        colors = _extract_colors_safe(image_path)
+        return Response(
+            {
+                "segmented_image": segmented_url,
+                "dominant_color": colors.get("dominant_color", UNKNOWN_COLORS["dominant_color"]),
+                "secondary_color": colors.get("secondary_color", UNKNOWN_COLORS["secondary_color"]),
+            },
+            status=status.HTTP_200_OK,
+        )
 
-    name = (data.get("name") or "").strip()
-    if not name:
-        return Response({"error": "name required"}, status=400)
+    def save(self, request):
+        data = request.data
+        segmented_url = data.get("segmented_image")
+        storage_id = data.get("storage_unit")
 
-    image_path = _resolve_segmented_path(segmented_url)
-    if not image_path.exists():
-        return Response({"error": "Image missing"}, status=400)
+        if not segmented_url or not storage_id:
+            return Response({"error": "segmented_image and storage_unit required"}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        storage = StorageUnit.objects.get(id=storage_id, user=request.user)
-    except StorageUnit.DoesNotExist:
-        return Response({"error": "Invalid storage unit"}, status=400)
-
-    normalized_image = _normalize_segmented_image(image_path)
-
-    accessory = AccessoryItem.objects.create(
-        user=request.user,
-        storage_unit=storage,
-        image=File(normalized_image, name=normalized_image.name),
-        name=name,
-        description=data.get("description") or "",
-        dominant_color=data.get("dominant_color") or UNKNOWN_COLORS["dominant_color"],
-        secondary_color=data.get("secondary_color"),
-    )
-    try:
-        os.remove(image_path)
-    except Exception:
-        pass
-
-    return Response({"id": accessory.id}, status=201)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def list_accessories(request):
-    items = AccessoryItem.objects.filter(user=request.user).order_by("-created_at")
-    serializer = AccessoryItemSerializer(items, many=True, context={"request": request})
-    return Response(serializer.data, status=200)
-
-
-@api_view(["GET", "PUT", "DELETE"])
-@permission_classes([IsAuthenticated])
-def accessory_detail(request, pk):
-    try:
-        item = AccessoryItem.objects.get(id=pk, user=request.user)
-    except AccessoryItem.DoesNotExist:
-        return Response({"error": "Not found"}, status=404)
-
-    if request.method == "GET":
-        serializer = AccessoryItemSerializer(item, context={"request": request})
-        return Response(serializer.data, status=200)
-
-    if request.method == "DELETE":
-        item.image.delete(save=False)
-        item.delete()
-        return Response(status=204)
-
-    if "name" in request.data:
-        name = (request.data.get("name") or "").strip()
+        name = (data.get("name") or "").strip()
         if not name:
-            return Response({"error": "Name is required"}, status=400)
-        item.name = name
+            return Response({"error": "name required"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if "description" in request.data:
-        item.description = request.data.get("description") or ""
+        image_path = _resolve_segmented_path(segmented_url)
+        if not image_path.exists():
+            return Response({"error": "Image missing"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if "storage_unit" in request.data:
-        storage_id = request.data.get("storage_unit")
         try:
             storage = StorageUnit.objects.get(id=storage_id, user=request.user)
         except StorageUnit.DoesNotExist:
-            return Response({"error": "Invalid storage unit"}, status=400)
-        item.storage_unit = storage
+            return Response({"error": "Invalid storage unit"}, status=status.HTTP_400_BAD_REQUEST)
 
-    item.save()
-    serializer = AccessoryItemSerializer(item, context={"request": request})
-    return Response(serializer.data, status=200)
+        normalized_image = _normalize_segmented_image(image_path)
 
+        accessory = AccessoryItem.objects.create(
+            user=request.user,
+            storage_unit=storage,
+            image=File(normalized_image, name=normalized_image.name),
+            name=name,
+            description=data.get("description") or "",
+            dominant_color=data.get("dominant_color") or UNKNOWN_COLORS["dominant_color"],
+            secondary_color=data.get("secondary_color"),
+        )
+        try:
+            os.remove(image_path)
+        except Exception:
+            pass
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def toggle_accessory_favourite(request, pk):
-    try:
-        item = AccessoryItem.objects.get(id=pk, user=request.user)
-    except AccessoryItem.DoesNotExist:
-        return Response({"error": "Not found"}, status=404)
+        return Response({"id": accessory.id}, status=status.HTTP_201_CREATED)
 
-    item.is_favourite = not item.is_favourite
-    item.save(update_fields=["is_favourite"])
-    return Response({"id": item.id, "is_favourite": item.is_favourite}, status=200)
+    def all(self, request):
+        items = self.get_queryset().order_by("-created_at")
+        serializer = AccessoryItemSerializer(items, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None):
+        item = self._get_item(pk)
+        if not item:
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = AccessoryItemSerializer(item, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def update(self, request, pk=None):
+        item = self._get_item(pk)
+        if not item:
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if "name" in request.data:
+            name = (request.data.get("name") or "").strip()
+            if not name:
+                return Response({"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST)
+            item.name = name
+
+        if "description" in request.data:
+            item.description = request.data.get("description") or ""
+
+        if "storage_unit" in request.data:
+            storage_id = request.data.get("storage_unit")
+            try:
+                storage = StorageUnit.objects.get(id=storage_id, user=request.user)
+            except StorageUnit.DoesNotExist:
+                return Response({"error": "Invalid storage unit"}, status=status.HTTP_400_BAD_REQUEST)
+            item.storage_unit = storage
+
+        item.save()
+        serializer = AccessoryItemSerializer(item, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def destroy(self, request, pk=None):
+        item = self._get_item(pk)
+        if not item:
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        item.image.delete(save=False)
+        item.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def toggle_favourite(self, request, pk=None):
+        item = self._get_item(pk)
+        if not item:
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        item.is_favourite = not item.is_favourite
+        item.save(update_fields=["is_favourite"])
+        return Response({"id": item.id, "is_favourite": item.is_favourite}, status=status.HTTP_200_OK)
