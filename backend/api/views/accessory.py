@@ -7,8 +7,8 @@ from django.conf import settings
 from django.core.files import File
 from django.core.files.base import ContentFile
 from PIL import Image
-from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import status, viewsets
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -19,6 +19,10 @@ from ..models import AccessoryItem, StorageUnit
 from ..serializer import AccessoryItemSerializer
 
 UNKNOWN_COLORS = {"dominant_color": "Unknown", "secondary_color": "Unknown"}
+
+
+class AccessoryProcessRequestSerializer(serializers.Serializer):
+    image = serializers.ImageField(required=True)
 
 
 def _resolve_segmented_path(segmented_url: str) -> Path:
@@ -62,17 +66,9 @@ def _normalize_segmented_image(image_path: Path) -> ContentFile:
     return output
 
 
-@extend_schema_view(
-    process=extend_schema(summary="Process accessory image"),
-    save=extend_schema(summary="Save processed accessory"),
-    all=extend_schema(summary="List all accessories"),
-    retrieve=extend_schema(summary="Get accessory detail"),
-    update=extend_schema(summary="Update accessory"),
-    destroy=extend_schema(summary="Delete accessory"),
-    toggle_favourite=extend_schema(summary="Toggle accessory favourite"),
-)
 class AccessoryViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = AccessoryItemSerializer
 
     def get_queryset(self):
         return AccessoryItem.objects.filter(user=self.request.user)
@@ -83,6 +79,10 @@ class AccessoryViewSet(viewsets.ViewSet):
         except AccessoryItem.DoesNotExist:
             return None
 
+    @extend_schema(
+        summary="Process accessory image",
+        request={"multipart/form-data": AccessoryProcessRequestSerializer},
+    )
     def process(self, request):
         image = request.FILES.get("image")
         if not image:
@@ -108,6 +108,7 @@ class AccessoryViewSet(viewsets.ViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(summary="Save processed accessory")
     def save(self, request):
         data = request.data
         segmented_url = data.get("segmented_image")
@@ -147,11 +148,13 @@ class AccessoryViewSet(viewsets.ViewSet):
 
         return Response({"id": accessory.id}, status=status.HTTP_201_CREATED)
 
+    @extend_schema(summary="List all accessories")
     def all(self, request):
         items = self.get_queryset().order_by("-created_at")
         serializer = AccessoryItemSerializer(items, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(summary="Get accessory detail")
     def retrieve(self, request, pk=None):
         item = self._get_item(pk)
         if not item:
@@ -160,6 +163,7 @@ class AccessoryViewSet(viewsets.ViewSet):
         serializer = AccessoryItemSerializer(item, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(summary="Update accessory")
     def update(self, request, pk=None):
         item = self._get_item(pk)
         if not item:
@@ -186,6 +190,7 @@ class AccessoryViewSet(viewsets.ViewSet):
         serializer = AccessoryItemSerializer(item, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(summary="Delete accessory")
     def destroy(self, request, pk=None):
         item = self._get_item(pk)
         if not item:
@@ -195,6 +200,7 @@ class AccessoryViewSet(viewsets.ViewSet):
         item.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(summary="Toggle accessory favourite", request=None)
     def toggle_favourite(self, request, pk=None):
         item = self._get_item(pk)
         if not item:
