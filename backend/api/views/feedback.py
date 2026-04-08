@@ -1,12 +1,11 @@
-from rest_framework.decorators import api_view, permission_classes
+from drf_spectacular.utils import extend_schema, extend_schema_view
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..models import BetaFeedback
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 def submit_feedback(request):
     message = (request.data.get("message") or "").strip()
     if not message:
@@ -37,3 +36,13 @@ def submit_feedback(request):
         },
         status=201,
     )
+
+
+@extend_schema_view(
+    create=extend_schema(summary="Submit beta feedback"),
+)
+class FeedbackViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request):
+        return submit_feedback(request)
