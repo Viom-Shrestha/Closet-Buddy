@@ -1,8 +1,9 @@
 from django.urls import path
 
-from ..views.recommendation import occasion_catalog_view
+from ..views.recommendation import RecommendationViewSet
 
+occasion_catalog = RecommendationViewSet.as_view({"get": "occasions"})
 
 urlpatterns = [
-    path("", occasion_catalog_view, name="occasion_catalog"),
+    path("", occasion_catalog, name="occasion_catalog"),
 ]

@@ -1,23 +1,23 @@
 from django.urls import path
 
-from ..views.admin import (
-    admin_clothing_detail,
-    admin_clothing_list,
-    admin_clothing_reclassify,
-    admin_dashboard,
-    admin_feedback_list,
-    admin_feedback_mark_read,
-    admin_non_clothing_list,
-    admin_outfit_detail,
-    admin_outfits_list,
-    admin_send_password_reset,
-    admin_set_user_active,
-    admin_set_user_staff,
-    admin_user_clothing,
-    admin_user_outfits,
-    admin_user_summary,
-    admin_users,
-)
+from ..views.admin import AdminViewSet
+
+admin_dashboard = AdminViewSet.as_view({"get": "dashboard"})
+admin_users = AdminViewSet.as_view({"get": "users"})
+admin_set_user_active = AdminViewSet.as_view({"post": "set_user_active"})
+admin_set_user_staff = AdminViewSet.as_view({"post": "set_user_staff"})
+admin_user_summary = AdminViewSet.as_view({"get": "user_summary"})
+admin_user_clothing = AdminViewSet.as_view({"get": "user_clothing"})
+admin_user_outfits = AdminViewSet.as_view({"get": "user_outfits"})
+admin_send_password_reset = AdminViewSet.as_view({"post": "send_password_reset"})
+admin_clothing_list = AdminViewSet.as_view({"get": "clothing_list"})
+admin_clothing_detail = AdminViewSet.as_view({"get": "clothing_detail", "delete": "clothing_delete"})
+admin_clothing_reclassify = AdminViewSet.as_view({"post": "clothing_reclassify"})
+admin_outfits_list = AdminViewSet.as_view({"get": "outfits_list"})
+admin_outfit_detail = AdminViewSet.as_view({"get": "outfit_detail"})
+admin_non_clothing_list = AdminViewSet.as_view({"get": "non_clothing_list"})
+admin_feedback_list = AdminViewSet.as_view({"get": "feedback_list"})
+admin_feedback_mark_read = AdminViewSet.as_view({"post": "feedback_mark_read"})
 
 urlpatterns = [
     path("dashboard/", admin_dashboard, name="admin_dashboard"),

@@ -11,7 +11,8 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from PIL import Image
 
-from rest_framework.decorators import api_view, permission_classes
+from drf_spectacular.utils import extend_schema, extend_schema_view
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -278,8 +279,6 @@ def _classify_weather_safe(
         return None, None
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
 def clothing_process(request):
 
     image = request.FILES.get("image")
@@ -378,8 +377,6 @@ def clothing_process(request):
 
     return Response(result, status=200)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
 def clothing_save(request):
     data = request.data
 
@@ -469,8 +466,6 @@ def clothing_save(request):
     
     return Response({"id": clothing.id}, status=201)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
 def delete_segmented_image(request):
     segmented_url = request.data.get('url') or request.data.get('segmented_image')
     
@@ -492,8 +487,6 @@ def delete_segmented_image(request):
         return Response({"detail": f"Error: {str(e)}"}, status=500)
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def recent_clothes(request):
     items = ClothingItem.objects.filter(user=request.user)\
                                 .order_by("-created_at")[:6]
@@ -508,15 +501,11 @@ def recent_clothes(request):
     ])
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def all_clothes(request):
     items = ClothingItem.objects.filter(user=request.user).order_by("-created_at")
     serializer = ClothingItemSerializer(items, many=True, context={"request": request})
     return Response(serializer.data, status=200)
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
 def toggle_favourite(request, pk):
     try:
         item = ClothingItem.objects.get(id=pk, user=request.user)
@@ -531,8 +520,6 @@ def toggle_favourite(request, pk):
         "is_favourite": item.is_favourite
     }, status=200)
 
-@api_view(["DELETE"])
-@permission_classes([IsAuthenticated])
 def delete_clothing(request, pk):
 
     try:
@@ -545,8 +532,6 @@ def delete_clothing(request, pk):
 
     return Response({"detail": "Deleted"}, status=204)
 
-@api_view(["PUT"])
-@permission_classes([IsAuthenticated])
 def update_clothing(request, pk):
 
     try:
@@ -592,8 +577,6 @@ def update_clothing(request, pk):
     return Response(serializer.errors, status=400)
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def clothing_detail(request, pk):
     try:
         item = ClothingItem.objects.get(id=pk, user=request.user)
@@ -602,4 +585,46 @@ def clothing_detail(request, pk):
 
     serializer = ClothingItemSerializer(item, context={"request": request})
     return Response(serializer.data)
+
+
+@extend_schema_view(
+    process=extend_schema(summary="Process clothing image"),
+    save=extend_schema(summary="Save processed clothing"),
+    delete_segmented=extend_schema(summary="Delete segmented preview image"),
+    recent=extend_schema(summary="List recent clothing"),
+    all=extend_schema(summary="List all clothing"),
+    toggle_favourite=extend_schema(summary="Toggle clothing favourite"),
+    detail=extend_schema(summary="Get clothing detail"),
+    delete_item=extend_schema(summary="Delete clothing"),
+    update_item=extend_schema(summary="Update clothing"),
+)
+class ClothingViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def process(self, request):
+        return clothing_process(request)
+
+    def save(self, request):
+        return clothing_save(request)
+
+    def delete_segmented(self, request):
+        return delete_segmented_image(request)
+
+    def recent(self, request):
+        return recent_clothes(request)
+
+    def all(self, request):
+        return all_clothes(request)
+
+    def toggle_favourite(self, request, pk=None):
+        return toggle_favourite(request, pk)
+
+    def detail(self, request, pk=None):
+        return clothing_detail(request, pk)
+
+    def delete_item(self, request, pk=None):
+        return delete_clothing(request, pk)
+
+    def update_item(self, request, pk=None):
+        return update_clothing(request, pk)
 

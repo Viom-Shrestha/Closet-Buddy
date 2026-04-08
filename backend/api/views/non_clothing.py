@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view, permission_classes
+from drf_spectacular.utils import extend_schema, extend_schema_view
+from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -6,51 +7,66 @@ from ..models import NonClothingItem
 from ..serializer import NonClothingItemSerializer
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def save_non_clothing_item(request):
+@extend_schema_view(
+    create=extend_schema(summary="Create non-clothing item"),
+    list=extend_schema(summary="List non-clothing items"),
+    retrieve=extend_schema(summary="Get non-clothing detail"),
+    update=extend_schema(summary="Update non-clothing item"),
+    destroy=extend_schema(summary="Delete non-clothing item"),
+)
+class NonClothingViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
 
-    item = NonClothingItem.objects.create(
-        user=request.user,
-        storage_unit_id=request.data["storage_id"],
-        name=request.data["name"],
-        description=request.data.get("description", "")
-    )
+    def get_queryset(self):
+        return NonClothingItem.objects.filter(user=self.request.user)
 
-    return Response(NonClothingItemSerializer(item).data, status=201)
+    def _get_item(self, pk):
+        try:
+            return self.get_queryset().get(id=pk)
+        except NonClothingItem.DoesNotExist:
+            return None
 
+    def create(self, request):
+        item = NonClothingItem.objects.create(
+            user=request.user,
+            storage_unit_id=request.data["storage_id"],
+            name=request.data["name"],
+            description=request.data.get("description", ""),
+        )
+        return Response(NonClothingItemSerializer(item).data, status=status.HTTP_201_CREATED)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def list_non_clothing_items(request):
+    def list(self, request):
+        items = self.get_queryset()
+        return Response(NonClothingItemSerializer(items, many=True).data, status=status.HTTP_200_OK)
 
-    items = NonClothingItem.objects.filter(user=request.user)
-    return Response(NonClothingItemSerializer(items, many=True).data)
+    def retrieve(self, request, pk=None):
+        item = self._get_item(pk)
+        if not item:
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        return Response(NonClothingItemSerializer(item).data, status=status.HTTP_200_OK)
 
-@api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def non_clothing_detail(request, pk):
-    try:
-        item = NonClothingItem.objects.get(id=pk, user=request.user)
-    except NonClothingItem.DoesNotExist:
-        return Response({"error": "Not found"}, status=404)
+    def update(self, request, pk=None):
+        item = self._get_item(pk)
+        if not item:
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if request.method == 'GET':
-        return Response(NonClothingItemSerializer(item).data, status=200)
+        if "name" in request.data:
+            name = (request.data.get("name") or "").strip()
+            if not name:
+                return Response({"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST)
+            item.name = name
 
-    if request.method == 'DELETE':
+        if "description" in request.data:
+            item.description = request.data.get("description") or ""
+
+        item.save()
+        return Response(NonClothingItemSerializer(item).data, status=status.HTTP_200_OK)
+
+    def destroy(self, request, pk=None):
+        item = self._get_item(pk)
+        if not item:
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
         item.delete()
-        return Response(status=204)
-
-    if 'name' in request.data:
-        name = (request.data.get('name') or '').strip()
-        if not name:
-            return Response({"error": "Name is required"}, status=400)
-        item.name = name
-
-    if 'description' in request.data:
-        item.description = request.data.get('description') or ''
-
-    item.save()
-    return Response(NonClothingItemSerializer(item).data, status=200)
+        return Response(status=status.HTTP_204_NO_CONTENT)
