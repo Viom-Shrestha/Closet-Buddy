@@ -24,6 +24,34 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
   Map<String, dynamic>? item;
   bool loading = true;
   bool hasChanges = false;
+  List<String> _categoryOptions = [];
+  List<String> _occasionOptions = [];
+  List<String> _temperatureOptions = [];
+  List<String> _weatherOptions = [];
+
+  static const List<String> _defaultTemperatureValues = [
+    'freezing',
+    'cold',
+    'cool',
+    'warm',
+    'hot',
+  ];
+  static const List<String> _defaultWeatherValues = [
+    'rainy',
+    'snowy',
+    'windy',
+    'humid',
+    'dry',
+  ];
+  static const String _shoeCategory = 'Shoes';
+  static const List<String> _shoeOccasionValues = [
+    'Casual',
+    'Sports',
+    'Formal',
+    'Outdoor',
+    'Party',
+    'Home',
+  ];
 
   late AnimationController _enterCtrl;
   late AnimationController _shimmerCtrl;
@@ -64,9 +92,68 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
 
   Future<void> _load() async {
     final data = await _svc.getById(widget.clothingId);
+    List<Map<String, dynamic>> allItems = [];
+    try {
+      allItems = await _svc.getAllClothes();
+    } catch (_) {
+      allItems = const [];
+    }
+    final isShoeItem = _looksLikeShoeMetadata(
+      category: _safe(data?['category']),
+      subcategory: _safe(data?['subcategory']),
+    );
+    final shoeOccasions = allItems
+        .where(
+          (entry) => _looksLikeShoeMetadata(
+            category: _safe(entry['category']),
+            subcategory: _safe(entry['subcategory']),
+          ),
+        )
+        .map((entry) => _safe(entry['occasion']))
+        .where((entry) => entry.isNotEmpty)
+        .toList();
     if (mounted) {
       setState(() {
         item = data;
+        if (isShoeItem) {
+          _categoryOptions = const [_shoeCategory];
+          _occasionOptions = _normalizeOptions([
+            ..._shoeOccasionValues,
+            ...shoeOccasions,
+            _safe(data?['occasion']),
+          ]);
+          if (_safe(item?['category']).isEmpty ||
+              _safe(item?['category']) != _shoeCategory) {
+            item?['category'] = _shoeCategory;
+          }
+        } else {
+          _categoryOptions = _collectOptions(
+            allItems,
+            'category',
+            extras: [_safe(data?['category'])],
+          );
+          _occasionOptions = _collectOptions(
+            allItems,
+            'occasion',
+            extras: [_safe(data?['occasion'])],
+          );
+        }
+        _temperatureOptions = _collectOptions(
+          allItems,
+          'detected_temp',
+          extras: [
+            _safe(data?['detected_temp']),
+            ..._defaultTemperatureValues,
+          ],
+        );
+        _weatherOptions = _collectOptions(
+          allItems,
+          'detected_weather',
+          extras: [
+            _safe(data?['detected_weather']),
+            ..._defaultWeatherValues,
+          ],
+        );
         loading = false;
       });
       _enterCtrl.forward();
@@ -113,6 +200,52 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
     return [];
   }
 
+  String _safe(dynamic value) => (value ?? '').toString().trim();
+
+  bool _looksLikeShoeMetadata({
+    required String category,
+    required String subcategory,
+  }) {
+    final blob = '$category $subcategory'.toLowerCase();
+    const keys = [
+      'shoe',
+      'shoes',
+      'sneaker',
+      'boot',
+      'heel',
+      'footwear',
+      'slipper',
+      'sandal',
+      'loafer',
+      'flip flop',
+    ];
+    return keys.any(blob.contains);
+  }
+
+  List<String> _normalizeOptions(Iterable<String> rawValues) {
+    final set = <String>{};
+    for (final value in rawValues) {
+      final clean = _safe(value);
+      if (clean.isEmpty) continue;
+      set.add(clean);
+    }
+    final list = set.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
+
+  List<String> _collectOptions(
+    List<Map<String, dynamic>> items,
+    String field, {
+    List<String> extras = const [],
+  }) {
+    final values = <String>[
+      ...extras,
+      ...items.map((entry) => _safe(entry[field])),
+    ];
+    return _normalizeOptions(values);
+  }
+
   // ── Actions ─────────────────────────────────────────────────────────────────
 
   Future<void> _toggleFav() async {
@@ -146,12 +279,20 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
   }
 
   Future<void> _edit() async {
+    final isShoeItem = _looksLikeShoeMetadata(
+      category: _safe(item?['category']),
+      subcategory: _safe(item?['subcategory']),
+    );
     final ctrls = {
-      'category': TextEditingController(text: item!['category']),
+      'category': TextEditingController(
+        text: isShoeItem ? _shoeCategory : item!['category'],
+      ),
       'subcategory': TextEditingController(text: item!['subcategory']),
       'dominant_color': TextEditingController(text: item!['dominant_color']),
       'secondary_color': TextEditingController(text: item!['secondary_color']),
       'occasion': TextEditingController(text: item!['occasion']),
+      'detected_temp': TextEditingController(text: item!['detected_temp']),
+      'detected_weather': TextEditingController(text: item!['detected_weather']),
       'attributes': TextEditingController(text: _attrs().join(', ')),
     };
 
@@ -160,17 +301,32 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
       isScrollControlled: true,
       backgroundColor: ClothingDetailTokens.transparent,
       barrierColor: ClothingDetailTokens.black.withValues(alpha: 0.26),
-      builder: (_) => _EditSheet(ctrls: ctrls),
+      builder: (_) => _EditSheet(
+        ctrls: ctrls,
+        isShoe: isShoeItem,
+        dropdownOptions: {
+          'category': _categoryOptions,
+          'occasion': _occasionOptions,
+          'detected_temp': _temperatureOptions,
+          'detected_weather': _weatherOptions,
+        },
+      ),
     );
 
     if (saved != true) return;
 
+    if (isShoeItem) {
+      ctrls['category']!.text = _shoeCategory;
+    }
     final payload = {
-      'category': ctrls['category']!.text,
-      'subcategory': ctrls['subcategory']!.text,
-      'dominant_color': ctrls['dominant_color']!.text,
-      'secondary_color': ctrls['secondary_color']!.text,
-      'occasion': ctrls['occasion']!.text,
+      'is_shoe': isShoeItem,
+      'category': ctrls['category']!.text.trim(),
+      'subcategory': ctrls['subcategory']!.text.trim(),
+      'dominant_color': ctrls['dominant_color']!.text.trim(),
+      'secondary_color': ctrls['secondary_color']!.text.trim(),
+      'occasion': ctrls['occasion']!.text.trim(),
+      'detected_temp': ctrls['detected_temp']!.text.trim(),
+      'detected_weather': ctrls['detected_weather']!.text.trim(),
       'attributes': ctrls['attributes']!.text
           .split(',')
           .map((e) => e.trim())
@@ -180,7 +336,15 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
 
     final ok = await _svc.updateClothing(item!['id'], payload);
     if (ok && mounted) {
-      setState(() => item!.addAll(payload));
+      final refreshed = await _svc.getById(item!['id']);
+      if (!mounted) return;
+      setState(() {
+        if (refreshed != null) {
+          item = refreshed;
+        } else {
+          item!.addAll(payload);
+        }
+      });
       hasChanges = true;
       _toast('Changes saved');
     }
@@ -1342,7 +1506,13 @@ class _ConfirmDialog extends StatelessWidget {
 
 class _EditSheet extends StatelessWidget {
   final Map<String, TextEditingController> ctrls;
-  const _EditSheet({required this.ctrls});
+  final Map<String, List<String>> dropdownOptions;
+  final bool isShoe;
+  const _EditSheet({
+    required this.ctrls,
+    required this.dropdownOptions,
+    this.isShoe = false,
+  });
 
   static const _labels = <String, String>{
     'category': 'Category',
@@ -1350,8 +1520,139 @@ class _EditSheet extends StatelessWidget {
     'dominant_color': 'Primary Color',
     'secondary_color': 'Secondary Color',
     'occasion': 'Occasion',
+    'detected_temp': 'Temperature',
+    'detected_weather': 'Weather',
     'attributes': 'Attributes (comma-separated)',
   };
+
+  String _safe(dynamic value) => (value ?? '').toString().trim();
+
+  String _humanize(String value) {
+    final normalized = value.trim().replaceAll(RegExp(r'[_-]+'), ' ');
+    if (normalized.isEmpty) return '';
+    return normalized
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .map(
+          (part) =>
+              '${part[0].toUpperCase()}${part.length > 1 ? part.substring(1).toLowerCase() : ''}',
+        )
+        .join(' ');
+  }
+
+  List<String> _dropdownValues(String key) {
+    final values = <String>{
+      ...?dropdownOptions[key]?.map(_safe).where((entry) => entry.isNotEmpty),
+      _safe(ctrls[key]?.text),
+    }..remove('');
+
+    final sorted = values.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return sorted;
+  }
+
+  InputDecoration _inputDecoration(String key) {
+    return InputDecoration(
+      labelText: _labels[key] ?? key,
+      labelStyle: const TextStyle(
+        fontSize: 14,
+        color: ClothingDetailTokens.textMuted,
+      ),
+      filled: true,
+      fillColor: ClothingDetailTokens.card,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: ClothingDetailTokens.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: ClothingDetailTokens.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: ClothingDetailTokens.accent,
+          width: 2,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+    );
+  }
+
+  Widget _buildTextInput(String key) {
+    final controller = ctrls[key]!;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: TextField(
+        controller: controller,
+        style: const TextStyle(
+          fontSize: 15,
+          color: ClothingDetailTokens.text,
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: _inputDecoration(key),
+      ),
+    );
+  }
+
+  Widget _buildDropdownInput(String key) {
+    final controller = ctrls[key]!;
+    final options = _dropdownValues(key);
+    final current = _safe(controller.text);
+    final selected = options.contains(current)
+        ? current
+        : (options.isNotEmpty ? options.first : null);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: DropdownButtonFormField<String>(
+        key: ValueKey<String>('${key}_$selected'),
+        initialValue: selected,
+        isExpanded: true,
+        style: const TextStyle(
+          fontSize: 15,
+          color: ClothingDetailTokens.text,
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: _inputDecoration(key),
+        items: options
+            .map(
+              (option) => DropdownMenuItem<String>(
+                value: option,
+                child: Text(
+                  _humanize(option),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            )
+            .toList(),
+        onChanged: (value) {
+          controller.text = value ?? '';
+        },
+      ),
+    );
+  }
+
+  Widget _buildLockedCategoryInput() {
+    final controller = ctrls['category']!;
+    controller.text = 'Shoes';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: TextField(
+        controller: controller,
+        readOnly: true,
+        enableInteractiveSelection: false,
+        style: const TextStyle(
+          fontSize: 15,
+          color: ClothingDetailTokens.text,
+          fontWeight: FontWeight.w600,
+        ),
+        decoration: _inputDecoration('category').copyWith(
+          helperText: 'Shoes category is locked for shoe items.',
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1401,51 +1702,14 @@ class _EditSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          ...ctrls.entries.map(
-            (e) => Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: TextField(
-                controller: e.value,
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: ClothingDetailTokens.text,
-                  fontWeight: FontWeight.w500,
-                ),
-                decoration: InputDecoration(
-                  labelText: _labels[e.key] ?? e.key,
-                  labelStyle: const TextStyle(
-                    fontSize: 14,
-                    color: ClothingDetailTokens.textMuted,
-                  ),
-                  filled: true,
-                  fillColor: ClothingDetailTokens.card,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: ClothingDetailTokens.border,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: ClothingDetailTokens.border,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: ClothingDetailTokens.accent,
-                      width: 2,
-                    ),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 16,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          isShoe ? _buildLockedCategoryInput() : _buildDropdownInput('category'),
+          _buildTextInput('subcategory'),
+          _buildTextInput('dominant_color'),
+          _buildTextInput('secondary_color'),
+          _buildDropdownInput('occasion'),
+          _buildDropdownInput('detected_temp'),
+          _buildDropdownInput('detected_weather'),
+          _buildTextInput('attributes'),
           const SizedBox(height: 8),
           GestureDetector(
             onTap: () => Navigator.pop(context, true),

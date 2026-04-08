@@ -1,6 +1,8 @@
 import base64
+from pathlib import Path
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APITestCase
@@ -227,3 +229,128 @@ class RecommendationApiTests(APITestCase):
         self.assertIn("sort_order", res.data)
         self.assertEqual(res.data["aliases"].get("date night"), "date")
         self.assertEqual(res.data["aliases"].get("any"), "")
+
+
+class ShoeUploadFlowTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="shoe-user", password="test1234")
+        self.storage = StorageUnit.objects.create(
+            user=self.user,
+            name="Shoe Closet",
+            type="closet",
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _write_media_file(self, relative_path: str) -> Path:
+        media_root = Path(settings.MEDIA_ROOT)
+        target = media_root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(_png_upload("tmp.png").read())
+        return target
+
+    def test_process_shoe_uses_shoe_metadata_flow(self):
+        original_path = self._write_media_file("clothing/review/test-original.png")
+        segmented_path = self._write_media_file("clothing/segmented/test-segmented.png")
+        original_url = "http://testserver/media/clothing/review/test-original.png"
+
+        with (
+            patch("api.views.clothing._authenticate_item", return_value=None),
+            patch(
+                "api.views.clothing._persist_original_upload",
+                return_value=(original_url, original_path),
+            ),
+            patch(
+                "api.views.clothing.segment_image",
+                return_value="/media/clothing/segmented/test-segmented.png",
+            ),
+            patch(
+                "api.views.clothing._resolve_media_path_safe",
+                return_value=segmented_path,
+            ),
+            patch(
+                "api.views.clothing._extract_colors_safe",
+                return_value={"dominant_color": "Black", "secondary_color": "White"},
+            ),
+            patch(
+                "api.views.clothing.classify_shoe_metadata",
+                return_value=("Shoe", "Sneakers", "Sports", ["mesh"]),
+            ) as shoe_mock,
+            patch("api.views.clothing._classify_clothing_safe") as clothing_mock,
+            patch("api.views.clothing._predict_occasion_safe") as occasion_mock,
+            patch(
+                "api.views.clothing._classify_weather_safe",
+                return_value=("cool", "dry"),
+            ),
+        ):
+            res = self.client.post(
+                "/api/clothing/process/",
+                {"image": _png_upload("shoe-upload.png"), "is_shoe": "true"},
+            )
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["is_shoe"], True)
+        self.assertEqual(res.data["category"], "Shoes")
+        self.assertEqual(res.data["subcategory"], "Sneakers")
+        self.assertEqual(res.data["occasion"], "Sports")
+        shoe_mock.assert_called_once()
+        clothing_mock.assert_not_called()
+        occasion_mock.assert_not_called()
+
+    def test_save_shoe_forces_shoe_category(self):
+        original_path = self._write_media_file("clothing/review/test-save-source.png")
+        original_url = "http://testserver/media/clothing/review/test-save-source.png"
+
+        with patch(
+            "api.views.clothing._resolve_media_path_safe",
+            return_value=original_path,
+        ):
+            res = self.client.post(
+                "/api/clothing/save/",
+                {
+                    "storage_unit": self.storage.id,
+                    "original_image": original_url,
+                    "use_segmentation": False,
+                    "is_shoe": True,
+                    "category": "Topwear",
+                    "subcategory": "Sneakers",
+                    "dominant_color": "Black",
+                    "secondary_color": "White",
+                    "occasion": "Sports",
+                    "attributes": ["mesh"],
+                    "detected_temp": "cool",
+                    "detected_weather": "dry",
+                },
+                format="json",
+            )
+
+        self.assertEqual(res.status_code, 201)
+        clothing = ClothingItem.objects.get(id=res.data["id"])
+        self.assertEqual(clothing.category, "Shoes")
+        self.assertEqual(clothing.subcategory.lower(), "sneakers")
+        self.assertEqual(clothing.occasion, "Sports")
+
+    def test_update_shoe_keeps_category_locked(self):
+        clothing = ClothingItem.objects.create(
+            user=self.user,
+            storage_unit=self.storage,
+            image=_png_upload("shoe-existing.png"),
+            category="footwear",
+            subcategory="sneakers",
+            dominant_color="Black",
+            secondary_color="White",
+            attributes=[],
+        )
+
+        res = self.client.put(
+            f"/api/clothing/{clothing.id}/update/",
+            {
+                "category": "Topwear",
+                "occasion": "Formal",
+            },
+            format="json",
+        )
+
+        self.assertEqual(res.status_code, 200)
+        clothing.refresh_from_db()
+        self.assertEqual(clothing.category, "Shoes")
+        self.assertEqual(clothing.occasion, "Formal")
