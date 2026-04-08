@@ -1,9 +1,13 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import viewsets
+from rest_framework import serializers, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..models import BetaFeedback
+
+
+class FeedbackSchemaSerializer(serializers.Serializer):
+    """Schema placeholder for feedback create endpoint."""
 
 
 def submit_feedback(request):
@@ -43,6 +47,7 @@ def submit_feedback(request):
 )
 class FeedbackViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = FeedbackSchemaSerializer
 
     def create(self, request):
         return submit_feedback(request)

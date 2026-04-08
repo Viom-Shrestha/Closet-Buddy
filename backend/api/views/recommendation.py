@@ -1,5 +1,5 @@
-from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import viewsets
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -14,6 +14,10 @@ from ..recommend.engine import recommend_outfits
 
 
 RECOMMENDATION_LIMIT = 3
+
+
+class RecommendationSchemaSerializer(serializers.Serializer):
+    """Schema placeholder for recommendation endpoints."""
 
 
 def recommend_outfits_view(request):
@@ -83,15 +87,14 @@ def occasion_catalog_view(request):
     )
 
 
-@extend_schema_view(
-    recommend=extend_schema(summary="Recommend outfits"),
-    occasions=extend_schema(summary="Get occasion catalog"),
-)
 class RecommendationViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = RecommendationSchemaSerializer
 
+    @extend_schema(summary="Recommend outfits")
     def recommend(self, request):
         return recommend_outfits_view(request)
 
+    @extend_schema(summary="Get occasion catalog")
     def occasions(self, request):
         return occasion_catalog_view(request)

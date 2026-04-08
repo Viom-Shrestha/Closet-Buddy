@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from typing import Any, Dict, List, Optional
 from .models import (
     AccessoryItem,
     ClothingItem,
@@ -71,7 +72,7 @@ class ClothingItemSerializer(serializers.ModelSerializer):
             "storage_unit",
         ]
 
-    def get_storage_unit(self, obj):
+    def get_storage_unit(self, obj) -> Dict[str, Any]:
         return {
             "id": obj.storage_unit.id,
             "name": obj.storage_unit.name,
@@ -135,7 +136,7 @@ class StorageUnitSerializer(serializers.ModelSerializer):
             "created_at"
         ]
 
-    def get_parent_storage(self, obj):
+    def get_parent_storage(self, obj) -> Optional[Dict[str, Any]]:
         if obj.parent_storage:
             return {
                 "id": obj.parent_storage.id,
@@ -144,7 +145,7 @@ class StorageUnitSerializer(serializers.ModelSerializer):
             }
         return None
     
-    def get_sub_storages(self, obj):
+    def get_sub_storages(self, obj) -> List[Dict[str, Any]]:
         return StorageUnitSerializer(
             obj.sub_units.all(),
             many=True,
@@ -152,9 +153,9 @@ class StorageUnitSerializer(serializers.ModelSerializer):
         ).data
 
 
-    def get_item_count(self, obj):
+    def get_item_count(self, obj) -> int:
 
-        def collect_ids(s):
+        def collect_ids(s) -> List[int]:
             ids = [s.id]
             for c in s.sub_units.all():
                 ids += collect_ids(c)
@@ -175,7 +176,7 @@ class NonClothingItemSerializer(serializers.ModelSerializer):
         model = NonClothingItem
         fields = ['id', 'name', 'description', 'storage_unit', 'created_at']
 
-    def get_storage_unit(self, obj):
+    def get_storage_unit(self, obj) -> Dict[str, Any]:
         """Return minimal storage info"""
         return {
             "id": obj.storage_unit.id,
@@ -201,7 +202,7 @@ class AccessoryItemSerializer(serializers.ModelSerializer):
             "storage_unit",
         ]
 
-    def get_storage_unit(self, obj):
+    def get_storage_unit(self, obj) -> Dict[str, Any]:
         return {
             "id": obj.storage_unit.id,
             "name": obj.storage_unit.name,
@@ -268,7 +269,7 @@ class OutfitSlotItemSerializer(serializers.ModelSerializer):
             "is_favourite",
         ]
 
-    def get_image(self, obj):
+    def get_image(self, obj) -> str:
         request = self.context.get("request")
         if not obj.image:
             return ""
@@ -276,7 +277,7 @@ class OutfitSlotItemSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(obj.image.url)
         return obj.image.url
 
-    def _serialize_storage_unit(self, storage):
+    def _serialize_storage_unit(self, storage) -> Optional[Dict[str, Any]]:
         if not storage:
             return None
 
@@ -288,7 +289,7 @@ class OutfitSlotItemSerializer(serializers.ModelSerializer):
             "parent_storage": self._serialize_storage_unit(parent) if parent else None,
         }
 
-    def get_storage_unit(self, obj):
+    def get_storage_unit(self, obj) -> Optional[Dict[str, Any]]:
         storage = getattr(obj, "storage_unit", None)
         return self._serialize_storage_unit(storage)
 
@@ -307,7 +308,7 @@ class OutfitAccessoryItemSerializer(serializers.ModelSerializer):
             "is_favourite",
         ]
 
-    def get_image(self, obj):
+    def get_image(self, obj) -> str:
         request = self.context.get("request")
         if not obj.image:
             return ""
