@@ -7,12 +7,9 @@ from .models import (
     StorageUnit,
 )
 from .metadata_normalization import (
-    coerce_temperature_label,
-    coerce_weather_label,
     normalize_attributes,
     normalize_color_label,
-    normalize_occasion_label,
-    to_display_label,
+    normalize_subcategory_label,
 )
 from django.contrib.auth.models import User
 
@@ -96,17 +93,22 @@ class ClothingItemUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def validate_occasion(self, value):
-        normalized = normalize_occasion_label(value)
-        return to_display_label(normalized)
+        text = str(value or "").strip()
+        return text or None
+
+    def validate_subcategory(self, value):
+        return normalize_subcategory_label(value) or str(value or "").strip()
 
     def validate_attributes(self, value):
         return normalize_attributes(value)
 
     def validate_detected_temp(self, value):
-        return coerce_temperature_label(value, allow_unknown=True)
+        text = str(value or "").strip()
+        return text or None
 
     def validate_detected_weather(self, value):
-        return coerce_weather_label(value, allow_unknown=True)
+        text = str(value or "").strip()
+        return text or None
 
     def validate_dominant_color(self, value):
         return normalize_color_label(value) or "Unknown"

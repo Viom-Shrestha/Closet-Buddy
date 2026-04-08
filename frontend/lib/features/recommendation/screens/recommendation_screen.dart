@@ -55,7 +55,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   final List<String> _occasionOptions = [''];
   final Set<String> _canonicalOccasions = {};
   final Set<String> _occasionAttributeSignals = {};
-  final Map<String, String> _occasionAliases = {};
   final List<String> _occasionOrder = [];
 
   String _temperature = 'cool';
@@ -166,16 +165,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
           .toList();
     }
 
-    final aliasesRaw = catalog['aliases'];
-    final nextAliases = <String, String>{};
-    if (aliasesRaw is Map) {
-      aliasesRaw.forEach((key, value) {
-        final alias = _normalizeToken(key);
-        if (alias.isEmpty) return;
-        nextAliases[alias] = _normalizeToken(value);
-      });
-    }
-
     final nextCanonical = toStringList(
       catalog['canonical_occasions'],
     ).toSet();
@@ -185,9 +174,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     final nextOrder = toStringList(catalog['sort_order']);
 
     setState(() {
-      _occasionAliases
-        ..clear()
-        ..addAll(nextAliases);
       _canonicalOccasions
         ..clear()
         ..addAll(nextCanonical);
@@ -310,14 +296,8 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         .trim();
   }
 
-  String _normalizeOccasion(dynamic raw) {
-    final token = _normalizeToken(raw);
-    if (token.isEmpty) return '';
-    return _occasionAliases[token] ?? token;
-  }
-
   String _canonicalOccasion(dynamic raw, {bool allowUnknown = false}) {
-    final normalized = _normalizeOccasion(raw);
+    final normalized = _normalizeToken(raw);
     if (normalized.isEmpty) return '';
     if (_canonicalOccasions.isEmpty) {
       return allowUnknown ? normalized : '';
