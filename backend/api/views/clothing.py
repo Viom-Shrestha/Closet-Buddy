@@ -15,22 +15,20 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from ai_models.classification.attribute_clip import extract_attributes, extract_shoe_details
+from ai_models.classification.attribute_clip import extract_attributes
 from ai_models.classification.clothing_classification import (
     classify_subcategory,
     map_category_from_subcategory,
 )
 from ai_models.classification.occasion import predict_occasion
+from ai_models.classification.shoe_metadata import classify_shoe_metadata
 from ai_models.classification.weather import classify_clothing_weather
 
 from ..models import ClothingItem, StorageUnit
 from ..metadata_normalization import (
-    coerce_temperature_label,
-    coerce_weather_label,
     normalize_attributes,
     normalize_color_label,
-    normalize_occasion_label,
-    to_display_label,
+    normalize_subcategory_label,
 )
 from ..serializer import ClothingItemSerializer, ClothingItemUpdateSerializer
 
@@ -41,6 +39,19 @@ from ai_models.utils.color_extraction_util import extract_colors_with_names
 UNKNOWN_COLORS = {"dominant_color": "Unknown", "secondary_color": "Unknown"}
 DEFAULT_OCCASION = "Casual"
 DEFAULT_OCCASION_CONFIDENCE = 0.0
+SHOE_LOCKED_CATEGORY = "Shoes"
+SHOE_SLOT_KEYS = [
+    "shoe",
+    "shoes",
+    "sneaker",
+    "boot",
+    "heel",
+    "footwear",
+    "slipper",
+    "sandal",
+    "loafer",
+    "flip flop",
+]
 
 
 def _as_bool(value):
@@ -208,18 +219,6 @@ def _predict_occasion_safe(image_path: Path) -> Tuple[str, float]:
         return DEFAULT_OCCASION, DEFAULT_OCCASION_CONFIDENCE
 
 
-def _classify_shoe_safe(image_path: Path) -> Tuple[str, str, str, List[str]]:
-    try:
-        shoe_details = extract_shoe_details(image_path)
-        category = "Shoe"
-        subcategory = _title_label(shoe_details.get("shoe_type", "Shoes"))
-        occasion = _title_label(shoe_details.get("usage", DEFAULT_OCCASION))
-        attributes = list(shoe_details.get("attributes", []))
-        return category, subcategory, occasion, attributes
-    except Exception:
-        return "Shoe", "Shoes", DEFAULT_OCCASION, []
-
-
 def _classify_clothing_safe(image_path: Path) -> Tuple[str, str, List[str]]:
     subcategory = "Shirt"
     category = "Topwear"
@@ -252,20 +251,15 @@ def _coerce_attributes(raw_attributes) -> List:
     return normalize_attributes(raw_attributes)
 
 
-def _coerce_temp_label(raw_label):
+def _coerce_optional_label(raw_label):
     candidate = _first_value(raw_label)
-    return coerce_temperature_label(candidate, allow_unknown=True)
+    text = str(candidate or "").strip()
+    return text or None
 
 
-def _coerce_weather_label(raw_label):
-    candidate = _first_value(raw_label)
-    return coerce_weather_label(candidate, allow_unknown=True)
-
-
-def _coerce_occasion_label(raw_label):
-    candidate = _first_value(raw_label)
-    normalized = normalize_occasion_label(candidate)
-    return to_display_label(normalized)
+def _is_shoe_metadata(category: Optional[str], subcategory: Optional[str]) -> bool:
+    blob = f"{category or ''} {subcategory or ''}".lower()
+    return any(key in blob for key in SHOE_SLOT_KEYS)
 
 
 def _classify_weather_safe(
@@ -339,13 +333,14 @@ def clothing_process(request):
     # -------- COLORS --------
     colors = _extract_colors_safe(image_path)
     
-    # -------- Occasion --------
-    occasion, occasion_conf = _predict_occasion_safe(image_path)
-
     # -------- CLASSIFICATION + ATTRIBUTES --------
+    occasion = DEFAULT_OCCASION
+    occasion_conf = DEFAULT_OCCASION_CONFIDENCE
     if is_shoe:
-        category, subcategory, occasion, attributes = _classify_shoe_safe(image_path)
+        category, subcategory, occasion, attributes = classify_shoe_metadata(image_path)
+        category = SHOE_LOCKED_CATEGORY
     else:
+        occasion, occasion_conf = _predict_occasion_safe(image_path)
         category, subcategory, attributes = _classify_clothing_safe(image_path)
 
     # -------- WEATHER LABELS --------
@@ -355,9 +350,9 @@ def clothing_process(request):
         subcategory=subcategory,
     )
     attributes = normalize_attributes(attributes)
-    occasion = _coerce_occasion_label(occasion) or DEFAULT_OCCASION
-    detected_temp = coerce_temperature_label(detected_temp, allow_unknown=True)
-    detected_weather = coerce_weather_label(detected_weather, allow_unknown=True)
+    occasion = _coerce_optional_label(occasion) or DEFAULT_OCCASION
+    detected_temp = _coerce_optional_label(detected_temp)
+    detected_weather = _coerce_optional_label(detected_weather)
 
     result = {
         "original_image": original_url,
@@ -391,6 +386,7 @@ def clothing_save(request):
     segmented_url = data.get("segmented_image")
     original_url = data.get("original_image")
     use_segmentation = _as_bool(data.get("use_segmentation", True))
+    is_shoe = _as_bool(data.get("is_shoe", False))
     storage_id = data.get("storage_unit")
 
     if use_segmentation and not segmented_url and original_url:
@@ -412,14 +408,23 @@ def clothing_save(request):
     except StorageUnit.DoesNotExist:
         return Response({"error": "Invalid storage unit"}, status=400)
 
-    missing_fields = [f for f in ["dominant_color", "category", "subcategory"] if not data.get(f)]
+    required_fields = ["dominant_color", "subcategory"]
+    if not is_shoe:
+        required_fields.append("category")
+    missing_fields = [f for f in required_fields if not data.get(f)]
     if missing_fields:
         return Response({"error": f"Missing fields: {', '.join(missing_fields)}"}, status=400)
 
     attributes = _coerce_attributes(data.get("attributes", []))
-    detected_temp = _coerce_temp_label(data.get("detected_temp"))
-    detected_weather = _coerce_weather_label(data.get("detected_weather"))
-    occasion = _coerce_occasion_label(data.get("occasion"))
+    detected_temp = _coerce_optional_label(data.get("detected_temp"))
+    detected_weather = _coerce_optional_label(data.get("detected_weather"))
+    occasion = _coerce_optional_label(data.get("occasion"))
+    category = str(_first_value(data.get("category")) or "").strip()
+    raw_subcategory = _first_value(data.get("subcategory"))
+    subcategory = normalize_subcategory_label(raw_subcategory) or str(raw_subcategory or "").strip()
+    if is_shoe or _is_shoe_metadata(category, subcategory):
+        category = SHOE_LOCKED_CATEGORY
+        occasion = occasion or DEFAULT_OCCASION
     dominant_color = normalize_color_label(data.get("dominant_color")) or UNKNOWN_COLORS["dominant_color"]
     secondary_color = normalize_color_label(data.get("secondary_color"))
     if use_segmentation:
@@ -434,8 +439,8 @@ def clothing_save(request):
         image=File(image_content, name=image_content.name),
         dominant_color=dominant_color,
         secondary_color=secondary_color,
-        category=data["category"],
-        subcategory=data["subcategory"],
+        category=category,
+        subcategory=subcategory,
         occasion=occasion,
         attributes=attributes,
         detected_temp=detected_temp,
@@ -447,8 +452,8 @@ def clothing_save(request):
             category=clothing.category,
             subcategory=clothing.subcategory,
         )
-        clothing.detected_temp = coerce_temperature_label(detected_temp, allow_unknown=True)
-        clothing.detected_weather = coerce_weather_label(detected_weather, allow_unknown=True)
+        clothing.detected_temp = _coerce_optional_label(detected_temp)
+        clothing.detected_weather = _coerce_optional_label(detected_weather)
         clothing.save(update_fields=["detected_temp", "detected_weather"])
 
     cleanup_urls = [segmented_url, original_url]
@@ -551,6 +556,7 @@ def update_clothing(request, pk):
 
     payload = dict(request.data)
     storage_id = payload.pop("storage_unit", None)
+    is_shoe_flag = _as_bool(_first_value(payload.pop("is_shoe", False)))
 
     if storage_id is not None:
         try:
@@ -564,6 +570,13 @@ def update_clothing(request, pk):
         item.save(update_fields=["storage_unit"])
 
     payload = _normalize_update_payload(payload)
+
+    if (
+        is_shoe_flag
+        or _is_shoe_metadata(item.category, item.subcategory)
+        or _is_shoe_metadata(payload.get("category"), payload.get("subcategory"))
+    ):
+        payload["category"] = SHOE_LOCKED_CATEGORY
 
     if not payload:
         serializer = ClothingItemSerializer(item, context={"request": request})

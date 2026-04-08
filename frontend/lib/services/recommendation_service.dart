@@ -22,7 +22,6 @@ class RecommendationService {
     final res = await _client.get('/occasions/');
     if (res.statusCode != 200) {
       return _occasionCatalogCache ?? const {
-        'aliases': <String, String>{},
         'canonical_occasions': <String>[],
         'attribute_signals': <String>[],
         'sort_order': <String>[],
@@ -32,21 +31,10 @@ class RecommendationService {
     final decoded = jsonDecode(res.body);
     if (decoded is! Map) {
       return _occasionCatalogCache ?? const {
-        'aliases': <String, String>{},
         'canonical_occasions': <String>[],
         'attribute_signals': <String>[],
         'sort_order': <String>[],
       };
-    }
-
-    final aliasesRaw = decoded['aliases'];
-    final aliases = <String, String>{};
-    if (aliasesRaw is Map) {
-      aliasesRaw.forEach((key, value) {
-        final alias = key.toString().trim();
-        if (alias.isEmpty) return;
-        aliases[alias] = value?.toString() ?? '';
-      });
     }
 
     List<String> stringList(dynamic raw) {
@@ -58,7 +46,6 @@ class RecommendationService {
     }
 
     final catalog = <String, dynamic>{
-      'aliases': aliases,
       'canonical_occasions': stringList(decoded['canonical_occasions']),
       'attribute_signals': stringList(decoded['attribute_signals']),
       'sort_order': stringList(decoded['sort_order']),

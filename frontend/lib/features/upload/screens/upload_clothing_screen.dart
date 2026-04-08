@@ -22,10 +22,21 @@ class UploadClothingScreen extends StatefulWidget {
   @override
   State<UploadClothingScreen> createState() => _UploadClothingScreenState();
 }
+
 class _UploadClothingScreenState extends State<UploadClothingScreen> {
   final ClothingService clothingService =
       ServiceRegistry.instance.clothingService;
   final ImagePicker picker = ImagePicker();
+  static const String _shoeCategory = 'Shoes';
+  static const String _defaultShoeOccasion = 'Casual';
+  static const List<String> _shoeOccasionValues = [
+    'Casual',
+    'Sports',
+    'Formal',
+    'Outdoor',
+    'Party',
+    'Home',
+  ];
 
   UploadStep currentStep = UploadStep.selectImage;
   File? selectedImage;
@@ -45,6 +56,26 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   String detectedTemp = '';
   String detectedWeather = '';
   List<String> attributes = [];
+  List<String> _categoryOptions = [];
+  List<String> _occasionOptions = [];
+  List<String> _temperatureOptions = [];
+  List<String> _weatherOptions = [];
+  bool _metadataOptionsLoaded = false;
+
+  static const List<String> _defaultTemperatureValues = [
+    'freezing',
+    'cold',
+    'cool',
+    'warm',
+    'hot',
+  ];
+  static const List<String> _defaultWeatherValues = [
+    'rainy',
+    'snowy',
+    'windy',
+    'humid',
+    'dry',
+  ];
 
   late TextEditingController categoryController;
   late TextEditingController subcategoryController;
@@ -67,6 +98,11 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     detectedTempController = TextEditingController();
     detectedWeatherController = TextEditingController();
     attributesController = TextEditingController();
+    if (widget.isShoe) {
+      category = _shoeCategory;
+      categoryController.text = _shoeCategory;
+      _categoryOptions = const [_shoeCategory];
+    }
   }
 
   @override
@@ -221,7 +257,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       final hasSegmented = parsedSegmented.isNotEmpty;
       final hasOriginal = parsedOriginal.isNotEmpty;
       final failedFromApi = result['segmentation_failed'] == true;
-      final fallbackToOriginal = failedFromApi || (!hasSegmented && hasOriginal);
+      final fallbackToOriginal =
+          failedFromApi || (!hasSegmented && hasOriginal);
       final segmentationMessage = _safeText(result['segmentation_message']);
 
       setState(() {
@@ -235,11 +272,14 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                   : 'Segmentation failed. You can continue without segmentation.')
             : null;
 
-        category = _safeText(result['category']);
+        category = widget.isShoe ? _shoeCategory : _safeText(result['category']);
         subcategory = _safeText(result['subcategory']);
         dominantColor = _safeText(result['dominant_color']);
         secondaryColor = _safeText(result['secondary_color']);
         occasion = _safeText(result['occasion']);
+        if (widget.isShoe && occasion.isEmpty) {
+          occasion = _defaultShoeOccasion;
+        }
         detectedTemp = _safeText(result['detected_temp']);
         detectedWeather = _safeText(result['detected_weather']);
         attributes = _extractTags(result);
@@ -257,6 +297,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         isLoading = false;
         currentStep = UploadStep.reviewing;
       });
+      await _loadMetadataDropdownOptions(force: true);
 
       if (fallbackToOriginal && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -309,7 +350,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     }
   }
 
-  void _confirmSegmentationReview() {
+  Future<void> _confirmSegmentationReview() async {
+    await _loadMetadataDropdownOptions();
+    if (!mounted) return;
     setState(() {
       if (segmentedUrl == null) {
         useOriginalImage = true;
@@ -318,7 +361,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     });
   }
 
-  void _continueWithoutSegmentation() {
+  Future<void> _continueWithoutSegmentation() async {
+    await _loadMetadataDropdownOptions();
+    if (!mounted) return;
     setState(() {
       useOriginalImage = true;
       currentStep = UploadStep.editing;
@@ -338,7 +383,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
 
   Future<void> _saveClothing() async {
     final useSegmentation = !useOriginalImage && segmentedUrl != null;
-    final sourceUrl = useSegmentation ? segmentedUrl : (originalImageUrl ?? segmentedUrl);
+    final sourceUrl = useSegmentation
+        ? segmentedUrl
+        : (originalImageUrl ?? segmentedUrl);
     if (sourceUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No processed image available to save')),
@@ -356,12 +403,21 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     detectedTemp = detectedTempController.text.trim();
     detectedWeather = detectedWeatherController.text.trim();
     attributes = _normalizeTags(_splitAttributes(attributesController.text));
+    if (widget.isShoe) {
+      category = _shoeCategory;
+      categoryController.text = category;
+      if (occasion.isEmpty) {
+        occasion = _defaultShoeOccasion;
+        occasionController.text = occasion;
+      }
+    }
 
     final payload = {
       "storage_unit": widget.storageId,
       "segmented_image": sourceUrl,
       "original_image": originalImageUrl,
       "use_segmentation": useSegmentation,
+      "is_shoe": widget.isShoe,
       "category": category,
       "subcategory": subcategory,
       "dominant_color": dominantColor,
@@ -391,9 +447,12 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
 
       Navigator.pop(context, true); // IMPORTANT
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Failed to save clothing")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Failed to save clothing"),
+          backgroundColor: UploadTokens.dangerStrong,
+        ),
+      );
     }
   }
 
@@ -425,7 +484,7 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       segmentationFailed = false;
       segmentationNotice = null;
 
-      category = '';
+      category = widget.isShoe ? _shoeCategory : '';
       subcategory = '';
       dominantColor = '';
       secondaryColor = '';
@@ -433,6 +492,11 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       detectedTemp = '';
       detectedWeather = '';
       attributes = [];
+      _categoryOptions = widget.isShoe ? [_shoeCategory] : [];
+      _occasionOptions = [];
+      _temperatureOptions = [];
+      _weatherOptions = [];
+      _metadataOptionsLoaded = false;
 
       categoryController.clear();
       subcategoryController.clear();
@@ -442,6 +506,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       detectedTempController.clear();
       detectedWeatherController.clear();
       attributesController.clear();
+      if (widget.isShoe) {
+        categoryController.text = _shoeCategory;
+      }
 
       currentStep = UploadStep.selectImage;
     });
@@ -766,7 +833,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                       color: UploadTokens.dangerStrong.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: UploadTokens.dangerStrong.withValues(alpha: 0.35),
+                        color: UploadTokens.dangerStrong.withValues(
+                          alpha: 0.35,
+                        ),
                       ),
                     ),
                     child: Row(
@@ -954,11 +1023,23 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                 SizedBox(height: 24),
                 _buildMetadataSummary(),
                 SizedBox(height: 16),
-                _buildTextField(
-                  'Category',
-                  categoryController,
-                  (val) => category = val,
-                ),
+                widget.isShoe
+                    ? _buildReadOnlyField(
+                        label: 'Category',
+                        value: _shoeCategory,
+                        helperText: 'Shoes category is locked for shoe uploads.',
+                      )
+                    : _buildDropdownField(
+                        label: 'Category',
+                        value: categoryController.text,
+                        options: _categoryOptions,
+                        onChanged: (val) {
+                          setState(() {
+                            category = val;
+                            categoryController.text = val;
+                          });
+                        },
+                      ),
                 SizedBox(height: 16),
                 _buildTextField(
                   'Subcategory',
@@ -978,22 +1059,40 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                   (val) => secondaryColor = val,
                 ),
                 SizedBox(height: 16),
-                _buildTextField(
-                  'Occasion',
-                  occasionController,
-                  (val) => occasion = val,
+                _buildDropdownField(
+                  label: 'Occasion',
+                  value: occasionController.text,
+                  options: _occasionOptions,
+                  onChanged: (val) {
+                    setState(() {
+                      occasion = val;
+                      occasionController.text = val;
+                    });
+                  },
                 ),
                 SizedBox(height: 16),
-                _buildTextField(
-                  'Temperature',
-                  detectedTempController,
-                  (val) => detectedTemp = val.trim(),
+                _buildDropdownField(
+                  label: 'Temperature',
+                  value: detectedTempController.text,
+                  options: _temperatureOptions,
+                  onChanged: (val) {
+                    setState(() {
+                      detectedTemp = val.trim();
+                      detectedTempController.text = detectedTemp;
+                    });
+                  },
                 ),
                 SizedBox(height: 16),
-                _buildTextField(
-                  'Weather',
-                  detectedWeatherController,
-                  (val) => detectedWeather = val.trim(),
+                _buildDropdownField(
+                  label: 'Weather',
+                  value: detectedWeatherController.text,
+                  options: _weatherOptions,
+                  onChanged: (val) {
+                    setState(() {
+                      detectedWeather = val.trim();
+                      detectedWeatherController.text = detectedWeather;
+                    });
+                  },
                 ),
                 SizedBox(height: 16),
                 _buildTextField(
@@ -1140,6 +1239,121 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
             ),
             contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReadOnlyField({
+    required String label,
+    required String value,
+    String helperText = '',
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: UploadTokens.ink,
+          ),
+        ),
+        SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: UploadTokens.surfaceSoft,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: UploadTokens.line),
+          ),
+          child: Text(
+            _humanize(value),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: UploadTokens.ink,
+            ),
+          ),
+        ),
+        if (helperText.trim().isNotEmpty) ...[
+          SizedBox(height: 6),
+          Text(
+            helperText,
+            style: TextStyle(fontSize: 12, color: UploadTokens.muted),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDropdownField({
+    required String label,
+    required String value,
+    required List<String> options,
+    required ValueChanged<String> onChanged,
+  }) {
+    final normalizedValue = value.trim();
+    final merged = _mergeDropdownOptions(
+      options,
+      currentValue: normalizedValue,
+    );
+
+    final selected = merged.contains(normalizedValue)
+        ? normalizedValue
+        : (merged.isNotEmpty ? merged.first : null);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: UploadTokens.ink,
+          ),
+        ),
+        SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          key: ValueKey<String>('${label}_$selected'),
+          initialValue: selected,
+          isExpanded: true,
+          style: TextStyle(fontSize: 15, color: UploadTokens.ink),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: UploadTokens.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: UploadTokens.line),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: UploadTokens.line),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: UploadTokens.ink, width: 2),
+            ),
+            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          items: merged
+              .map(
+                (option) => DropdownMenuItem<String>(
+                  value: option,
+                  child: Text(
+                    _humanize(option),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (next) {
+            if (next == null) return;
+            onChanged(next);
+          },
         ),
       ],
     );
@@ -1294,6 +1508,150 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     return (value ?? '').toString().trim();
   }
 
+  bool _looksLikeShoeMetadata({
+    required String category,
+    required String subcategory,
+  }) {
+    final blob = '$category $subcategory'.toLowerCase();
+    const keys = [
+      'shoe',
+      'shoes',
+      'sneaker',
+      'boot',
+      'heel',
+      'footwear',
+      'slipper',
+      'sandal',
+      'loafer',
+      'flip flop',
+    ];
+    return keys.any(blob.contains);
+  }
+
+  List<String> _mergeDropdownOptions(
+    List<String> values, {
+    String currentValue = '',
+  }) {
+    final set = <String>{};
+    for (final value in values) {
+      final normalized = _safeText(value);
+      if (normalized.isEmpty) continue;
+      set.add(normalized);
+    }
+    final current = _safeText(currentValue);
+    if (current.isNotEmpty) {
+      set.add(current);
+    }
+    final options = set.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return options;
+  }
+
+  List<String> _collectOptions(
+    List<Map<String, dynamic>> items,
+    String field, {
+    List<String> extras = const [],
+  }) {
+    final values = <String>[
+      ...extras,
+      ...items.map((entry) => _safeText(entry[field])),
+    ];
+    return _mergeDropdownOptions(values);
+  }
+
+  Future<void> _loadMetadataDropdownOptions({bool force = false}) async {
+    if (_metadataOptionsLoaded && !force) return;
+    try {
+      final items = await clothingService.getAllClothes();
+      if (!mounted) return;
+      setState(() {
+        if (widget.isShoe) {
+          final shoeOccasions = items
+              .where(
+                (entry) => _looksLikeShoeMetadata(
+                  category: _safeText(entry['category']),
+                  subcategory: _safeText(entry['subcategory']),
+                ),
+              )
+              .map((entry) => _safeText(entry['occasion']))
+              .where((entry) => entry.isNotEmpty)
+              .toList();
+          category = _shoeCategory;
+          categoryController.text = _shoeCategory;
+          if (occasionController.text.trim().isEmpty) {
+            occasion = _defaultShoeOccasion;
+            occasionController.text = occasion;
+          }
+          _categoryOptions = const [_shoeCategory];
+          _occasionOptions = _mergeDropdownOptions(
+            [
+              ..._shoeOccasionValues,
+              ...shoeOccasions,
+            ],
+            currentValue: occasionController.text,
+          );
+        } else {
+          _categoryOptions = _collectOptions(
+            items,
+            'category',
+            extras: [categoryController.text],
+          );
+          _occasionOptions = _collectOptions(
+            items,
+            'occasion',
+            extras: [occasionController.text],
+          );
+        }
+        _temperatureOptions = _collectOptions(
+          items,
+          'detected_temp',
+          extras: [
+            detectedTempController.text,
+            ..._defaultTemperatureValues,
+          ],
+        );
+        _weatherOptions = _collectOptions(
+          items,
+          'detected_weather',
+          extras: [
+            detectedWeatherController.text,
+            ..._defaultWeatherValues,
+          ],
+        );
+        _metadataOptionsLoaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (widget.isShoe) {
+          category = _shoeCategory;
+          categoryController.text = _shoeCategory;
+          if (occasionController.text.trim().isEmpty) {
+            occasion = _defaultShoeOccasion;
+            occasionController.text = occasion;
+          }
+          _categoryOptions = const [_shoeCategory];
+          _occasionOptions = _mergeDropdownOptions([
+            ..._shoeOccasionValues,
+            occasionController.text,
+          ]);
+        } else {
+          _categoryOptions = _mergeDropdownOptions([categoryController.text]);
+          _occasionOptions = _mergeDropdownOptions([occasionController.text]);
+        }
+        _temperatureOptions = _mergeDropdownOptions([
+          detectedTempController.text,
+          ..._defaultTemperatureValues,
+        ]);
+        _weatherOptions = _mergeDropdownOptions([
+          detectedWeatherController.text,
+          ..._defaultWeatherValues,
+        ]);
+        _metadataOptionsLoaded = true;
+      });
+    }
+  }
+
   List<String> _extractTags(Map<String, dynamic> result) {
     final raw = result['attributes'] ?? result['tags'];
     if (raw is List) {
@@ -1344,4 +1702,3 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         .toList();
   }
 }
-

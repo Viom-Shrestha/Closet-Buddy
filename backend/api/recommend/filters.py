@@ -5,7 +5,6 @@ from ..metadata_normalization import (
     coerce_temperature_label,
     coerce_weather_label,
     normalize_attributes,
-    normalize_occasion_label,
     normalize_token,
 )
 
@@ -229,7 +228,7 @@ def normalize_weather(weather: Dict) -> Dict[str, str]:
 
 
 def normalize_occasion(value: Optional[str]) -> str:
-    return normalize_occasion_label(value)
+    return normalize_token(value)
 
 
 def attr_set(item: ClothingItem) -> set:

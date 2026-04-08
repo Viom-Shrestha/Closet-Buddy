@@ -88,24 +88,34 @@ DRESS_LENGTH_PROMPTS = {
 # -------- SHOES --------
 
 SHOE_TYPE_PROMPTS = {
-    "sneakers": "sneakers shoes",
-    "formal shoes": "formal leather shoes",
-    "boots": "boots footwear",
-    "sandals": "sandals footwear",
-    "heels": "high heels footwear"
+    "sneakers": "sneakers athletic running shoes trainers",
+    "formal shoes": "formal leather dress shoes office shoes oxford derby",
+    "boots": "boots ankle boots leather boots winter boots",
+    "sandals": "sandals open toe footwear summer sandals",
+    "heels": "high heels pumps stilettos women's heels",
+    "loafers": "loafers slip on casual formal shoes",
+    "slippers": "slippers indoor home footwear",
+    "flip flops": "flip flops beach sandals casual",
+    "sports shoes": "sports running gym training shoes",
 }
 
 SHOE_MATERIAL_PROMPTS = {
-    "leather": "leather shoes",
-    "canvas": "canvas shoes",
-    "suede": "suede shoes",
-    "synthetic": "synthetic material shoes"
+    "leather": "leather shoes genuine leather formal footwear",
+    "canvas": "canvas shoes lightweight casual sneakers",
+    "suede": "suede leather shoes soft texture",
+    "synthetic": "synthetic material shoes artificial leather",
+    "mesh": "mesh breathable sports shoes running shoes",
+    "rubber": "rubber footwear waterproof shoes",
+    "knit": "knit fabric shoes flexible sneakers",
 }
 
 SHOE_USAGE_PROMPTS = {
-    "sports": "sports shoes",
-    "casual": "casual shoes",
-    "formal": "formal shoes"
+    "sports": "sports running gym training athletic shoes",
+    "casual": "casual everyday sneakers comfortable shoes",
+    "formal": "formal office business dress shoes",
+    "outdoor": "outdoor hiking trekking shoes durable",
+    "party": "party wear stylish fashionable shoes",
+    "home": "home indoor slippers comfortable",
 }
 
 
