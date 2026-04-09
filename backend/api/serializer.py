@@ -464,15 +464,18 @@ class OutfitWriteSerializer(serializers.ModelSerializer):
             incoming_ids = {acc.id for acc in accessories}
             accessories_changed = current_ids != incoming_ids
 
-        if (slot_changed or accessories_changed) and not had_fresh_ai_snapshot:
-            validated_data["ai_rating_score"] = None
-            validated_data["ai_rating_reasons"] = []
-            validated_data["ai_rating_breakdown"] = {}
-            validated_data["ai_rated_at"] = None
+        if slot_changed or accessories_changed:
+            if not had_fresh_ai_snapshot:
+                validated_data["ai_rating_score"] = None
+                validated_data["ai_rating_reasons"] = []
+                validated_data["ai_rating_breakdown"] = {}
+                validated_data["ai_rated_at"] = None
+            validated_data["wear_count"] = 0
+            validated_data["last_worn_at"] = None
 
         for key, value in validated_data.items():
             setattr(instance, key, value)
-        instance.save()
+        instance.save(update_fields=list(validated_data.keys()) if validated_data else None)
         if accessories is not None:
             instance.accessories.set(accessories)
         self._sync_clothing_items(instance)
