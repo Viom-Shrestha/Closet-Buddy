@@ -394,6 +394,7 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
   @override
   Widget build(BuildContext context) {
     if (loading) return _LoadingScreen();
+    if (item == null) return _MissingItemScreen(hasChanges: hasChanges);
 
     final isFav = item!['is_favourite'] == true;
     final attrs = _attrs();
@@ -954,6 +955,42 @@ class _LoadingScreen extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MissingItemScreen extends StatelessWidget {
+  final bool hasChanges;
+
+  const _MissingItemScreen({required this.hasChanges});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: ClothingDetailTokens.bg,
+      appBar: AppBar(
+        backgroundColor: ClothingDetailTokens.surface,
+        foregroundColor: ClothingDetailTokens.text,
+        title: const Text('Item unavailable'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => Navigator.pop(context, hasChanges),
+        ),
+      ),
+      body: const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'This clothing item could not be loaded. It may have been removed or is temporarily unavailable.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: ClothingDetailTokens.textMuted,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
         ),
       ),
     );

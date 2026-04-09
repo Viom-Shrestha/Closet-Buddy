@@ -5,7 +5,6 @@ import 'package:frontend/services/clothing_service.dart';
 import 'package:frontend/services/recommendation_service.dart';
 import 'package:frontend/services/outfit_service.dart';
 import 'package:frontend/theme/app_theme.dart';
-import 'package:frontend/features/wardrobe/screens/clothing_detail_screen.dart';
 import 'package:frontend/features/outfit/screens/outfit_screen.dart';
 import 'package:frontend/widgets/outfit_canvas.dart';
 import 'package:frontend/services/api_client.dart';
@@ -55,7 +54,9 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   final List<String> _occasionOptions = [''];
   final Set<String> _canonicalOccasions = {};
   final Set<String> _occasionAttributeSignals = {};
+  final List<String> _classifierOccasions = [];
   final List<String> _occasionOrder = [];
+  final Map<String, String> _occasionAliases = {};
 
   String _temperature = 'cool';
   String _weather = 'dry';
@@ -165,6 +166,18 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
           .toList();
     }
 
+    Map<String, String> toStringMap(dynamic raw) {
+      if (raw is! Map) return const {};
+      final mapped = <String, String>{};
+      raw.forEach((key, value) {
+        final k = key.toString().trim().toLowerCase();
+        if (k.isEmpty) return;
+        mapped[k] = value?.toString().trim().toLowerCase() ?? '';
+      });
+      return mapped;
+    }
+
+    final nextClassifier = toStringList(catalog['classifier_occasions']);
     final nextCanonical = toStringList(
       catalog['canonical_occasions'],
     ).toSet();
@@ -172,17 +185,27 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       catalog['attribute_signals'],
     ).toSet();
     final nextOrder = toStringList(catalog['sort_order']);
+    final nextAliases = toStringMap(catalog['aliases']);
+    final canonicalPool = nextCanonical.isNotEmpty
+        ? nextCanonical
+        : nextClassifier.toSet();
 
     setState(() {
+      _classifierOccasions
+        ..clear()
+        ..addAll(nextClassifier);
       _canonicalOccasions
         ..clear()
-        ..addAll(nextCanonical);
+        ..addAll(canonicalPool);
       _occasionAttributeSignals
         ..clear()
         ..addAll(nextAttributeSignals);
       _occasionOrder
         ..clear()
         ..addAll(nextOrder);
+      _occasionAliases
+        ..clear()
+        ..addAll(nextAliases);
       _rebuildOccasionOptions();
     });
   }
@@ -299,11 +322,12 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   String _canonicalOccasion(dynamic raw, {bool allowUnknown = false}) {
     final normalized = _normalizeToken(raw);
     if (normalized.isEmpty) return '';
+    final aliasMapped = _occasionAliases[normalized] ?? normalized;
     if (_canonicalOccasions.isEmpty) {
-      return allowUnknown ? normalized : '';
+      return allowUnknown ? aliasMapped : '';
     }
-    if (_canonicalOccasions.contains(normalized)) return normalized;
-    if (allowUnknown) return normalized;
+    if (_canonicalOccasions.contains(aliasMapped)) return aliasMapped;
+    if (allowUnknown) return aliasMapped;
     return '';
   }
 
@@ -379,20 +403,32 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       found.addAll(_occasionSignalsForItem(item));
     }
 
+    final orderedCanonical = (_classifierOccasions.isNotEmpty
+            ? _classifierOccasions
+            : _occasionOrder)
+        .where((value) => value.isNotEmpty)
+        .toList();
+
+    final canonicalBase = orderedCanonical
+        .where(_canonicalOccasions.contains)
+        .toList();
+
     final orderIndex = <String, int>{
-      for (var i = 0; i < _occasionOrder.length; i++) _occasionOrder[i]: i,
+      for (var i = 0; i < orderedCanonical.length; i++) orderedCanonical[i]: i,
     };
-    final sorted = found.toList()
+    final extras = found
+        .where((value) => !canonicalBase.contains(value))
+        .toList()
       ..sort((left, right) {
-        final leftOrder = orderIndex[left] ?? _occasionOrder.length;
-        final rightOrder = orderIndex[right] ?? _occasionOrder.length;
+        final leftOrder = orderIndex[left] ?? orderedCanonical.length;
+        final rightOrder = orderIndex[right] ?? orderedCanonical.length;
         if (leftOrder != rightOrder) {
           return leftOrder.compareTo(rightOrder);
         }
         return left.compareTo(right);
       });
 
-    final nextOptions = <String>['', ...sorted];
+    final nextOptions = <String>['', ...canonicalBase, ...extras];
     _occasionOptions
       ..clear()
       ..addAll(nextOptions);
@@ -510,14 +546,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     return payload;
   }
 
-  void _openItemDetail(int? id) {
-    if (id == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ClothingDetailScreen(clothingId: id)),
-    );
-  }
-
   void _showOutfitItems(int index, Map<String, dynamic> rec) {
     final items = _mapOutfitItems(index, rec);
     showModalBottomSheet(
@@ -543,10 +571,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                   title: entry['label'] as String,
                   subtitle: _itemTitle(entry['item'] as Map<String, dynamic>?),
                   item: entry['item'] as Map<String, dynamic>?,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _openItemDetail(_asInt(entry['item']?['id']));
-                  },
                 ),
             ],
           ),
@@ -723,34 +747,38 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Why this outfit works',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
-              for (final reason in reasons)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.check_circle_outline,
-                        size: 18,
-                        color: RecommendationTokens.success,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(reason)),
-                    ],
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Why this outfit works',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
-                ),
-            ],
+                  const SizedBox(height: 12),
+                  for (final reason in reasons)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.check_circle_outline,
+                            size: 18,
+                            color: RecommendationTokens.success,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(reason)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -759,34 +787,79 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
 
   List<String> _whyDetails(int index, Map<String, dynamic> rec) {
     final reasons = <String>[];
+    final top = _resolvedItem(index, rec, 'topwear');
+    final bottom = _resolvedItem(index, rec, 'bottomwear');
+    final shoes = _resolvedItem(index, rec, 'shoes');
     final outer = _resolvedItem(index, rec, 'outerwear');
+    final displayTemp = _processedTemperature ?? _temperature;
+    final displayWeather = _processedWeather ?? _weather;
+    final items = <Map<String, dynamic>>[
+      if (top != null) top,
+      if (bottom != null) bottom,
+      if (shoes != null) shoes,
+      if (outer != null) outer,
+    ];
 
-    if (_temperature == 'freezing' || _temperature == 'cold') {
+    if (displayTemp == 'freezing' || displayTemp == 'cold') {
       reasons.add(
         outer != null
             ? 'Layered with outerwear for colder conditions.'
             : 'Lightweight layers keep it flexible if temps rise.',
       );
-    }
-    if (_temperature == 'hot' || _temperature == 'warm') {
+    } else if (displayTemp == 'hot' || displayTemp == 'warm') {
       reasons.add(
         outer == null
             ? 'No outerwear keeps the look breathable in warm weather.'
             : 'Outerwear adds structure while staying lightweight.',
       );
+    } else {
+      reasons.add('Balanced layers suit moderate temperatures.');
     }
-    if (_weather == 'rainy') {
+
+    if (displayWeather == 'rainy') {
       reasons.add(
         outer != null
             ? 'Outer layer adds protection for rainy conditions.'
             : 'Lightweight pieces keep you comfortable if rain passes quickly.',
       );
-    }
-    if (_weather == 'snowy') {
+    } else if (displayWeather == 'snowy') {
       reasons.add(
         outer != null
             ? 'Winter-ready with an outer layer for snowy weather.'
             : 'Add outerwear if the temperature drops further.',
+      );
+    } else if (displayWeather == 'windy') {
+      reasons.add(
+        outer != null
+            ? 'Layering helps block wind while keeping the outfit cohesive.'
+            : 'Clean silhouette stays comfortable for breezy conditions.',
+      );
+    } else if (displayWeather == 'humid') {
+      reasons.add(
+        'Breathable styling choices help in humid weather.',
+      );
+    } else {
+      reasons.add('Versatile combination works well for dry conditions.');
+    }
+
+    final palette = _paletteTone(items);
+    if (palette == 'neutral') {
+      reasons.add('Neutral tones make this outfit easy to style and repeat.');
+    } else if (palette == 'bold') {
+      reasons.add('Bold color mix creates visual energy without losing balance.');
+    } else {
+      reasons.add('Color balance keeps the look polished and wearable.');
+    }
+
+    final selectedOccasion = _canonicalOccasion(_occasionCtrl.text.trim());
+    if (selectedOccasion.isNotEmpty && items.isNotEmpty) {
+      final matched = items.any(
+        (item) => _occasionSignalsForItem(item).contains(selectedOccasion),
+      );
+      reasons.add(
+        matched
+            ? 'Pieces align with your selected ${_occasionDisplayLabel(selectedOccasion)} occasion.'
+            : 'Styling still works even when strict occasion matches are limited.',
       );
     }
 
@@ -795,7 +868,19 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       reasons.add('Style tags: ${tags.join(', ')}.');
     }
 
-    return reasons;
+    final unique = <String>[];
+    for (final reason in reasons) {
+      if (!unique.contains(reason)) {
+        unique.add(reason);
+      }
+    }
+    if (unique.length < 3) {
+      unique.addAll([
+        'Top, bottom, and footwear create a complete silhouette.',
+        'The outfit balances practicality with style for day-to-day wear.',
+      ]);
+    }
+    return unique.take(5).toList();
   }
 
   void _openSwapSheet(int index, String slot) {
@@ -1003,7 +1088,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   }
 
   String _itemTitle(Map<String, dynamic>? item) {
-    if (item == null) return 'Unknown';
+    if (item == null) return 'Unknown item';
     final sub = item['subcategory']?.toString() ?? '';
     final cat = item['category']?.toString() ?? '';
     return sub.isNotEmpty ? sub : cat;
@@ -1014,11 +1099,23 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     Map<String, dynamic> rec,
   ) {
     return [
-      {'label': 'Topwear', 'item': _resolvedItem(index, rec, 'topwear')},
-      {'label': 'Bottomwear', 'item': _resolvedItem(index, rec, 'bottomwear')},
-      {'label': 'Footwear', 'item': _resolvedItem(index, rec, 'shoes')},
+      {
+        'label': 'Topwear',
+        'item': _resolvedItem(index, rec, 'topwear'),
+      },
+      {
+        'label': 'Bottomwear',
+        'item': _resolvedItem(index, rec, 'bottomwear'),
+      },
+      {
+        'label': 'Footwear',
+        'item': _resolvedItem(index, rec, 'shoes'),
+      },
       if (_resolvedSlotId(index, rec, 'outerwear') != null)
-        {'label': 'Outerwear', 'item': _resolvedItem(index, rec, 'outerwear')},
+        {
+          'label': 'Outerwear',
+          'item': _resolvedItem(index, rec, 'outerwear'),
+        },
     ];
   }
 
@@ -1320,17 +1417,51 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         InputDecorator(
           decoration: InputDecoration(
             labelText: 'Occasion',
-            labelStyle: const TextStyle(color: RecommendationTokens.muted),
+            labelStyle: const TextStyle(
+              color: RecommendationTokens.muted,
+              fontWeight: FontWeight.w600,
+            ),
+            floatingLabelStyle: const TextStyle(
+              color: RecommendationTokens.slateSoft,
+              fontWeight: FontWeight.w700,
+            ),
+            prefixIcon: const Icon(
+              Icons.theater_comedy_outlined,
+              color: RecommendationTokens.slateSoft,
+              size: 18,
+            ),
+            filled: true,
+            fillColor: RecommendationTokens.surfaceSoft.withValues(alpha: 0.65),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 4,
             ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: RecommendationTokens.line),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: RecommendationTokens.slateSoft,
+                width: 1.4,
+              ),
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _occasionValue,
               isExpanded: true,
+              style: const TextStyle(
+                color: RecommendationTokens.inkStrong,
+                fontWeight: FontWeight.w600,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: RecommendationTokens.muted,
+              ),
               items: _occasionOptions
                   .map(
                     (option) => DropdownMenuItem<String>(
@@ -1349,16 +1480,16 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          _occasionOptions.length <= 1
-              ? 'No occasion-tagged clothing detected yet. Add or edit clothing metadata to unlock filters.'
-              : 'Occasion choices are limited to what your wardrobe currently supports.',
-          style: const TextStyle(
-            fontSize: 11,
-            color: RecommendationTokens.muted,
+        if (_occasionOptions.length <= 1) ...[
+          const SizedBox(height: 6),
+          const Text(
+            'No occasion classes are available right now.',
+            style: TextStyle(
+              fontSize: 11,
+              color: RecommendationTokens.muted,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -1369,17 +1500,58 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     required List<String> options,
     required ValueChanged<String> onChanged,
   }) {
+    IconData icon = Icons.tune_rounded;
+    if (label.toLowerCase() == 'temperature') {
+      icon = Icons.thermostat_rounded;
+    } else if (label.toLowerCase() == 'weather') {
+      icon = Icons.wb_cloudy_rounded;
+    }
+
     return InputDecorator(
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: RecommendationTokens.muted),
+        labelStyle: const TextStyle(
+          color: RecommendationTokens.muted,
+          fontWeight: FontWeight.w600,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: RecommendationTokens.slateSoft,
+          fontWeight: FontWeight.w700,
+        ),
+        prefixIcon: Icon(
+          icon,
+          color: RecommendationTokens.slateSoft,
+          size: 18,
+        ),
+        filled: true,
+        fillColor: RecommendationTokens.surfaceSoft.withValues(alpha: 0.65),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: RecommendationTokens.line),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: RecommendationTokens.slateSoft,
+            width: 1.4,
+          ),
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
+          style: const TextStyle(
+            color: RecommendationTokens.inkStrong,
+            fontWeight: FontWeight.w600,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: RecommendationTokens.muted,
+          ),
           items: options
               .map(
                 (option) => DropdownMenuItem<String>(

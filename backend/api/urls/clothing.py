@@ -8,7 +8,7 @@ clothing_recent = ClothingViewSet.as_view({"get": "recent"})
 clothing_all = ClothingViewSet.as_view({"get": "all"})
 clothing_delete_segmented = ClothingViewSet.as_view({"post": "delete_segmented"})
 clothing_toggle_favourite = ClothingViewSet.as_view({"post": "toggle_favourite"})
-clothing_detail = ClothingViewSet.as_view({"get": "detail"})
+clothing_detail = ClothingViewSet.as_view({"get": "retrieve"})
 clothing_delete = ClothingViewSet.as_view({"delete": "delete_item"})
 clothing_update = ClothingViewSet.as_view({"put": "update_item"})
 

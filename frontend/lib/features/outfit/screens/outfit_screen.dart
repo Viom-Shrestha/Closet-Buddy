@@ -2964,6 +2964,7 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
             : const <String, dynamic>{};
     final aiRatedAtText = _formatDate(outfit?['ai_rated_at']?.toString());
     final wearCount = _asInt(outfit?['wear_count']) ?? 0;
+    final lastWornAt = _formatDate(outfit?['last_worn_at']?.toString());
     final alreadyWornToday = _isWornToday(outfit);
     final isFav = outfit?['is_favourite'] == true;
     final createdAt = _formatDate(outfit?['created_at']?.toString());
@@ -3151,6 +3152,10 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
                       _InfoRow(
                         'Worn',
                         wearCount == 0 ? 'Not yet' : '$wearCount times',
+                      ),
+                      _InfoRow(
+                        'Last worn',
+                        lastWornAt == '-' ? 'Not yet' : lastWornAt,
                       ),
                       _InfoRow('Created', createdAt),
                       if (storageRows.isNotEmpty) ...[
