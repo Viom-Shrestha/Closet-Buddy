@@ -92,6 +92,8 @@ def recommend_outfits(
             "fallback_used": fallback_used,
             "occasion_fallback_used": occasion_fallback_used,
             "occasion_applied": "",
+            "insufficient_wardrobe": True,
+            "missing_slots": ["topwear", "bottomwear", "footwear"],
         }
 
     # If user asks for an occasion, try to constrain to wardrobe items that signal it.
@@ -132,11 +134,20 @@ def recommend_outfits(
         topwear, bottomwear, footwear, outerwear = filters.split_by_category(items)
 
     if not topwear or not bottomwear or not footwear:
+        missing = []
+        if not topwear:
+            missing.append("topwear")
+        if not bottomwear:
+            missing.append("bottomwear")
+        if not footwear:
+            missing.append("footwear")
         return {
             "results": [],
             "fallback_used": fallback_used,
             "occasion_fallback_used": occasion_fallback_used,
             "occasion_applied": scoring_occasion,
+            "insufficient_wardrobe": True,
+            "missing_slots": missing,
         }
 
     # Phase 1: rank each slot pool by weather+occasion context and keep top-N only.
