@@ -50,7 +50,7 @@ HUMID_SIGNALS = {
     "lightweight", "loose", "chambray",
 }
 
-CANONICAL_OCCASIONS = {
+OCCASION_CLASSIFIER_ORDER = [
     "casual",
     "formal",
     "office",
@@ -62,8 +62,26 @@ CANONICAL_OCCASIONS = {
     "travel",
     "beach",
     "street",
+]
+
+CANONICAL_OCCASIONS = {
+    *OCCASION_CLASSIFIER_ORDER,
     "outdoor",
     "workout",
+}
+
+OCCASION_ALIASES = {
+    "date night": "date",
+    "night out": "party",
+    "streetwear": "street",
+    "sporty": "sport",
+    "active": "sport",
+    "athletic": "sport",
+    "gym": "sport",
+    "fitness": "sport",
+    "any": "",
+    "any occasion": "",
+    "none": "",
 }
 
 OCCASION_ATTRIBUTE_SIGNALS = {
@@ -90,18 +108,8 @@ OCCASION_ATTRIBUTE_SIGNALS = {
 }
 
 OCCASION_SORT_ORDER = [
-    "casual",
-    "formal",
-    "office",
-    "party",
-    "date",
-    "sport",
-    "travel",
-    "street",
-    "beach",
-    "home",
+    *OCCASION_CLASSIFIER_ORDER,
     "outdoor",
-    "traditional",
     "workout",
 ]
 
@@ -237,8 +245,11 @@ def attr_set(item: ClothingItem) -> set:
 
 def canonical_occasion(value: Optional[str]) -> str:
     normalized = normalize_occasion(value)
-    if normalized in CANONICAL_OCCASIONS:
-        return normalized
+    if not normalized:
+        return ""
+    alias_mapped = OCCASION_ALIASES.get(normalized, normalized)
+    if alias_mapped in CANONICAL_OCCASIONS:
+        return alias_mapped
     return ""
 
 

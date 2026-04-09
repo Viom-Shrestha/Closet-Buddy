@@ -22,18 +22,22 @@ class RecommendationService {
     final res = await _client.get('/occasions/');
     if (res.statusCode != 200) {
       return _occasionCatalogCache ?? const {
+        'classifier_occasions': <String>[],
         'canonical_occasions': <String>[],
         'attribute_signals': <String>[],
         'sort_order': <String>[],
+        'aliases': <String, String>{},
       };
     }
 
     final decoded = jsonDecode(res.body);
     if (decoded is! Map) {
       return _occasionCatalogCache ?? const {
+        'classifier_occasions': <String>[],
         'canonical_occasions': <String>[],
         'attribute_signals': <String>[],
         'sort_order': <String>[],
+        'aliases': <String, String>{},
       };
     }
 
@@ -45,10 +49,23 @@ class RecommendationService {
           .toList();
     }
 
+    Map<String, String> stringMap(dynamic raw) {
+      if (raw is! Map) return const {};
+      final mapped = <String, String>{};
+      raw.forEach((key, value) {
+        final k = key.toString().trim().toLowerCase();
+        if (k.isEmpty) return;
+        mapped[k] = value?.toString().trim().toLowerCase() ?? '';
+      });
+      return mapped;
+    }
+
     final catalog = <String, dynamic>{
+      'classifier_occasions': stringList(decoded['classifier_occasions']),
       'canonical_occasions': stringList(decoded['canonical_occasions']),
       'attribute_signals': stringList(decoded['attribute_signals']),
       'sort_order': stringList(decoded['sort_order']),
+      'aliases': stringMap(decoded['aliases']),
     };
 
     _occasionCatalogCache = catalog;

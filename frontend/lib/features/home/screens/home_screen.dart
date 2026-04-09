@@ -246,6 +246,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _openOutfitDetail(Map<String, dynamic> outfit) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OutfitDetailPage(initialOutfit: outfit),
+      ),
+    );
+    if (!mounted) return;
+    fetchHomeData();
+  }
+
   void _refreshTodayOutfit({bool force = false, int? excludeId}) {
     if (!mounted) return;
     if (outfits.isEmpty) {
@@ -1068,19 +1079,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
 
               // ── Outfit canvas ──────────────────────────────────────────
-              Container(
-                height: 380,
-                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                decoration: BoxDecoration(
-                  color: HomeTokens.parchment,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: HomeTokens.rule),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: todayOutfit == null
-                      ? _buildOutfitEmptyPreview()
-                      : _buildTodayOutfitPreview(todayOutfit),
+              HoverClickable(
+                onTap: todayOutfit == null
+                    ? null
+                    : () => _openOutfitDetail(todayOutfit),
+                child: Container(
+                  height: 380,
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  decoration: BoxDecoration(
+                    color: HomeTokens.parchment,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: HomeTokens.rule),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: todayOutfit == null
+                        ? _buildOutfitEmptyPreview()
+                        : _buildTodayOutfitPreview(todayOutfit),
+                  ),
                 ),
               ),
 
@@ -1125,16 +1141,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   }
                                 }
                                 if (!mounted) return;
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => OutfitDetailPage(
-                                      initialOutfit: todayOutfit,
-                                    ),
-                                  ),
-                                );
-                                if (!mounted) return;
-                                fetchHomeData();
+                                await _openOutfitDetail(todayOutfit);
                               },
                       ),
                     ),
@@ -1457,13 +1464,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return HoverClickable(
       onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => OutfitDetailPage(initialOutfit: outfit),
-          ),
-        );
-        fetchHomeData();
+        await _openOutfitDetail(outfit);
       },
       child: Container(
         width: width,
