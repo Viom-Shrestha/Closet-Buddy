@@ -59,13 +59,24 @@ class RecommendationService {
       throw 'Unexpected recommendation response shape.';
     }
 
-    String message = 'Failed to generate recommendations';
     try {
       final decoded = jsonDecode(res.body);
-      if (decoded is Map && decoded['error'] != null) {
-        message = decoded['error'].toString();
+      if (decoded is Map) {
+        if (res.statusCode == 422) {
+          final missing = decoded['missing_slots'];
+          final slots = missing is List && missing.isNotEmpty
+              ? missing.join(', ')
+              : null;
+          throw slots != null
+              ? 'Your wardrobe is missing required items: $slots. Add at least one of each to generate an outfit.'
+              : (decoded['error']?.toString() ??
+                  'Your wardrobe does not have enough items to generate an outfit.');
+        }
+        if (decoded['error'] != null) throw decoded['error'].toString();
       }
-    } catch (_) {}
-    throw message;
+    } catch (e) {
+      rethrow;
+    }
+    throw 'Failed to generate recommendations (status ${res.statusCode}).';
   }
 }

@@ -1,4 +1,5 @@
 import logging
+import random
 from typing import Dict, List, Optional
 
 from ..models import ClothingItem
@@ -826,37 +827,112 @@ def _composite_ai_cohesion_score(outfit: Dict, text_prompt: str) -> Dict[str, fl
     }
 
 
+_STRENGTH_COHESION_HIGH = [
+    "The pieces match each other well and feel like one complete outfit.",
+    "There's a clear through-line here — every item feels like it belongs.",
+    "Strong cohesion: the garments read as a single, intentional look.",
+    "This combination has a distinct personality and commits to it fully.",
+    "Each piece reinforces the others — nothing feels out of place.",
+    "The styling direction is consistent from top to bottom.",
+    "A well-assembled outfit — the overall vibe is tight and deliberate.",
+    "Great cohesion. The look hangs together naturally without any forced elements.",
+]
+
+_STRENGTH_COHESION_MID = [
+    "The overall style mostly works together, with room to make it feel tighter.",
+    "Solid foundation — a small tweak could push the cohesion from good to great.",
+    "The pieces share enough DNA to feel coordinated, even if not perfectly unified.",
+    "There's a workable look here, though one item is doing its own thing slightly.",
+    "Generally cohesive — the direction is clear even if the execution isn't seamless.",
+    "Most pieces are on the same page; one swap could lock the whole thing in.",
+]
+
+_STRENGTH_COLOR_HIGH = [
+    "The {palette} palette feels balanced and easy on the eyes.",
+    "Color-wise, this is confident — the {palette} tones complement each other well.",
+    "The {palette} combination is polished and intentional.",
+    "Strong color story: the {palette} palette is harmonious without feeling predictable.",
+    "The {palette} tones are well-chosen and give the outfit a clean, finished look.",
+    "Excellent color harmony — the {palette} palette flows naturally across the pieces.",
+    "The {palette} choices feel deliberate and sophisticated.",
+]
+
+_STRENGTH_COLOR_MID = [
+    "The {palette} palette works fairly well overall.",
+    "The {palette} tones are generally compatible — nothing clashes.",
+    "Color balance is decent; the {palette} palette holds together with minor tension.",
+    "The {palette} combination is reasonable and avoids any obvious missteps.",
+    "Not a perfect palette, but the {palette} tones are close enough to feel considered.",
+    "The {palette} hues coexist fine — a bolder or cleaner anchor could sharpen it.",
+]
+
+_STRENGTH_DRESS_HIGH = [
+    "Everything stays at a similar dress level, so the look feels intentional.",
+    "The formality is consistent across all pieces — no awkward mismatches.",
+    "Dress-level cohesion is spot on; the outfit reads as a unified style tier.",
+    "All items sit in the same register, which gives the look authority.",
+    "The styling energy is consistent — nothing pulls the look up or down unexpectedly.",
+    "Great balance of formality — every piece belongs in the same context.",
+    "The pieces share the same occasion language, which makes the outfit feel considered.",
+]
+
+_STRENGTH_DRESS_MID = [
+    "Most pieces are close in dress level, but one item feels slightly off.",
+    "The formality is mostly consistent — one piece edges in a different direction.",
+    "Generally well-matched in register; a small adjustment would tighten it up.",
+    "The dress level is coherent enough, though one item introduces a small tension.",
+    "Almost there on formality — the majority of pieces agree, with one outlier.",
+    "The vibe is mostly unified; one swap could make the occasion alignment cleaner.",
+]
+
+_IMPROVE_COHESION = [
+    "Main improvement: make the overall look feel more connected. Try swapping one piece so the style direction is more consistent.",
+    "To lift this further: focus on cohesion. One piece is pulling the look in a different direction — replacing it could unify everything.",
+    "Consider swapping the weakest-fitting piece to sharpen the styling story.",
+    "The biggest gain here would come from tightening cohesion — one item feels like it belongs to a different outfit.",
+    "Try replacing the odd-one-out piece with something that shares more DNA with the rest of the look.",
+    "Cohesion is the area to work on. A single well-chosen swap could elevate this from good to great.",
+    "One piece is slightly misaligned with the overall vibe. Swapping it out would make the look feel complete.",
+]
+
+_IMPROVE_COLOR = [
+    "Main improvement: color clarity in the {palette} palette. Use one dominant accent and let neutrals support it.",
+    "To sharpen this look, simplify the color story — pick one accent to lead and let the {palette} tones support it.",
+    "The {palette} palette could be cleaner. Reducing the number of competing tones would add polish.",
+    "Refining the color balance would help most here. Try anchoring with a neutral and letting one hue stand out.",
+    "The {palette} tones are close, but the palette feels slightly crowded. Paring it back would add clarity.",
+    "Color is where the most improvement lies — a cleaner {palette} combination would make the outfit feel more intentional.",
+    "Streamlining the {palette} palette (fewer competing tones, one clear accent) would significantly improve the overall look.",
+]
+
+_IMPROVE_DRESS = [
+    "Main improvement: keep the dress level consistent. Try to keep all pieces in a similar vibe — either all casual or all dressy.",
+    "The biggest upgrade here would be evening out the formality. One piece reads as a different occasion than the rest.",
+    "Align the dress levels: one item is dressed up (or down) relative to the others, which creates a subtle friction.",
+    "Consider replacing the piece that breaks the formality chain — the rest of the outfit has a clear register.",
+    "Dress-level consistency is the key improvement. One swap for something in the same occasion tier would sharpen the look.",
+    "The outfit would benefit from a more unified formality. One piece feels out of place occasion-wise.",
+    "Try matching the energy of all pieces more closely — mixing dress levels here creates a slight disconnect.",
+]
+
+
 def _strength_reason(dimension: str, value: float, palette: str) -> str:
     if dimension == "cohesion":
-        if value >= 0.80:
-            return "The pieces match each other well and feel like one complete outfit."
-        return "The overall style mostly works together, with room to make it feel tighter."
-
+        pool = _STRENGTH_COHESION_HIGH if value >= 0.80 else _STRENGTH_COHESION_MID
+        return random.choice(pool)
     if dimension == "color":
-        if value >= 0.80:
-            return f"The {palette} palette feels balanced and easy on the eyes."
-        return f"The {palette} palette works fairly well overall."
-
-    if value >= 0.80:
-        return "Everything stays at a similar dress level, so the look feels intentional."
-    return "Most pieces are close in dress level, but one item feels slightly off."
+        pool = _STRENGTH_COLOR_HIGH if value >= 0.80 else _STRENGTH_COLOR_MID
+        return random.choice(pool).format(palette=palette)
+    pool = _STRENGTH_DRESS_HIGH if value >= 0.80 else _STRENGTH_DRESS_MID
+    return random.choice(pool)
 
 
-def _improvement_reason(dimension: str, value: float, palette: str) -> str:
+def _improvement_reason(dimension: str, palette: str) -> str:
     if dimension == "cohesion":
-        return (
-            "Main improvement: make the overall look feel more connected. "
-            "Try swapping one piece so the style direction is more consistent."
-        )
+        return random.choice(_IMPROVE_COHESION)
     if dimension == "color":
-        return (
-            f"Main improvement: color clarity in the {palette} palette. "
-            "Use one dominant accent and let neutrals support it."
-        )
-    return (
-        "Main improvement: keep the dress level consistent. "
-        "Try to keep all pieces in a similar vibe (for example all casual or all dressy)."
-    )
+        return random.choice(_IMPROVE_COLOR).format(palette=palette)
+    return random.choice(_IMPROVE_DRESS)
 
 
 def ai_rating_snapshot(outfit: Dict) -> Dict:
@@ -887,7 +963,7 @@ def ai_rating_snapshot(outfit: Dict) -> Dict:
     reasons = [
         _strength_reason(strongest[0], strongest[1], palette),
         _strength_reason(second[0], second[1], palette),
-        _improvement_reason(weakest[0], weakest[1], palette),
+        _improvement_reason(weakest[0], palette),
     ]
 
     return {
