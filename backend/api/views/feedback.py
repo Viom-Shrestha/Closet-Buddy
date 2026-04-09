@@ -7,7 +7,8 @@ from ..models import BetaFeedback
 
 
 class FeedbackSchemaSerializer(serializers.Serializer):
-    """Schema placeholder for feedback create endpoint."""
+    message = serializers.CharField()
+    rating = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=5)
 
 
 def submit_feedback(request):
@@ -42,8 +43,19 @@ def submit_feedback(request):
     )
 
 
+class FeedbackResponseSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    message = serializers.CharField()
+    rating = serializers.IntegerField(allow_null=True)
+    created_at = serializers.DateTimeField()
+
+
 @extend_schema_view(
-    create=extend_schema(summary="Submit beta feedback"),
+    create=extend_schema(
+        summary="Submit beta feedback",
+        request=FeedbackSchemaSerializer,
+        responses={201: FeedbackResponseSerializer},
+    ),
 )
 class FeedbackViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]

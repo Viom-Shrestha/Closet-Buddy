@@ -2714,6 +2714,12 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
       _outfit = latest ?? widget.initialOutfit;
       _aiRatingDelta = null;
       _loading = false;
+      // If the backend cleared the AI score (e.g. items changed), clear
+      // the outdated flag so the UI shows "No AI rating yet" instead of
+      // a stale "Rating outdated" banner with nothing beneath it.
+      if (_asDouble(_outfit?['ai_rating_score']) == null) {
+        _ratingOutdated = false;
+      }
     });
   }
 
@@ -3572,36 +3578,37 @@ class _AiRatingCard extends StatelessWidget {
           breakdown['neutral_weather_fit'],
     );
 
+    // Thresholds match the backend _strength_reason / _improvement_reason logic.
     final cohesionLine = clip == null
         ? 'Style cohesion is moderate with room to refine.'
-        : clip >= 0.78
-            ? 'Strong style cohesion across the selected pieces.'
-            : clip >= 0.62
-                ? 'Style cohesion is decent but could be tighter.'
-                : 'Style cohesion is weak; align silhouettes more closely.';
+        : clip >= 0.80
+            ? 'Strong style cohesion — the pieces read as one intentional look.'
+            : clip >= 0.65
+                ? 'Style cohesion is decent; one swap could tighten it further.'
+                : 'Style cohesion is weak — align silhouettes and vibe more closely.';
 
     final colorLine = color == null
         ? 'Color balance is fairly consistent.'
-        : color >= 0.8
-            ? 'Color harmony is a clear strength.'
-            : color >= 0.64
-                ? 'Color balance works, with room to simplify.'
-                : 'Color pairing feels busy; simplify the palette.';
+        : color >= 0.80
+            ? 'Color harmony is a clear strength of this outfit.'
+            : color >= 0.65
+                ? 'Color balance works, though the palette could be simplified.'
+                : 'Color pairing feels crowded — simplify to one accent tone.';
 
     String improvementLine;
     if (clip != null && color != null && dressLevel != null) {
       if (clip <= color && clip <= dressLevel) {
         improvementLine =
-            'Improve cohesion by swapping one piece to match the outfit direction.';
+            'Biggest gain: tighten cohesion by swapping one piece to match the styling direction.';
       } else if (color <= clip && color <= dressLevel) {
         improvementLine =
-            'Improve color clarity by limiting to one main accent with neutrals.';
+            'Biggest gain: simplify the palette — one dominant accent with neutrals supporting it.';
       } else {
         improvementLine =
-            'Improve dress-level balance by aligning each piece to the same vibe.';
+            'Biggest gain: align the dress level — keep all pieces in the same occasion register.';
       }
     } else {
-      improvementLine = 'Try one focused swap to improve overall balance.';
+      improvementLine = 'Try one focused swap to improve the overall balance.';
     }
 
     return [cohesionLine, colorLine, improvementLine];
