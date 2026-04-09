@@ -624,8 +624,13 @@ class ClothingViewSet(viewsets.ViewSet):
         return toggle_favourite(request, pk)
 
     @extend_schema(summary="Get clothing detail")
-    def detail(self, request, pk=None):
+    def retrieve(self, request, pk=None):
         return clothing_detail(request, pk)
+
+    # Backward-compatible alias for older action mappings.
+    @extend_schema(exclude=True)
+    def retrieve_item(self, request, pk=None):
+        return self.retrieve(request, pk)
 
     @extend_schema(summary="Delete clothing")
     def delete_item(self, request, pk=None):

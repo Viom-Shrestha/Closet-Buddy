@@ -220,14 +220,54 @@ class RecommendationApiTests(APITestCase):
         self.assertIn("warning", res.data)
         self.assertIn("Not enough items match that occasion", res.data["warning"])
 
+    def test_recommendations_rejects_invalid_payload_shape(self):
+        res = self.client.post("/api/recommendations/", [], format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.data.get("error"), "Invalid payload. Expected a JSON object.")
+
+    def test_recommendations_rejects_non_object_weather(self):
+        payload = {"weather": "dry"}
+        res = self.client.post("/api/recommendations/", payload, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(
+            res.data.get("error"),
+            "weather must be an object with temperature and weather.",
+        )
+
+    def test_recommendations_rejects_non_string_occasion(self):
+        payload = {
+            "weather": {"temperature": "cool", "weather": "dry"},
+            "occasion": {"value": "casual"},
+        }
+        res = self.client.post("/api/recommendations/", payload, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.data.get("error"), "occasion must be a string.")
+
     def test_occasions_catalog_endpoint(self):
         res = self.client.get("/api/occasions/")
 
         self.assertEqual(res.status_code, 200)
+        self.assertIn("classifier_occasions", res.data)
         self.assertIn("aliases", res.data)
         self.assertIn("canonical_occasions", res.data)
         self.assertIn("attribute_signals", res.data)
         self.assertIn("sort_order", res.data)
+        self.assertEqual(
+            res.data["classifier_occasions"],
+            [
+                "casual",
+                "formal",
+                "office",
+                "party",
+                "date",
+                "traditional",
+                "sport",
+                "home",
+                "travel",
+                "beach",
+                "street",
+            ],
+        )
         self.assertEqual(res.data["aliases"].get("date night"), "date")
         self.assertEqual(res.data["aliases"].get("any"), "")
 
