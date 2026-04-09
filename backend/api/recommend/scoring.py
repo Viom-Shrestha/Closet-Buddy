@@ -17,6 +17,7 @@ from .filters import (
     WARM_SIGNALS,
     attr_set,
     canonical_occasion,
+    has_precipitation_profile,
     is_outerwear,
     item_occasion_signals,
 )
@@ -588,6 +589,9 @@ def _item_weather_score(item: ClothingItem, temperature: str, condition: str) ->
 
     # Secondary: condition suitability, preferring classifier weather labels.
     detected_weather = coerce_weather_label(item.detected_weather, allow_unknown=True) or ""
+    if detected_weather in {"rainy", "snowy"} and not has_precipitation_profile(item):
+        # Legacy noisy labels on generic garments should not over-steer recommendations.
+        detected_weather = ""
     if detected_weather:
         if condition == detected_weather:
             score = min(score + 0.1, 1.0)

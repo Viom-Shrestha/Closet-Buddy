@@ -21,7 +21,7 @@ from ai_models.classification.clothing_classification import (
     classify_subcategory,
     map_category_from_subcategory,
 )
-from ai_models.classification.occasion import predict_occasion
+from ai_models.classification.occasion import predict_occasion_details
 from ai_models.classification.shoe_metadata import classify_shoe_metadata
 from ai_models.classification.weather import classify_clothing_weather
 
@@ -40,6 +40,12 @@ from ai_models.utils.color_extraction_util import extract_colors_with_names
 UNKNOWN_COLORS = {"dominant_color": "Unknown", "secondary_color": "Unknown"}
 DEFAULT_OCCASION = "Casual"
 DEFAULT_OCCASION_CONFIDENCE = 0.0
+MIN_TEMPERATURE_CONFIDENCE = 0.31
+MIN_TEMPERATURE_MARGIN = 0.004
+MIN_WEATHER_CONFIDENCE = 0.30
+MIN_WEATHER_MARGIN = 0.005
+MIN_PRECIPITATION_CONFIDENCE = 0.50
+MIN_PRECIPITATION_MARGIN = 0.030
 SHOE_LOCKED_CATEGORY = "Shoes"
 SHOE_SLOT_KEYS = [
     "shoe",
@@ -218,11 +224,14 @@ def _extract_colors_safe(image_path: Path) -> Dict[str, str]:
         return UNKNOWN_COLORS.copy()
 
 
-def _predict_occasion_safe(image_path: Path) -> Tuple[str, float]:
+def _predict_occasion_safe(image_path: Path) -> Tuple[Optional[str], float]:
     try:
-        return predict_occasion(image_path)
+        details = predict_occasion_details(image_path)
+        occasion = _coerce_optional_label(details.get("occasion"))
+        confidence = float(details.get("confidence") or 0.0)
+        return occasion, confidence
     except Exception:
-        return DEFAULT_OCCASION, DEFAULT_OCCASION_CONFIDENCE
+        return None, DEFAULT_OCCASION_CONFIDENCE
 
 
 def _classify_clothing_safe(image_path: Path) -> Tuple[str, str, List[str]]:
@@ -279,7 +288,35 @@ def _classify_weather_safe(
             category=category,
             subcategory=subcategory,
         )
-        return result.get("temperature"), result.get("weather")
+        detected_temp = _coerce_optional_label(result.get("temperature"))
+        detected_weather = _coerce_optional_label(result.get("weather"))
+
+        temp_conf = float(result.get("temperature_confidence") or 0.0)
+        temp_margin = float(result.get("temperature_margin") or 0.0)
+        weather_conf = float(result.get("weather_confidence") or 0.0)
+        weather_margin = float(result.get("weather_margin") or 0.0)
+        is_precipitation_specific = bool(result.get("is_precipitation_specific"))
+
+        if detected_temp and (
+            temp_conf < MIN_TEMPERATURE_CONFIDENCE
+            or temp_margin < MIN_TEMPERATURE_MARGIN
+        ):
+            detected_temp = None
+
+        if detected_weather:
+            if detected_weather in {"rainy", "snowy"} and not is_precipitation_specific:
+                if (
+                    weather_conf < MIN_PRECIPITATION_CONFIDENCE
+                    or weather_margin < MIN_PRECIPITATION_MARGIN
+                ):
+                    detected_weather = None
+            elif (
+                weather_conf < MIN_WEATHER_CONFIDENCE
+                or weather_margin < MIN_WEATHER_MARGIN
+            ):
+                detected_weather = None
+
+        return detected_temp, detected_weather
     except Exception:
         return None, None
 
@@ -338,7 +375,7 @@ def clothing_process(request):
     colors = _extract_colors_safe(image_path)
     
     # -------- CLASSIFICATION + ATTRIBUTES --------
-    occasion = DEFAULT_OCCASION
+    occasion = None
     occasion_conf = DEFAULT_OCCASION_CONFIDENCE
     if is_shoe:
         category, subcategory, occasion, attributes = classify_shoe_metadata(image_path)
@@ -354,7 +391,9 @@ def clothing_process(request):
         subcategory=subcategory,
     )
     attributes = normalize_attributes(attributes)
-    occasion = _coerce_optional_label(occasion) or DEFAULT_OCCASION
+    occasion = _coerce_optional_label(occasion)
+    if is_shoe:
+        occasion = occasion or DEFAULT_OCCASION
     detected_temp = _coerce_optional_label(detected_temp)
     detected_weather = _coerce_optional_label(detected_weather)
 
@@ -448,7 +487,7 @@ def clothing_save(request):
         detected_temp=detected_temp,
         detected_weather=detected_weather,
     )
-    if not detected_temp or not detected_weather:
+    if not detected_temp and not detected_weather:
         detected_temp, detected_weather = _classify_weather_safe(
             Path(clothing.image.path),
             category=clothing.category,

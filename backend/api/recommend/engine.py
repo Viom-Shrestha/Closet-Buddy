@@ -1,5 +1,5 @@
 import random
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Tuple
 
 from ..models import ClothingItem
 from . import filters, generator, scoring
@@ -21,6 +21,56 @@ def _rank_items_for_context(
     return [item for _, item in scored[:max_items]]
 
 
+def _outfit_item_ids(outfit: Dict) -> Set[int]:
+    ids: Set[int] = {
+        outfit["topwear"].id,
+        outfit["bottomwear"].id,
+        outfit["shoes"].id,
+    }
+    outer = outfit.get("outerwear")
+    if outer:
+        ids.add(outer.id)
+    return ids
+
+
+def _diversity_rerank(scored: List[Tuple[float, Dict]], limit: int) -> List[Dict]:
+    if limit <= 0 or not scored:
+        return []
+
+    remaining = list(scored)
+    remaining.sort(key=lambda pair: pair[0], reverse=True)
+
+    selected: List[Tuple[float, Dict, Set[int]]] = []
+
+    while remaining and len(selected) < limit:
+        if not selected:
+            score, outfit = remaining.pop(0)
+            selected.append((score, outfit, _outfit_item_ids(outfit)))
+            continue
+
+        best_index = 0
+        best_adjusted = float("-inf")
+        for index, (score, outfit) in enumerate(remaining):
+            candidate_ids = _outfit_item_ids(outfit)
+            max_overlap = 0.0
+            for _, _, chosen_ids in selected:
+                union = candidate_ids | chosen_ids
+                overlap = (len(candidate_ids & chosen_ids) / len(union)) if union else 0.0
+                if overlap > max_overlap:
+                    max_overlap = overlap
+
+            # Encourage variation without sacrificing quality.
+            adjusted = score - (0.18 * max_overlap)
+            if adjusted > best_adjusted:
+                best_adjusted = adjusted
+                best_index = index
+
+        score, outfit = remaining.pop(best_index)
+        selected.append((score, outfit, _outfit_item_ids(outfit)))
+
+    return [outfit for _, outfit, _ in selected]
+
+
 def recommend_outfits(
     user,
     weather: Dict,
@@ -35,7 +85,6 @@ def recommend_outfits(
     requested_occasion = (occasion or "").strip()
     normalized_occasion = filters.canonical_occasion(occasion)
     scoring_occasion = normalized_occasion
-    available = filters.available_occasions(items)
 
     if not items:
         return {
@@ -43,7 +92,6 @@ def recommend_outfits(
             "fallback_used": fallback_used,
             "occasion_fallback_used": occasion_fallback_used,
             "occasion_applied": "",
-            "available_occasions": [],
         }
 
     # If user asks for an occasion, try to constrain to wardrobe items that signal it.
@@ -89,14 +137,13 @@ def recommend_outfits(
             "fallback_used": fallback_used,
             "occasion_fallback_used": occasion_fallback_used,
             "occasion_applied": scoring_occasion,
-            "available_occasions": available,
         }
 
     # Phase 1: rank each slot pool by weather+occasion context and keep top-N only.
-    topwear = _rank_items_for_context(topwear, normalized_weather, scoring_occasion, 5)
-    bottomwear = _rank_items_for_context(bottomwear, normalized_weather, scoring_occasion, 5)
-    footwear = _rank_items_for_context(footwear, normalized_weather, scoring_occasion, 5)
-    outerwear = _rank_items_for_context(outerwear, normalized_weather, scoring_occasion, 3)
+    topwear = _rank_items_for_context(topwear, normalized_weather, scoring_occasion, 8)
+    bottomwear = _rank_items_for_context(bottomwear, normalized_weather, scoring_occasion, 8)
+    footwear = _rank_items_for_context(footwear, normalized_weather, scoring_occasion, 8)
+    outerwear = _rank_items_for_context(outerwear, normalized_weather, scoring_occasion, 4)
 
     outfits = generator.generate_outfits(
         topwear,
@@ -125,7 +172,6 @@ def recommend_outfits(
             "fallback_used": fallback_used,
             "occasion_fallback_used": occasion_fallback_used,
             "occasion_applied": scoring_occasion,
-            "available_occasions": available,
         }
 
     # Phase 2: score full combinations from the pre-vetted pool.
@@ -138,8 +184,10 @@ def recommend_outfits(
 
     scored.sort(key=lambda pair: pair[0], reverse=True)
 
+    selected_outfits = _diversity_rerank(scored, limit)
+
     results: List[Dict] = []
-    for _, outfit in scored[:limit]:
+    for outfit in selected_outfits:
         results.append(
             {
                 "topwear_id": outfit["topwear"].id,
@@ -154,5 +202,4 @@ def recommend_outfits(
         "fallback_used": fallback_used,
         "occasion_fallback_used": occasion_fallback_used,
         "occasion_applied": scoring_occasion,
-        "available_occasions": available,
     }

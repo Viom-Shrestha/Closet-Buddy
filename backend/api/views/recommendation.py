@@ -9,7 +9,6 @@ from ..metadata_normalization import (
     coerce_temperature_label,
     coerce_weather_label,
 )
-from ..recommend import filters
 from ..recommend.engine import recommend_outfits
 
 
@@ -17,8 +16,14 @@ RECOMMENDATION_LIMIT = 3
 
 
 class RecommendationWeatherSerializer(serializers.Serializer):
-    temperature = serializers.ChoiceField(choices=sorted(ALLOWED_TEMPERATURES))
-    weather = serializers.ChoiceField(choices=sorted(ALLOWED_WEATHER))
+    temperature = serializers.ChoiceField(
+        choices=["any", *sorted(ALLOWED_TEMPERATURES)],
+        required=False,
+    )
+    weather = serializers.ChoiceField(
+        choices=["any", *sorted(ALLOWED_WEATHER)],
+        required=False,
+    )
 
 
 class RecommendationRequestSerializer(serializers.Serializer):
@@ -35,9 +40,8 @@ class RecommendationOutfitSerializer(serializers.Serializer):
 
 
 class RecommendationMetadataSerializer(serializers.Serializer):
-    temperature = serializers.ChoiceField(choices=sorted(ALLOWED_TEMPERATURES))
-    weather = serializers.ChoiceField(choices=sorted(ALLOWED_WEATHER))
-    available_occasions = serializers.ListField(child=serializers.CharField(), required=False)
+    temperature = serializers.ChoiceField(choices=["any", *sorted(ALLOWED_TEMPERATURES)])
+    weather = serializers.ChoiceField(choices=["any", *sorted(ALLOWED_WEATHER)])
     occasion_applied = serializers.CharField(allow_blank=True)
 
 
@@ -51,14 +55,6 @@ class RecommendationResponseSerializer(serializers.Serializer):
 
 class RecommendationErrorSerializer(serializers.Serializer):
     error = serializers.CharField()
-
-
-class OccasionCatalogResponseSerializer(serializers.Serializer):
-    classifier_occasions = serializers.ListField(child=serializers.CharField())
-    canonical_occasions = serializers.ListField(child=serializers.CharField())
-    attribute_signals = serializers.ListField(child=serializers.CharField())
-    sort_order = serializers.ListField(child=serializers.CharField())
-    aliases = serializers.DictField(child=serializers.CharField(allow_blank=True))
 
 
 def _coerce_optional_text(value, field_name: str):
@@ -89,8 +85,6 @@ def recommend_outfits_view(request):
         return Response({"error": "Invalid temperature label."}, status=400)
     if condition and condition not in ALLOWED_WEATHER:
         return Response({"error": "Invalid weather label."}, status=400)
-    if not temperature or not condition:
-        return Response({"error": "weather.temperature and weather.weather are required."}, status=400)
 
     occasion = _coerce_optional_text(payload.get("occasion"), "occasion")
     if isinstance(occasion, Response):
@@ -106,16 +100,14 @@ def recommend_outfits_view(request):
         prompt=prompt,
         limit=RECOMMENDATION_LIMIT,
     )
-    available_occasions = data.get("available_occasions") or []
 
     response_body = {
         "outfits": data["results"],
         "fallback_used": data["fallback_used"],
         "occasion_fallback_used": data.get("occasion_fallback_used", False),
         "metadata": {
-            "temperature": temperature,
-            "weather": condition,
-            "available_occasions": available_occasions,
+            "temperature": temperature or "any",
+            "weather": condition or "any",
             "occasion_applied": data.get("occasion_applied") or "",
         },
     }
@@ -133,27 +125,6 @@ def recommend_outfits_view(request):
 
     return Response(response_body, status=200)
 
-
-def occasion_catalog_view(request):
-    canonical_order = [
-        name for name in filters.OCCASION_SORT_ORDER if name in filters.CANONICAL_OCCASIONS
-    ]
-    extras = sorted(filters.CANONICAL_OCCASIONS.difference(canonical_order))
-    alias_map = dict(filters.OCCASION_ALIASES)
-    if "any" not in alias_map:
-        alias_map["any"] = ""
-    return Response(
-        {
-            "classifier_occasions": list(filters.OCCASION_CLASSIFIER_ORDER),
-            "canonical_occasions": [*canonical_order, *extras],
-            "attribute_signals": sorted(filters.OCCASION_ATTRIBUTE_SIGNALS),
-            "sort_order": list(filters.OCCASION_SORT_ORDER),
-            "aliases": alias_map,
-        },
-        status=200,
-    )
-
-
 class RecommendationViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = RecommendationRequestSerializer
@@ -168,10 +139,3 @@ class RecommendationViewSet(viewsets.ViewSet):
     )
     def recommend(self, request):
         return recommend_outfits_view(request)
-
-    @extend_schema(
-        summary="Get occasion catalog",
-        responses={200: OccasionCatalogResponseSerializer},
-    )
-    def occasions(self, request):
-        return occasion_catalog_view(request)
