@@ -55,6 +55,9 @@ class RecommendationResponseSerializer(serializers.Serializer):
 
 class RecommendationErrorSerializer(serializers.Serializer):
     error = serializers.CharField()
+    missing_slots = serializers.ListField(
+        child=serializers.CharField(), required=False
+    )
 
 
 def _coerce_optional_text(value, field_name: str):
@@ -101,6 +104,16 @@ def recommend_outfits_view(request):
         limit=RECOMMENDATION_LIMIT,
     )
 
+    if data.get("insufficient_wardrobe"):
+        missing = data.get("missing_slots", [])
+        return Response(
+            {
+                "error": "Your wardrobe doesn't have enough items to generate an outfit.",
+                "missing_slots": missing,
+            },
+            status=422,
+        )
+
     response_body = {
         "outfits": data["results"],
         "fallback_used": data["fallback_used"],
@@ -135,6 +148,7 @@ class RecommendationViewSet(viewsets.ViewSet):
         responses={
             200: RecommendationResponseSerializer,
             400: RecommendationErrorSerializer,
+            422: RecommendationErrorSerializer,
         },
     )
     def recommend(self, request):

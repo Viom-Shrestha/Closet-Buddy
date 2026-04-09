@@ -414,25 +414,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     );
   }
 
-  void _openEditOutfit(int index, Map<String, dynamic> rec) {
-    final topId = _resolvedSlotId(index, rec, 'topwear');
-    final bottomId = _resolvedSlotId(index, rec, 'bottomwear');
-    final shoesId = _resolvedSlotId(index, rec, 'shoes');
-    final outerwearId = _resolvedSlotId(index, rec, 'outerwear');
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => OutfitBuilderPage(
-          initialTopId: topId,
-          initialBottomId: bottomId,
-          initialShoesId: shoesId,
-          initialOuterwearId: outerwearId,
-        ),
-      ),
-    );
-  }
-
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
@@ -1095,6 +1076,37 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                   ),
                 ),
               ),
+            if (_showResults && _compare.length != 2)
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: SafeArea(
+                  minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).popUntil(
+                        (route) => route.isFirst,
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: RecommendationTokens.inkStrong,
+                        foregroundColor: RecommendationTokens.surface,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 4,
+                      ),
+                      child: const Text(
+                        'Okay',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -1506,7 +1518,62 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     );
   }
 
+  String _formatList(List<String> items) {
+    if (items.length == 1) return items.first;
+    return '${items.sublist(0, items.length - 1).join(', ')} and ${items.last}';
+  }
+
+  List<String> _missingRequiredSlots() {
+    final items = _clothingById.values.toList();
+    final missing = <String>[];
+    if (!items.any((i) => OutfitSlotRules.slotFor(i) == 'topwear')) {
+      missing.add('topwear');
+    }
+    if (!items.any((i) => OutfitSlotRules.slotFor(i) == 'bottomwear')) {
+      missing.add('bottomwear');
+    }
+    if (!items.any((i) => OutfitSlotRules.slotFor(i) == 'shoes')) {
+      missing.add('footwear');
+    }
+    return missing;
+  }
+
   Widget _buildEmptyState() {
+    final missing = _missingRequiredSlots();
+    final hasEnough = missing.isEmpty;
+
+    if (!hasEnough) {
+      return Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: RecommendationTokens.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: RecommendationTokens.line),
+        ),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.checkroom_outlined,
+              size: 36,
+              color: RecommendationTokens.mutedSoft,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'No clothes to generate an outfit',
+              style: TextStyle(fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Add at least one ${_formatList(missing)} to your wardrobe to get started.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: RecommendationTokens.muted),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
@@ -1586,7 +1653,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
           isSaving: isSaving,
           isSaved: isSaved,
           isComparing: comparing,
-          onEdit: () => _openEditOutfit(index, rec),
           onSave: isSaving ? null : () => _saveOutfit(index, rec),
           onViewItems: () => _showOutfitItems(index, rec),
           onMenuSelected: (action) {
@@ -1932,7 +1998,6 @@ class _OutfitCard extends StatelessWidget {
   final bool isSaving;
   final bool isSaved;
   final bool isComparing;
-  final VoidCallback onEdit;
   final VoidCallback? onSave;
   final VoidCallback onViewItems;
   final ValueChanged<_CardMenuAction> onMenuSelected;
@@ -1945,7 +2010,6 @@ class _OutfitCard extends StatelessWidget {
     required this.isSaving,
     required this.isSaved,
     required this.isComparing,
-    required this.onEdit,
     required this.onSave,
     required this.onViewItems,
     required this.onMenuSelected,
@@ -2031,15 +2095,6 @@ class _OutfitCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                child: _ActionButton(
-                  label: 'Edit',
-                  icon: Icons.edit_outlined,
-                  onTap: onEdit,
-                  filled: false,
-                ),
-              ),
-              const SizedBox(width: 10),
               Expanded(
                 child: _ActionButton(
                   label: isSaved ? 'Saved' : 'Save outfit',
