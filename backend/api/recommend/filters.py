@@ -9,6 +9,41 @@ from ..metadata_normalization import (
 )
 
 
+SHOE_SLOT_KEYS = (
+    "shoe",
+    "sneaker",
+    "boot",
+    "heel",
+    "footwear",
+    "slipper",
+    "sandal",
+    "loafer",
+)
+
+BOTTOM_SLOT_KEYS = (
+    "pant",
+    "trouser",
+    "jean",
+    "short",
+    "skirt",
+    "bottom",
+    "jogger",
+    "legging",
+    "cargo",
+)
+
+OUTERWEAR_SLOT_KEYS = (
+    "jacket",
+    "coat",
+    "blazer",
+    "cardigan",
+    "hoodie",
+    "outerwear",
+    "parka",
+    "trench",
+)
+
+
 COLD_SIGNALS = {
     "wool", "knit", "hooded", "long sleeve", "boots", "leather",
     "full length", "fleece", "thermal", "padded", "quilted",
@@ -50,7 +85,33 @@ HUMID_SIGNALS = {
     "lightweight", "loose", "chambray",
 }
 
-OCCASION_CLASSIFIER_ORDER = [
+PRECIP_PROFILE_ATTR_SIGNALS = {
+    "waterproof",
+    "water resistant",
+    "raincoat",
+    "rain jacket",
+    "shell",
+    "snow",
+    "snow boot",
+    "winterized",
+    "galoshes",
+    "wellington",
+}
+
+PRECIP_PROFILE_TEXT_KEYS = {
+    "rain",
+    "snow",
+    "waterproof",
+    "water resistant",
+    "raincoat",
+    "shell",
+    "parka",
+    "windbreaker",
+    "trench",
+    "boot",
+}
+
+CANONICAL_OCCASIONS = {
     "casual",
     "formal",
     "office",
@@ -62,10 +123,6 @@ OCCASION_CLASSIFIER_ORDER = [
     "travel",
     "beach",
     "street",
-]
-
-CANONICAL_OCCASIONS = {
-    *OCCASION_CLASSIFIER_ORDER,
     "outdoor",
     "workout",
 }
@@ -84,64 +141,28 @@ OCCASION_ALIASES = {
     "none": "",
 }
 
-OCCASION_ATTRIBUTE_SIGNALS = {
-    "casual",
-    "formal",
-    "sport",
-    "sporty",
-    "street",
-    "streetwear",
-    "vintage",
-    "office",
-    "party",
-    "date",
-    "traditional",
-    "outdoor",
-    "home",
-    "travel",
-    "beach",
-    "workout",
-    "active",
-    "athletic",
-    "gym",
-    "fitness",
-}
-
-OCCASION_SORT_ORDER = [
-    *OCCASION_CLASSIFIER_ORDER,
-    "outdoor",
-    "workout",
-]
-
-
-def _normalize_text(value: Optional[str]) -> str:
-    return normalize_token(value)
-
-
-def _attr_set(item: ClothingItem) -> set:
+def attr_set(item: ClothingItem) -> set:
     return set(normalize_attributes(item.attributes or []))
 
 
 def _slot_text(item: ClothingItem) -> str:
-    return f"{item.category or ''} {item.subcategory or ''}".lower()
+    return normalize_token(f"{item.category or ''} {item.subcategory or ''}")
+
+
+def _has_any_key(text: str, keys: Iterable[str]) -> bool:
+    return any(key in text for key in keys)
 
 
 def is_shoe(item: ClothingItem) -> bool:
-    text = _slot_text(item)
-    keys = ["shoe", "sneaker", "boot", "heel", "footwear", "slipper", "sandal", "loafer"]
-    return any(key in text for key in keys)
+    return _has_any_key(_slot_text(item), SHOE_SLOT_KEYS)
 
 
 def is_bottom(item: ClothingItem) -> bool:
-    text = _slot_text(item)
-    keys = ["pant", "trouser", "jean", "short", "skirt", "bottom", "jogger", "legging", "cargo"]
-    return any(key in text for key in keys)
+    return _has_any_key(_slot_text(item), BOTTOM_SLOT_KEYS)
 
 
 def is_outerwear(item: ClothingItem) -> bool:
-    text = _slot_text(item)
-    keys = ["jacket", "coat", "blazer", "cardigan", "hoodie", "outerwear", "parka", "trench"]
-    return any(key in text for key in keys)
+    return _has_any_key(_slot_text(item), OUTERWEAR_SLOT_KEYS)
 
 
 def split_by_category(items: Iterable[ClothingItem]) -> Tuple[List[ClothingItem], List[ClothingItem], List[ClothingItem], List[ClothingItem]]:
@@ -174,9 +195,9 @@ def _conflicts_with_temperature(item: ClothingItem, temperature: str) -> bool:
         }
         return detected in hard_conflicts.get(temperature, set())
 
-    attrs = _attr_set(item)
+    attrs = attr_set(item)
     if not attrs:
-        return False  # Unlabelled — let it through, scored down later.
+        return False  # Unlabelled; let it through and down-score later.
 
     warm_count = len(attrs & WARM_SIGNALS)
     cold_count = len(attrs & COLD_SIGNALS)
@@ -198,12 +219,21 @@ def _fails_snow_requirement(attr_set: set) -> bool:
     return not bool(attr_set & SNOW_REQUIRED)
 
 
+def has_precipitation_profile(item: ClothingItem) -> bool:
+    attrs = attr_set(item)
+    if attrs & PRECIP_PROFILE_ATTR_SIGNALS:
+        return True
+
+    text = _slot_text(item)
+    return any(key in text for key in PRECIP_PROFILE_TEXT_KEYS)
+
+
 def filter_items(
     items: Iterable[ClothingItem],
     weather: Dict,
 ) -> List[ClothingItem]:
-    temperature = _normalize_text(weather.get("temperature"))
-    condition = _normalize_text(weather.get("weather"))
+    temperature = normalize_token(weather.get("temperature"))
+    condition = normalize_token(weather.get("weather"))
 
     filtered: List[ClothingItem] = []
     for item in items:
@@ -211,12 +241,14 @@ def filter_items(
             continue
 
         if condition == "snowy":
-            detected_weather = _normalize_text(item.detected_weather)
+            detected_weather = normalize_token(item.detected_weather)
+            if detected_weather in {"rainy", "snowy"} and not has_precipitation_profile(item):
+                detected_weather = ""
             if detected_weather:
                 if detected_weather not in {"snowy", "cold", "dry"}:
                     continue
             else:
-                attrs = _attr_set(item)
+                attrs = attr_set(item)
                 if _fails_snow_requirement(attrs):
                     continue
 
@@ -235,16 +267,8 @@ def normalize_weather(weather: Dict) -> Dict[str, str]:
     }
 
 
-def normalize_occasion(value: Optional[str]) -> str:
-    return normalize_token(value)
-
-
-def attr_set(item: ClothingItem) -> set:
-    return _attr_set(item)
-
-
 def canonical_occasion(value: Optional[str]) -> str:
-    normalized = normalize_occasion(value)
+    normalized = normalize_token(value)
     if not normalized:
         return ""
     alias_mapped = OCCASION_ALIASES.get(normalized, normalized)
@@ -260,21 +284,9 @@ def item_occasion_signals(item: ClothingItem) -> set:
     if direct:
         signals.add(direct)
 
-    for attr in normalize_attributes(item.attributes or []):
-        attr_token = normalize_token(attr)
-        if attr_token not in OCCASION_ATTRIBUTE_SIGNALS:
-            continue
-        mapped = canonical_occasion(attr_token)
+    for attr in attr_set(item):
+        mapped = canonical_occasion(attr)
         if mapped:
             signals.add(mapped)
 
     return signals
-
-
-def available_occasions(items: Iterable[ClothingItem]) -> List[str]:
-    found = set()
-    for item in items:
-        found.update(item_occasion_signals(item))
-
-    order_index = {name: idx for idx, name in enumerate(OCCASION_SORT_ORDER)}
-    return sorted(found, key=lambda name: order_index.get(name, len(OCCASION_SORT_ORDER)))

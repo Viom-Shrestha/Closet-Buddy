@@ -8,6 +8,9 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from api.recommend import scoring
+from api.views import clothing as clothing_view
+
 from .models import AccessoryItem, BetaFeedback, ClothingItem, NonClothingItem, Outfit, StorageUnit
 
 
@@ -220,6 +223,17 @@ class RecommendationApiTests(APITestCase):
         self.assertIn("warning", res.data)
         self.assertIn("Not enough items match that occasion", res.data["warning"])
 
+    @patch("api.recommend.scoring.clip_score", return_value=0.78)
+    def test_recommendations_accept_any_weather_and_temperature(self, _mock_clip):
+        payload = {"weather": {"temperature": "any", "weather": "any"}}
+        res = self.client.post("/api/recommendations/", payload, format="json")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("outfits", res.data)
+        self.assertEqual(len(res.data["outfits"]), 3)
+        self.assertEqual(res.data["metadata"]["temperature"], "any")
+        self.assertEqual(res.data["metadata"]["weather"], "any")
+
     def test_recommendations_rejects_invalid_payload_shape(self):
         res = self.client.post("/api/recommendations/", [], format="json")
         self.assertEqual(res.status_code, 400)
@@ -243,33 +257,83 @@ class RecommendationApiTests(APITestCase):
         self.assertEqual(res.status_code, 400)
         self.assertEqual(res.data.get("error"), "occasion must be a string.")
 
-    def test_occasions_catalog_endpoint(self):
-        res = self.client.get("/api/occasions/")
+    def test_item_context_score_ignores_rainy_label_for_generic_tshirt(self):
+        top = self._create_clothing("topwear", "t-shirt", "white")
+        top.detected_temp = "warm"
+        top.detected_weather = "rainy"
+        top.attributes = []
+        top.save(update_fields=["detected_temp", "detected_weather", "attributes"])
 
-        self.assertEqual(res.status_code, 200)
-        self.assertIn("classifier_occasions", res.data)
-        self.assertIn("aliases", res.data)
-        self.assertIn("canonical_occasions", res.data)
-        self.assertIn("attribute_signals", res.data)
-        self.assertIn("sort_order", res.data)
-        self.assertEqual(
-            res.data["classifier_occasions"],
-            [
-                "casual",
-                "formal",
-                "office",
-                "party",
-                "date",
-                "traditional",
-                "sport",
-                "home",
-                "travel",
-                "beach",
-                "street",
-            ],
+        dry_score = scoring.item_context_score(
+            top,
+            {"temperature": "warm", "weather": "dry"},
+            None,
         )
-        self.assertEqual(res.data["aliases"].get("date night"), "date")
-        self.assertEqual(res.data["aliases"].get("any"), "")
+        rainy_score = scoring.item_context_score(
+            top,
+            {"temperature": "warm", "weather": "rainy"},
+            None,
+        )
+
+        self.assertAlmostEqual(dry_score, rainy_score, places=4)
+
+
+class ClothingMetadataExtractionTests(APITestCase):
+    @patch("api.views.clothing.classify_clothing_weather")
+    def test_weather_safe_drops_low_confidence_precipitation_label(self, classify_mock):
+        classify_mock.return_value = {
+            "temperature": "warm",
+            "weather": "rainy",
+            "temperature_confidence": 0.82,
+            "temperature_margin": 0.12,
+            "weather_confidence": 0.33,
+            "weather_margin": 0.01,
+            "is_precipitation_specific": False,
+        }
+
+        detected_temp, detected_weather = clothing_view._classify_weather_safe(
+            Path("dummy.png"),
+            category="Topwear",
+            subcategory="T-Shirt",
+        )
+
+        self.assertEqual(detected_temp, "warm")
+        self.assertIsNone(detected_weather)
+
+    @patch("api.views.clothing.classify_clothing_weather")
+    def test_weather_safe_keeps_strong_precipitation_label_when_specific(self, classify_mock):
+        classify_mock.return_value = {
+            "temperature": "cold",
+            "weather": "rainy",
+            "temperature_confidence": 0.77,
+            "temperature_margin": 0.09,
+            "weather_confidence": 0.71,
+            "weather_margin": 0.05,
+            "is_precipitation_specific": True,
+        }
+
+        detected_temp, detected_weather = clothing_view._classify_weather_safe(
+            Path("dummy.png"),
+            category="Outerwear",
+            subcategory="Raincoat",
+        )
+
+        self.assertEqual(detected_temp, "cold")
+        self.assertEqual(detected_weather, "rainy")
+
+    @patch("api.views.clothing.predict_occasion_details")
+    def test_predict_occasion_safe_returns_none_on_ambiguous_result(self, occasion_mock):
+        occasion_mock.return_value = {
+            "occasion": "",
+            "raw_occasion": "Office",
+            "confidence": 0.28,
+            "margin": 0.01,
+            "reliable": False,
+        }
+
+        detected_occasion, confidence = clothing_view._predict_occasion_safe(Path("dummy.png"))
+        self.assertIsNone(detected_occasion)
+        self.assertEqual(confidence, 0.28)
 
 
 class ShoeUploadFlowTests(APITestCase):

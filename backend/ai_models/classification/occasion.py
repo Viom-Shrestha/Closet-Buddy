@@ -1,7 +1,7 @@
 from transformers import CLIPProcessor, CLIPModel
 from PIL import Image
 import torch
-from typing import Dict, List
+from typing import Any, Dict, List
 
 device =  "cpu"
 
@@ -65,6 +65,10 @@ OCCASION_PROMPTS: Dict[str, List[str]] = {
     ],
 }
 
+DEFAULT_OCCASION = "Casual"
+OCCASION_MIN_CONFIDENCE = 0.35
+OCCASION_MIN_MARGIN = 0.08
+
 # Flatten prompts for CLIP text tower input.
 ALL_PROMPTS: List[str] = []
 PROMPT_TO_CATEGORY: List[str] = []
@@ -74,8 +78,7 @@ for category, prompts in OCCASION_PROMPTS.items():
         PROMPT_TO_CATEGORY.append(category)
 
 
-def predict_occasion(image_path):
-
+def predict_occasion_details(image_path) -> Dict[str, Any]:
     image = Image.open(image_path).convert("RGB")
 
     inputs = clip_processor(
@@ -102,8 +105,19 @@ def predict_occasion(image_path):
     second_best = sorted_scores[1] if len(sorted_scores) > 1 else 0.0
     margin = confidence - second_best
 
-    # Safety fallback for low-confidence or ambiguous predictions.
-    if confidence < 0.35 or margin < 0.08:
-        best_category = "Casual"
+    reliable = confidence >= OCCASION_MIN_CONFIDENCE and margin >= OCCASION_MIN_MARGIN
 
-    return best_category, round(confidence, 3)
+    return {
+        "occasion": best_category if reliable else "",
+        "raw_occasion": best_category,
+        "confidence": round(confidence, 3),
+        "margin": round(margin, 3),
+        "reliable": reliable,
+    }
+
+
+def predict_occasion(image_path):
+    details = predict_occasion_details(image_path)
+    occasion = details.get("occasion") or DEFAULT_OCCASION
+    confidence = float(details.get("confidence") or 0.0)
+    return occasion, confidence

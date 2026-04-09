@@ -15,6 +15,10 @@ TEMPERATURE_ALIASES = {
     "lukewarm": "warm",
     "very hot": "hot",
     "heat": "hot",
+    "any": "",
+    "all": "",
+    "any temperature": "",
+    "no preference": "",
 }
 
 WEATHER_ALIASES = {
@@ -29,6 +33,10 @@ WEATHER_ALIASES = {
     "sunny": "dry",
     "cloudy": "dry",
     "overcast": "dry",
+    "any": "",
+    "all": "",
+    "any weather": "",
+    "no preference": "",
 }
 
 COLOR_ALIASES = {

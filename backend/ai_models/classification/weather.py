@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import clip
 import torch
@@ -223,6 +223,27 @@ def _top_two(scores: Dict[str, float]) -> Tuple[Tuple[str, float], Tuple[str, fl
     return best, second
 
 
+def _score_probabilities(scores: Dict[str, float]) -> Dict[str, float]:
+    if not scores:
+        return {}
+    labels = list(scores.keys())
+    values = torch.tensor([scores[label] for label in labels], dtype=torch.float32)
+    probs = torch.softmax(values, dim=0).tolist()
+    return {label: float(probs[index]) for index, label in enumerate(labels)}
+
+
+def _selected_margin(scores: Dict[str, float], selected_label: str) -> float:
+    if selected_label not in scores or len(scores) <= 1:
+        return 0.0
+    selected_score = scores[selected_label]
+    best_other = max(
+        score
+        for label, score in scores.items()
+        if label != selected_label
+    )
+    return selected_score - best_other
+
+
 def _select_temperature(scores: Dict[str, float]) -> str:
     (best_label, best_score), (_, second_score) = _top_two(scores)
     margin = best_score - second_score
@@ -265,12 +286,17 @@ def classify_clothing_weather(
     image_path: str,
     category: Optional[str] = None,
     subcategory: Optional[str] = None,
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """
-    Returns:
+    Returns classifier labels plus confidence metadata used by upload logic:
     {
         "temperature": "<label>",
-        "weather": "<label>"
+        "weather": "<label>",
+        "temperature_confidence": <float>,
+        "weather_confidence": <float>,
+        "temperature_margin": <float>,
+        "weather_margin": <float>,
+        "is_precipitation_specific": <bool>,
     }
     """
     image_features = _encode_image(image_path)
@@ -281,9 +307,23 @@ def classify_clothing_weather(
     _apply_temperature_priors(temp_scores, category, subcategory)
     _apply_weather_priors(weather_scores, category, subcategory)
 
+    selected_temperature = _select_temperature(temp_scores)
+    selected_weather = _select_weather(weather_scores, category, subcategory)
+
+    temp_probabilities = _score_probabilities(temp_scores)
+    weather_probabilities = _score_probabilities(weather_scores)
+
+    blob = _metadata_blob(category, subcategory)
+    is_precipitation_specific = _contains_any(blob, PRECIPITATION_KEYWORDS)
+
     return {
-        "temperature": _select_temperature(temp_scores),
-        "weather": _select_weather(weather_scores, category, subcategory),
+        "temperature": selected_temperature,
+        "weather": selected_weather,
+        "temperature_confidence": round(temp_probabilities.get(selected_temperature, 0.0), 4),
+        "weather_confidence": round(weather_probabilities.get(selected_weather, 0.0), 4),
+        "temperature_margin": round(_selected_margin(temp_scores, selected_temperature), 4),
+        "weather_margin": round(_selected_margin(weather_scores, selected_weather), 4),
+        "is_precipitation_specific": is_precipitation_specific,
     }
 
 
