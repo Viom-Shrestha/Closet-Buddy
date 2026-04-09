@@ -38,6 +38,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
 
   // Input state
   final List<String> _temperatureOptions = const [
+    'any',
     'freezing',
     'cold',
     'cool',
@@ -45,18 +46,45 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     'hot',
   ];
   final List<String> _weatherOptions = const [
+    'any',
     'rainy',
     'snowy',
     'windy',
     'humid',
     'dry',
   ];
-  final List<String> _occasionOptions = [''];
-  final Set<String> _canonicalOccasions = {};
-  final Set<String> _occasionAttributeSignals = {};
-  final List<String> _classifierOccasions = [];
-  final List<String> _occasionOrder = [];
-  final Map<String, String> _occasionAliases = {};
+  static const List<String> _occasionClasses = [
+    'casual',
+    'formal',
+    'office',
+    'party',
+    'date',
+    'traditional',
+    'sport',
+    'home',
+    'travel',
+    'beach',
+    'street',
+    'outdoor',
+    'workout',
+  ];
+  static const Map<String, String> _occasionAliases = {
+    'date night': 'date',
+    'night out': 'party',
+    'streetwear': 'street',
+    'sporty': 'sport',
+    'active': 'sport',
+    'athletic': 'sport',
+    'gym': 'sport',
+    'fitness': 'sport',
+    'any': '',
+    'any occasion': '',
+    'none': '',
+  };
+  static const List<String> _occasionOptions = [
+    '',
+    ..._occasionClasses,
+  ];
 
   String _temperature = 'cool';
   String _weather = 'dry';
@@ -84,7 +112,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   void initState() {
     super.initState();
     _seedWeatherLabels();
-    _loadOccasionCatalog();
+    _rebuildOccasionOptions();
     _loadClothing();
   }
 
@@ -150,62 +178,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     if (!mounted) return;
     setState(() {
       _clothingById = map;
-      _rebuildOccasionOptions();
-    });
-  }
-
-  Future<void> _loadOccasionCatalog() async {
-    final catalog = await _service.fetchOccasionCatalog();
-    if (!mounted) return;
-
-    List<String> toStringList(dynamic raw) {
-      if (raw is! List) return const [];
-      return raw
-          .map((item) => item.toString().trim().toLowerCase())
-          .where((item) => item.isNotEmpty)
-          .toList();
-    }
-
-    Map<String, String> toStringMap(dynamic raw) {
-      if (raw is! Map) return const {};
-      final mapped = <String, String>{};
-      raw.forEach((key, value) {
-        final k = key.toString().trim().toLowerCase();
-        if (k.isEmpty) return;
-        mapped[k] = value?.toString().trim().toLowerCase() ?? '';
-      });
-      return mapped;
-    }
-
-    final nextClassifier = toStringList(catalog['classifier_occasions']);
-    final nextCanonical = toStringList(
-      catalog['canonical_occasions'],
-    ).toSet();
-    final nextAttributeSignals = toStringList(
-      catalog['attribute_signals'],
-    ).toSet();
-    final nextOrder = toStringList(catalog['sort_order']);
-    final nextAliases = toStringMap(catalog['aliases']);
-    final canonicalPool = nextCanonical.isNotEmpty
-        ? nextCanonical
-        : nextClassifier.toSet();
-
-    setState(() {
-      _classifierOccasions
-        ..clear()
-        ..addAll(nextClassifier);
-      _canonicalOccasions
-        ..clear()
-        ..addAll(canonicalPool);
-      _occasionAttributeSignals
-        ..clear()
-        ..addAll(nextAttributeSignals);
-      _occasionOrder
-        ..clear()
-        ..addAll(nextOrder);
-      _occasionAliases
-        ..clear()
-        ..addAll(nextAliases);
       _rebuildOccasionOptions();
     });
   }
@@ -305,6 +277,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     required String fallback,
   }) {
     final value = raw?.toString().trim().toLowerCase() ?? '';
+    if (value.isEmpty) return 'any';
     if (allowed.contains(value)) return value;
     return fallback;
   }
@@ -319,15 +292,11 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         .trim();
   }
 
-  String _canonicalOccasion(dynamic raw, {bool allowUnknown = false}) {
+  String _canonicalOccasion(dynamic raw) {
     final normalized = _normalizeToken(raw);
     if (normalized.isEmpty) return '';
     final aliasMapped = _occasionAliases[normalized] ?? normalized;
-    if (_canonicalOccasions.isEmpty) {
-      return allowUnknown ? aliasMapped : '';
-    }
-    if (_canonicalOccasions.contains(aliasMapped)) return aliasMapped;
-    if (allowUnknown) return aliasMapped;
+    if (_occasionClasses.contains(aliasMapped)) return aliasMapped;
     return '';
   }
 
@@ -352,20 +321,12 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   Set<String> _occasionSignalsForItem(Map<String, dynamic> item) {
     final signals = <String>{};
 
-    final direct = _canonicalOccasion(
-      item['occasion'],
-      allowUnknown: _canonicalOccasions.isEmpty,
-    );
+    final direct = _canonicalOccasion(item['occasion']);
     if (direct.isNotEmpty) {
       signals.add(direct);
     }
 
-    if (_occasionAttributeSignals.isEmpty) {
-      return signals;
-    }
-
     for (final attr in _attributeTokens(item['attributes'])) {
-      if (!_occasionAttributeSignals.contains(attr)) continue;
       final mapped = _canonicalOccasion(attr);
       if (mapped.isNotEmpty) {
         signals.add(mapped);
@@ -398,41 +359,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   }
 
   void _rebuildOccasionOptions() {
-    final found = <String>{};
-    for (final item in _clothingById.values) {
-      found.addAll(_occasionSignalsForItem(item));
-    }
-
-    final orderedCanonical = (_classifierOccasions.isNotEmpty
-            ? _classifierOccasions
-            : _occasionOrder)
-        .where((value) => value.isNotEmpty)
-        .toList();
-
-    final canonicalBase = orderedCanonical
-        .where(_canonicalOccasions.contains)
-        .toList();
-
-    final orderIndex = <String, int>{
-      for (var i = 0; i < orderedCanonical.length; i++) orderedCanonical[i]: i,
-    };
-    final extras = found
-        .where((value) => !canonicalBase.contains(value))
-        .toList()
-      ..sort((left, right) {
-        final leftOrder = orderIndex[left] ?? orderedCanonical.length;
-        final rightOrder = orderIndex[right] ?? orderedCanonical.length;
-        if (leftOrder != rightOrder) {
-          return leftOrder.compareTo(rightOrder);
-        }
-        return left.compareTo(right);
-      });
-
-    final nextOptions = <String>['', ...canonicalBase, ...extras];
-    _occasionOptions
-      ..clear()
-      ..addAll(nextOptions);
-
     if (!_occasionOptions.contains(_occasionValue)) {
       _occasionValue = '';
       _occasionCtrl.clear();
@@ -514,8 +440,8 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   }
 
   String _buildOutfitName(Map<String, dynamic> rec) {
-    final temp = _temperature.toUpperCase();
-    final cond = _weather.toUpperCase();
+    final temp = _temperature == 'any' ? 'Any Temp' : _temperature.toUpperCase();
+    final cond = _weather == 'any' ? 'Any Weather' : _weather.toUpperCase();
     return 'AI Outfit $temp $cond';
   }
 
@@ -800,7 +726,9 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       if (outer != null) outer,
     ];
 
-    if (displayTemp == 'freezing' || displayTemp == 'cold') {
+    if (displayTemp == 'any') {
+      reasons.add('Selected for versatility across different temperatures.');
+    } else if (displayTemp == 'freezing' || displayTemp == 'cold') {
       reasons.add(
         outer != null
             ? 'Layered with outerwear for colder conditions.'
@@ -816,7 +744,9 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       reasons.add('Balanced layers suit moderate temperatures.');
     }
 
-    if (displayWeather == 'rainy') {
+    if (displayWeather == 'any') {
+      reasons.add('This combination can adapt across different weather conditions.');
+    } else if (displayWeather == 'rainy') {
       reasons.add(
         outer != null
             ? 'Outer layer adds protection for rainy conditions.'
@@ -1480,16 +1410,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
             ),
           ),
         ),
-        if (_occasionOptions.length <= 1) ...[
-          const SizedBox(height: 6),
-          const Text(
-            'No occasion classes are available right now.',
-            style: TextStyle(
-              fontSize: 11,
-              color: RecommendationTokens.muted,
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -1775,16 +1695,19 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     final displayWeather = _processedWeather ?? _weather;
     final items = [top, bottom, shoes, outer].whereType<Map<String, dynamic>>();
 
-    if (displayTemp == 'freezing' || displayTemp == 'cold') {
+    if (displayTemp == 'any') {
+      tags.add('All-temp');
+    } else if (displayTemp == 'freezing' || displayTemp == 'cold') {
       tags.add(outer != null ? 'Cold-ready' : 'Light layers');
     }
     if (displayTemp == 'hot' || displayTemp == 'warm') {
       tags.add(outer == null ? 'Breathable' : 'Layered');
     }
-    if (displayWeather == 'rainy' && outer != null) {
+    if (displayWeather == 'any') {
+      tags.add('Any weather');
+    } else if (displayWeather == 'rainy' && outer != null) {
       tags.add('Rain-friendly');
-    }
-    if (displayWeather == 'snowy' && outer != null) {
+    } else if (displayWeather == 'snowy' && outer != null) {
       tags.add('Winter-ready');
     }
 
