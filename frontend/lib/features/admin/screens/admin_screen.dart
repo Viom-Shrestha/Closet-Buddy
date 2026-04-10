@@ -19,7 +19,8 @@ class AdminScreen extends StatefulWidget {
 
 class _AdminScreenState extends State<AdminScreen>
     with TickerProviderStateMixin {
-  final ProfileService _profileService = ServiceRegistry.instance.profileService;
+  final ProfileService _profileService =
+      ServiceRegistry.instance.profileService;
   final AdminService _adminService = ServiceRegistry.instance.adminService;
   final MiscService _miscService = ServiceRegistry.instance.miscService;
 
@@ -79,7 +80,7 @@ class _AdminScreenState extends State<AdminScreen>
     _tabCtrl = TabController(length: _tabs.length, vsync: this);
     _enterCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 600),
     );
     _fadeAnim = CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOut);
     _bootstrap();
@@ -99,7 +100,7 @@ class _AdminScreenState extends State<AdminScreen>
     super.dispose();
   }
 
-  // ── Data ────────────────────────────────────────────────────────────────────
+  // ── Data ─────────────────────────────────────────────────────────────────────
 
   Future<void> _bootstrap() async {
     final profile = await _profileService.fetchProfile();
@@ -169,7 +170,9 @@ class _AdminScreenState extends State<AdminScreen>
     );
     if (!mounted) return;
     setState(() {
-      _nonClothingItems = List<Map<String, dynamic>>.from(data['results'] ?? []);
+      _nonClothingItems = List<Map<String, dynamic>>.from(
+        data['results'] ?? [],
+      );
       _loadingNonClothing = false;
     });
   }
@@ -204,7 +207,7 @@ class _AdminScreenState extends State<AdminScreen>
     setState(() => _profile = profile);
   }
 
-  // ── Actions ─────────────────────────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────────────────────
 
   Future<void> _setUserActive(Map<String, dynamic> user, bool next) async {
     final id = _asInt(user['id']);
@@ -277,9 +280,17 @@ class _AdminScreenState extends State<AdminScreen>
       title: 'Bulk Reclassify',
       subtitle: '${_selectedCatalogIds.length} items selected',
       children: [
-        _DarkTextField(controller: catCtrl, label: 'Category'),
+        _DarkDropdown(
+          controller: catCtrl,
+          label: 'Category',
+          options: _kCategories,
+        ),
         const SizedBox(height: 10),
-        _DarkTextField(controller: subCtrl, label: 'Subcategory (optional)'),
+        _DarkDropdown(
+          controller: subCtrl,
+          label: 'Subcategory (optional)',
+          options: _kSubcategories,
+        ),
       ],
       confirmLabel: 'Apply',
     );
@@ -301,13 +312,23 @@ class _AdminScreenState extends State<AdminScreen>
     if (ok) await _loadCatalog();
   }
 
+  Future<void> _deleteOutfit(int id) async {
+    final ok = await _adminService.deleteOutfit(id);
+    if (!mounted) return;
+    _snack(
+      ok ? 'Outfit deleted' : 'Delete failed',
+      ok ? kAdminGreen : kAdminRed,
+    );
+    if (ok) await _loadOutfits();
+  }
+
   Future<void> _toggleFeedbackRead(int id, bool value) async {
     final ok = await _adminService.markFeedbackRead(id, value);
     if (!mounted) return;
     if (ok) await _loadFeedback();
   }
 
-  // ── Build ────────────────────────────────────────────────────────────────────
+  // ── Build ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -360,7 +381,8 @@ class _AdminScreenState extends State<AdminScreen>
     );
   }
 
-  // ── Top bar ──────────────────────────────────────────────────────────────────
+  // ── Top bar ───────────────────────────────────────────────────────────────────
+  // IMPROVED: tighter, more refined header with better visual grouping
 
   Widget _buildTopBar() {
     final avatarUrl = _resolveImageUrl(_profile?['avatar']);
@@ -369,58 +391,69 @@ class _AdminScreenState extends State<AdminScreen>
     );
     return Container(
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 10,
-        left: 20,
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 16,
         right: 12,
         bottom: 10,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: kAdminSurface,
-        border: Border(bottom: BorderSide(color: kAdminBorder)),
+        border: Border(bottom: BorderSide(color: kAdminBorder, width: 1)),
       ),
       child: Row(
         children: [
-          GestureDetector(
+          // Back button
+          _IconBtn(
+            icon: Icons.arrow_back_ios_new_rounded,
             onTap: () => Navigator.of(context).maybePop(),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: kAdminSurface2,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kAdminBorder),
-              ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                size: 15,
-                color: kAdminTextMuted,
-              ),
-            ),
+            size: 15,
           ),
-          const SizedBox(width: 14),
-          // Logo mark
+          const SizedBox(width: 12),
+
+          // Brand mark + title cluster
           Container(
-            width: 28,
-            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: kAdminAccent.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(color: kAdminAccent.withValues(alpha: 0.3)),
+              color: kAdminAccent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kAdminAccent.withValues(alpha: 0.18)),
             ),
-            child: const Icon(
-              Icons.admin_panel_settings_rounded,
-              size: 15,
-              color: kAdminAccent,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.admin_panel_settings_rounded,
+                  size: 14,
+                  color: kAdminAccent,
+                ),
+                const SizedBox(width: 7),
+                const Text(
+                  'Admin Console',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: kAdminText,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
+
+          const Spacer(),
+
+          // Live pill
+          _LiveBadge(),
+
+          const SizedBox(width: 6),
+
+          // Avatar
           Container(
-            width: 28,
-            height: 28,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
               color: kAdminSurface2,
               shape: BoxShape.circle,
-              border: Border.all(color: kAdminBorder),
+              border: Border.all(color: kAdminBorder, width: 1.5),
             ),
             child: ClipOval(
               child: avatarUrl.isNotEmpty
@@ -433,172 +466,108 @@ class _AdminScreenState extends State<AdminScreen>
                   : _AvatarFallback(initial: avatarInitial),
             ),
           ),
-          const SizedBox(width: 10),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Admin Console',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: kAdminText,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              Text(
-                'Closet Buddy',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: kAdminTextDim,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          // Live indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(
-              color: kAdminGreen.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: kAdminGreen.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                    color: kAdminGreen,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                const Text(
-                  'Live',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: kAdminGreen,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
+
+          const SizedBox(width: 6),
+
+          // Theme toggle
+          _IconBtn(
+            icon: _isDarkTheme
+                ? Icons.light_mode_rounded
+                : Icons.dark_mode_rounded,
             onTap: () async {
               HapticFeedback.lightImpact();
               await ThemeService.instance.toggle();
             },
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: kAdminSurface2,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kAdminBorder),
-              ),
-              child: Icon(
-                _isDarkTheme
-                    ? Icons.light_mode_rounded
-                    : Icons.dark_mode_rounded,
-                size: 18,
-                color: kAdminTextMuted,
-              ),
-            ),
           ),
-          const SizedBox(width: 6),
-          GestureDetector(
+
+          const SizedBox(width: 4),
+
+          // Refresh
+          _IconBtn(
+            icon: Icons.refresh_rounded,
             onTap: () async {
               HapticFeedback.lightImpact();
               await _refreshAll();
             },
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: kAdminSurface2,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kAdminBorder),
-              ),
-              child: const Icon(
-                Icons.refresh_rounded,
-                size: 18,
-                color: kAdminTextMuted,
-              ),
-            ),
           ),
         ],
       ),
     );
   }
 
-  // ── Tab strip ────────────────────────────────────────────────────────────────
+  // ── Tab strip ─────────────────────────────────────────────────────────────────
+  // IMPROVED: pill-style selected indicator, tighter spacing
 
   Widget _buildTabStrip() {
     return Container(
-      height: 44,
       color: kAdminSurface,
-      child: TabBar(
-        controller: _tabCtrl,
-        isScrollable: true,
-        tabAlignment: TabAlignment.start,
-        indicatorColor: kAdminAccent,
-        indicatorWeight: 2,
-        indicatorSize: TabBarIndicatorSize.label,
-        labelColor: kAdminAccent,
-        unselectedLabelColor: kAdminTextMuted,
-        labelStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
-        ),
-        unselectedLabelStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        tabs: _tabs
-            .map(
-              (t) => Tab(
-                height: 44,
-                child: Row(
-                  children: [
-                    Icon(t.icon, size: 14),
-                    const SizedBox(width: 6),
-                    Text(t.label),
-                  ],
-                ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 46,
+            child: TabBar(
+              controller: _tabCtrl,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              indicatorColor: kAdminAccent,
+              indicatorWeight: 2.5,
+              indicatorSize: TabBarIndicatorSize.label,
+              labelColor: kAdminAccent,
+              unselectedLabelColor: kAdminTextMuted,
+              labelStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
               ),
-            )
-            .toList(),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              tabs: _tabs
+                  .map(
+                    (t) => Tab(
+                      height: 46,
+                      child: Row(
+                        children: [
+                          Icon(t.icon, size: 14),
+                          const SizedBox(width: 5),
+                          Text(t.label),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: kAdminBorder),
+        ],
       ),
     );
   }
 
-  // ── Overview tab — REDESIGNED ─────────────────────────────────────────────────
+  // ── Overview tab ─────────────────────────────────────────────────────────────
+  // IMPROVED: grouped sections, better card hierarchy, cleaner rhythm
 
   Widget _buildOverviewTab() {
-    if (_loadingOverview && _dashboard == null) {
-      return _loadingCenter();
-    }
-    if (_dashboard == null) {
-      return _errorCenter(_loadDashboard);
-    }
+    if (_loadingOverview && _dashboard == null) return _loadingCenter();
+    if (_dashboard == null) return _errorCenter(_loadDashboard);
 
     final overview = _map(_dashboard!['overview']);
     final last7 = _map(_dashboard!['last_7_days']);
     final engagement = _map(_dashboard!['engagement']);
     final outfitStats = _map(_dashboard!['outfit_stats']);
+    final wardrobeStats = _map(_dashboard!['wardrobe_stats']);
     final slotCoverage = _map(_dashboard!['slot_coverage']);
     final topCategories = _list(_dashboard!['top_categories']);
     final topColors = _list(_dashboard!['top_colors']);
+    final storageTypes = _list(_dashboard!['storage_types']);
+    final outfitsPerDay = _list(
+      _dashboard!['outfit_stats']?['outfits_per_day'],
+    );
     final recentUsers = _list(_dashboard!['recent_users']);
 
-    // Build slot data for ring chart
     final slotData = [
       _SlotDatum(
         'Top',
@@ -632,142 +601,51 @@ class _AdminScreenState extends State<AdminScreen>
       color: kAdminAccent,
       backgroundColor: kAdminSurface,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 56),
         children: [
-          // ── KPI ticker row ─────────────────────────────────────────────────
-          _AdminSectionLabel('Platform Totals'),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 90,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              children: [
-                _KpiCard(
-                  label: 'Users',
-                  value: '${overview['total_users'] ?? 0}',
-                  delta: '+${last7['new_users'] ?? 0}',
-                  color: kAdminBlue,
-                ),
-                _KpiCard(
-                  label: 'Active',
-                  value: '${overview['active_users'] ?? 0}',
-                  color: kAdminGreen,
-                ),
-                _KpiCard(
-                  label: 'Items',
-                  value: '${overview['total_clothing_items'] ?? 0}',
-                  delta: '+${last7['new_clothing'] ?? 0}',
-                  color: kAdminAccent,
-                ),
-                _KpiCard(
-                  label: 'Outfits',
-                  value: '${overview['total_outfits'] ?? 0}',
-                  delta: '+${last7['new_outfits'] ?? 0}',
-                  color: kAdminYellow,
-                ),
-                _KpiCard(
-                  label: 'Acc',
-                  value: '${overview['total_accessories'] ?? 0}',
-                  delta: '+${last7['new_accessories'] ?? 0}',
-                  color: kAdminRed,
-                ),
-                _KpiCard(
-                  label: 'Storages',
-                  value: '${overview['total_storages'] ?? 0}',
-                  color: kAdminTextMuted,
-                ),
-              ],
-            ),
+          // ── Hero KPI row — most important numbers up top ─────────────────
+          _buildHeroKpiRow(overview, last7),
+
+          const SizedBox(height: 20),
+
+          // ── Secondary stats row ──────────────────────────────────────────
+          _buildSecondaryKpiRow(overview, last7),
+
+          const SizedBox(height: 28),
+
+          // ── Activity chart ────────────────────────────────────────────────
+          _SectionHeader(
+            label: 'Activity',
+            subtitle: 'Outfits created per day',
+            icon: Icons.show_chart_rounded,
           ),
+          const SizedBox(height: 12),
+          _OutfitsPerDayChart(rows: outfitsPerDay),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
 
-          // ── Engagement row ─────────────────────────────────────────────────
-          _AdminSectionLabel('Engagement'),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _EngagementGauge(
-                  label: 'DAU',
-                  value: _toDouble(engagement['dau']),
-                  max: _toDouble(
-                    overview['active_users'],
-                  ).clamp(1, double.infinity),
-                  color: kAdminBlue,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _EngagementGauge(
-                  label: 'WAU',
-                  value: _toDouble(engagement['wau']),
-                  max: _toDouble(
-                    overview['active_users'],
-                  ).clamp(1, double.infinity),
-                  color: kAdminGreen,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _StatPill(
-                  label: 'Sessions/user',
-                  value: '${engagement['sessions_per_user'] ?? '-'}',
-                  icon: Icons.repeat_rounded,
-                  color: kAdminAccent,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _StatPill(
-                  label: 'Avg session',
-                  value: '${engagement['average_session_seconds'] ?? '-'}s',
-                  icon: Icons.timer_outlined,
-                  color: kAdminYellow,
-                ),
-              ),
-            ],
+          // ── Engagement ─────────────────────────────────────────────────────
+          _SectionHeader(label: 'Engagement', icon: Icons.people_alt_rounded),
+          const SizedBox(height: 12),
+          _buildEngagementSection(overview, engagement),
+
+          const SizedBox(height: 28),
+
+          // ── Key Metrics ────────────────────────────────────────────────────
+          _SectionHeader(label: 'Key Metrics', icon: Icons.insights_rounded),
+          const SizedBox(height: 12),
+          _buildKeyMetricsRow(outfitStats, wardrobeStats),
+
+          const SizedBox(height: 28),
+
+          // ── Wardrobe analytics ─────────────────────────────────────────────
+          _SectionHeader(
+            label: 'Wardrobe Analytics',
+            icon: Icons.checkroom_rounded,
           ),
-
-          const SizedBox(height: 24),
-
-          // ── Outfit quality + slot ring ─────────────────────────────────────
-          _AdminSectionLabel('Outfit Analytics'),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Slot ring chart
-              Expanded(flex: 5, child: _SlotRingChart(data: slotData)),
-              const SizedBox(width: 12),
-              // Rating + fav stacked
-              Expanded(
-                flex: 4,
-                child: Column(
-                  children: [
-                    _RatingMeter(
-                      rating: _toDouble(outfitStats['average_rating']),
-                      max: 5.0,
-                    ),
-                    const SizedBox(height: 10),
-                    _StatBlock2(
-                      label: 'Favourite rate',
-                      value: '${outfitStats['favourite_rate'] ?? '-'}%',
-                      icon: Icons.favorite_rounded,
-                      color: kAdminRed,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // ── Top categories horizontal bar ──────────────────────────────────
-          _AdminSectionLabel('Top Categories'),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
+          _SlotRingChart(data: slotData),
+          const SizedBox(height: 12),
           _HorizontalBarChart(
             rows: topCategories,
             labelKey: 'category',
@@ -775,60 +653,314 @@ class _AdminScreenState extends State<AdminScreen>
             color: kAdminBlue,
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
 
-          // ── Color distribution ─────────────────────────────────────────────
-          _AdminSectionLabel('Color Distribution'),
-          const SizedBox(height: 10),
-          _ColorSwatchChart(rows: topColors),
+          // ── Storage & Colors side by side ──────────────────────────────────
+          _SectionHeader(
+            label: 'Storage & Colors',
+            icon: Icons.palette_outlined,
+          ),
+          const SizedBox(height: 12),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _StorageTypesChart(rows: storageTypes)),
+                const SizedBox(width: 10),
+                Expanded(child: _ColorSwatchChart(rows: topColors)),
+              ],
+            ),
+          ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
 
           // ── Recent sign-ups ────────────────────────────────────────────────
-          _AdminSectionLabel('Recent Sign-ups'),
-          const SizedBox(height: 10),
-          ...recentUsers.map((u) => _RecentUserRow(user: u)),
+          _SectionHeader(
+            label: 'Recent Sign-ups',
+            icon: Icons.person_add_rounded,
+            count: recentUsers.length,
+          ),
+          const SizedBox(height: 12),
+          _buildRecentUsersCard(recentUsers),
         ],
       ),
     );
   }
 
-  // ── Users tab ────────────────────────────────────────────────────────────────
+  // ── Hero KPI: Users + Clothing + Outfits (most prominent) ────────────────────
+
+  Widget _buildHeroKpiRow(
+    Map<String, dynamic> overview,
+    Map<String, dynamic> last7,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 5,
+          child: _HeroKpiCard(
+            label: 'Total Users',
+            value: '${overview['total_users'] ?? 0}',
+            delta: '+${last7['new_users'] ?? 0} this week',
+            icon: Icons.group_rounded,
+            color: kAdminBlue,
+            subValue: 'Active: ${overview['active_users'] ?? 0}',
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          flex: 5,
+          child: _HeroKpiCard(
+            label: 'Clothing Items',
+            value: '${overview['total_clothing_items'] ?? 0}',
+            delta: '+${last7['new_clothing'] ?? 0} this week',
+            icon: Icons.checkroom_rounded,
+            color: kAdminAccent,
+            subValue: 'Accessories: ${overview['total_accessories'] ?? 0}',
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          flex: 5,
+          child: _HeroKpiCard(
+            label: 'Outfits',
+            value: '${overview['total_outfits'] ?? 0}',
+            delta: '+${last7['new_outfits'] ?? 0} this week',
+            icon: Icons.style_rounded,
+            color: kAdminYellow,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Secondary KPI: smaller supporting stats ───────────────────────────────────
+
+  Widget _buildSecondaryKpiRow(
+    Map<String, dynamic> overview,
+    Map<String, dynamic> last7,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: _MiniKpiCard(
+            label: 'Storages',
+            value: '${overview['total_storages'] ?? 0}',
+            delta: '+${last7['new_storages'] ?? 0}',
+            icon: Icons.inventory_2_outlined,
+            color: kAdminBlue,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MiniKpiCard(
+            label: 'Non-Clothing',
+            value: '${overview['total_non_clothing'] ?? 0}',
+            delta: '+${last7['new_non_clothing'] ?? 0}',
+            icon: Icons.category_outlined,
+            color: kAdminTextMuted,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MiniKpiCard(
+            label: 'Admins',
+            value: '${overview['admin_users'] ?? 0}',
+            icon: Icons.admin_panel_settings_rounded,
+            color: kAdminYellow,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MiniKpiCard(
+            label: 'Accessories',
+            value: '${overview['total_accessories'] ?? 0}',
+            delta: '+${last7['new_accessories'] ?? 0}',
+            icon: Icons.watch_rounded,
+            color: kAdminRed,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Engagement section ─────────────────────────────────────────────────────────
+
+  Widget _buildEngagementSection(
+    Map<String, dynamic> overview,
+    Map<String, dynamic> engagement,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kAdminSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kAdminBorder),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _EngagementGauge(
+                  label: 'Daily Active Users',
+                  value: _toDouble(engagement['dau']),
+                  max: _toDouble(
+                    overview['active_users'],
+                  ).clamp(1, double.infinity),
+                  color: kAdminBlue,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Container(width: 1, height: 64, color: kAdminBorder),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _EngagementGauge(
+                  label: 'Weekly Active Users',
+                  value: _toDouble(engagement['wau']),
+                  max: _toDouble(
+                    overview['active_users'],
+                  ).clamp(1, double.infinity),
+                  color: kAdminGreen,
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Divider(height: 1, color: kAdminBorder),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _StatPill(
+                  label: 'Sessions / user',
+                  value: '${engagement['sessions_per_user'] ?? '—'}',
+                  icon: Icons.repeat_rounded,
+                  color: kAdminAccent,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatPill(
+                  label: 'Avg session length',
+                  value: '${engagement['average_session_seconds'] ?? '—'}s',
+                  icon: Icons.timer_outlined,
+                  color: kAdminYellow,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Key metrics row ──────────────────────────────────────────────────────────
+
+  Widget _buildKeyMetricsRow(
+    Map<String, dynamic> outfitStats,
+    Map<String, dynamic> wardrobeStats,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: _StatPill(
+            label: 'Avg wardrobe size',
+            value: '${wardrobeStats['average_wardrobe_size'] ?? '—'}',
+            icon: Icons.checkroom_rounded,
+            color: kAdminBlue,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _StatPill(
+            label: 'Avg outfit rating',
+            value: outfitStats['average_rating'] != null
+                ? '${outfitStats['average_rating']} / 5'
+                : '—',
+            icon: Icons.star_rounded,
+            color: kAdminYellow,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _StatPill(
+            label: 'Favourite rate',
+            value: '${outfitStats['favourite_rate'] ?? '—'}%',
+            icon: Icons.favorite_rounded,
+            color: kAdminRed,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Recent users card ─────────────────────────────────────────────────────────
+
+  Widget _buildRecentUsersCard(List<Map<String, dynamic>> recentUsers) {
+    if (recentUsers.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: kAdminSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kAdminBorder),
+        ),
+        child: Center(
+          child: Text(
+            'No recent sign-ups',
+            style: TextStyle(color: kAdminTextMuted, fontSize: 13),
+          ),
+        ),
+      );
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: kAdminSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kAdminBorder),
+      ),
+      child: Column(
+        children: List.generate(recentUsers.length, (i) {
+          final isLast = i == recentUsers.length - 1;
+          return Column(
+            children: [
+              _RecentUserRow(user: recentUsers[i]),
+              if (!isLast)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Divider(height: 1, color: kAdminBorder),
+                ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  // ── Users tab ─────────────────────────────────────────────────────────────────
 
   Widget _buildUsersTab() {
     return Column(
       children: [
-        _SearchBar(
-          controller: _searchCtrl,
-          hint: 'Search by name or email…',
-          onSearch: _loadUsers,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: _SearchBar(
+            controller: _searchCtrl,
+            hint: 'Search by name or email…',
+            onSearch: _loadUsers,
+          ),
         ),
-        // User count strip
         if (_users.isNotEmpty)
-          Container(
+          Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: kAdminBlue.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: kAdminBlue.withValues(alpha: 0.25),
-                    ),
-                  ),
-                  child: Text(
-                    '${_users.length} users',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: kAdminBlue,
-                    ),
-                  ),
+                _CountBadge(
+                  count: _users.length,
+                  label: 'user',
+                  color: kAdminBlue,
                 ),
               ],
             ),
@@ -862,43 +994,53 @@ class _AdminScreenState extends State<AdminScreen>
     );
   }
 
-  // ── Catalog tab ──────────────────────────────────────────────────────────────
+  // ── Catalog tab ───────────────────────────────────────────────────────────────
 
   Widget _buildCatalogTab() {
     return Column(
       children: [
-        _SearchBar(
-          controller: _catalogSearchCtrl,
-          hint: 'Search catalog…',
-          onSearch: _refreshCatalogData,
-          trailing: _DarkChipButton(
-            label: 'Filters',
-            icon: Icons.tune_rounded,
-            onTap: _showCatalogFilters,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: _SearchBar(
+            controller: _catalogSearchCtrl,
+            hint: 'Search catalog…',
+            onSearch: _refreshCatalogData,
+            trailing: _DarkChipButton(
+              label: 'Filters',
+              icon: Icons.tune_rounded,
+              onTap: _showCatalogFilters,
+            ),
           ),
         ),
-        _buildNonClothingPanel(),
+        const SizedBox(height: 10),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _buildNonClothingPanel(),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Row(
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: _selectedCatalogIds.isEmpty
                       ? kAdminSurface2
-                      : kAdminAccent.withValues(alpha: 0.15),
+                      : kAdminAccent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: _selectedCatalogIds.isEmpty
                         ? kAdminBorder
-                        : kAdminAccent.withValues(alpha: 0.4),
+                        : kAdminAccent.withValues(alpha: 0.35),
                   ),
                 ),
                 child: Text(
                   _selectedCatalogIds.isEmpty
-                      ? 'Tap to select items'
+                      ? 'Tap items to select'
                       : '${_selectedCatalogIds.length} selected',
                   style: TextStyle(
                     fontSize: 11,
@@ -956,13 +1098,12 @@ class _AdminScreenState extends State<AdminScreen>
     );
   }
 
-  // ── Outfits tab ──────────────────────────────────────────────────────────────
+  // ── Non-clothing panel ────────────────────────────────────────────────────────
 
   Widget _buildNonClothingPanel() {
     final previewRows = _nonClothingItems.take(6).toList();
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: kAdminSurface,
         borderRadius: BorderRadius.circular(12),
@@ -973,7 +1114,7 @@ class _AdminScreenState extends State<AdminScreen>
         children: [
           Row(
             children: [
-              const Icon(Icons.inventory_2_outlined, size: 14, color: kAdminAccent),
+              Icon(Icons.inventory_2_outlined, size: 13, color: kAdminAccent),
               const SizedBox(width: 6),
               const Text(
                 'Non-clothing Inventory',
@@ -981,27 +1122,28 @@ class _AdminScreenState extends State<AdminScreen>
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: kAdminText,
+                  letterSpacing: -0.1,
                 ),
               ),
               const Spacer(),
               if (_loadingNonClothing)
                 const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  width: 13,
+                  height: 13,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: kAdminAccent,
+                  ),
                 )
               else
-                Text(
-                  '${_nonClothingItems.length} item${_nonClothingItems.length == 1 ? '' : 's'}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: kAdminTextMuted,
-                    fontWeight: FontWeight.w600,
-                  ),
+                _CountBadge(
+                  count: _nonClothingItems.length,
+                  label: 'item',
+                  color: kAdminAccent,
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           if (_loadingNonClothing && _nonClothingItems.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
@@ -1014,8 +1156,8 @@ class _AdminScreenState extends State<AdminScreen>
               ),
             )
           else if (_nonClothingItems.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 4),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
               child: Text(
                 'No non-clothing items found.',
                 style: TextStyle(fontSize: 11, color: kAdminTextMuted),
@@ -1025,20 +1167,22 @@ class _AdminScreenState extends State<AdminScreen>
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                headingRowHeight: 30,
+                headingRowHeight: 28,
                 dataRowMinHeight: 34,
-                dataRowMaxHeight: 44,
-                columnSpacing: 18,
-                horizontalMargin: 10,
+                dataRowMaxHeight: 42,
+                columnSpacing: 20,
+                horizontalMargin: 8,
                 dividerThickness: 0.5,
+                headingRowColor: WidgetStateProperty.all(kAdminSurface2),
                 columns: const [
                   DataColumn(
                     label: Text(
                       'Name',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         color: kAdminTextMuted,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
@@ -1046,9 +1190,10 @@ class _AdminScreenState extends State<AdminScreen>
                     label: Text(
                       'Storage',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         color: kAdminTextMuted,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
@@ -1056,9 +1201,10 @@ class _AdminScreenState extends State<AdminScreen>
                     label: Text(
                       'Owner',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         color: kAdminTextMuted,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
@@ -1066,9 +1212,10 @@ class _AdminScreenState extends State<AdminScreen>
                     label: Text(
                       'Created',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         color: kAdminTextMuted,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
@@ -1080,26 +1227,38 @@ class _AdminScreenState extends State<AdminScreen>
                     cells: [
                       DataCell(
                         Text(
-                          _truncateText(item['name'], max: 24),
-                          style: const TextStyle(fontSize: 12, color: kAdminText),
+                          _truncateText(item['name'], max: 22),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: kAdminText,
+                          ),
                         ),
                       ),
                       DataCell(
                         Text(
-                          _truncateText(storage['name'], max: 20),
-                          style: const TextStyle(fontSize: 12, color: kAdminTextMuted),
+                          _truncateText(storage['name'], max: 18),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: kAdminTextMuted,
+                          ),
                         ),
                       ),
                       DataCell(
                         Text(
-                          _truncateText(user['username'], max: 18),
-                          style: const TextStyle(fontSize: 12, color: kAdminTextMuted),
+                          _truncateText(user['username'], max: 16),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: kAdminTextMuted,
+                          ),
                         ),
                       ),
                       DataCell(
                         Text(
                           _formatShortDate(item['created_at']),
-                          style: const TextStyle(fontSize: 12, color: kAdminTextMuted),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: kAdminTextMuted,
+                          ),
                         ),
                       ),
                     ],
@@ -1109,9 +1268,9 @@ class _AdminScreenState extends State<AdminScreen>
             ),
           if (_nonClothingItems.length > previewRows.length)
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: 6),
               child: Text(
-                'Showing latest ${previewRows.length} items.',
+                'Showing latest ${previewRows.length} of ${_nonClothingItems.length} items',
                 style: const TextStyle(fontSize: 10, color: kAdminTextDim),
               ),
             ),
@@ -1119,6 +1278,8 @@ class _AdminScreenState extends State<AdminScreen>
       ),
     );
   }
+
+  // ── Outfits tab ───────────────────────────────────────────────────────────────
 
   Widget _buildOutfitsTab() {
     return RefreshIndicator(
@@ -1139,59 +1300,40 @@ class _AdminScreenState extends State<AdminScreen>
                     : width >= 600
                     ? 2
                     : 1;
-                final childAspectRatio = width >= 900 ? 1.4 : 1.2;
-
                 return GridView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
                   itemCount: _adminOutfits.length,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: childAspectRatio,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.9,
                   ),
-                  itemBuilder: (_, i) =>
-                      _OutfitGridCard(outfit: _adminOutfits[i]),
+                  itemBuilder: (_, i) {
+                    final outfit = _adminOutfits[i];
+                    final id = _asInt(outfit['id']);
+                    return _OutfitGridCard(
+                      outfit: outfit,
+                      onDelete: id == null ? null : () => _deleteOutfit(id),
+                    );
+                  },
                 );
               },
             ),
     );
   }
 
-  // ── Feedback tab ─────────────────────────────────────────────────────────────
+  // ── Feedback tab ──────────────────────────────────────────────────────────────
 
   Widget _buildFeedbackTab() {
     final unread = _feedback.where((f) => f['is_read'] != true).length;
     return Column(
       children: [
         if (unread > 0)
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: kAdminAccent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kAdminAccent.withValues(alpha: 0.25)),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.mark_email_unread_rounded,
-                  color: kAdminAccent,
-                  size: 15,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '$unread unread message${unread > 1 ? 's' : ''}',
-                  style: const TextStyle(
-                    color: kAdminAccent,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: _UnreadBanner(count: unread),
           ),
         Expanded(
           child: RefreshIndicator(
@@ -1223,11 +1365,15 @@ class _AdminScreenState extends State<AdminScreen>
     );
   }
 
-  Widget _loadingCenter() {
-    return Center(
-      child: CircularProgressIndicator(color: kAdminAccent, strokeWidth: 2),
-    );
-  }
+  // ── Shared UI helpers ──────────────────────────────────────────────────────────
+
+  Widget _loadingCenter() => const Center(
+    child: CircularProgressIndicator(
+      color: kAdminAccent,
+      strokeWidth: 2,
+      strokeCap: StrokeCap.round,
+    ),
+  );
 
   Widget _errorCenter(VoidCallback onRetry) {
     return Center(
@@ -1235,16 +1381,17 @@ class _AdminScreenState extends State<AdminScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 64,
-            height: 64,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               color: kAdminSurface2,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: kAdminBorder),
             ),
             child: const Icon(
               Icons.cloud_off_rounded,
               color: kAdminTextDim,
-              size: 28,
+              size: 26,
             ),
           ),
           const SizedBox(height: 14),
@@ -1256,14 +1403,37 @@ class _AdminScreenState extends State<AdminScreen>
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           _DarkButton(label: 'Retry', onTap: onRetry),
         ],
       ),
     );
   }
 
-  // ── Access denied ────────────────────────────────────────────────────────────
+  Widget _emptyCenter(String label, IconData icon) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: kAdminSurface2,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kAdminBorder),
+          ),
+          child: Icon(icon, color: kAdminTextDim, size: 24),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          label,
+          style: const TextStyle(color: kAdminTextMuted, fontSize: 13),
+        ),
+      ],
+    ),
+  );
+
+  // ── Access denied ─────────────────────────────────────────────────────────────
 
   Widget _buildAccessDenied() => Scaffold(
     backgroundColor: kAdminBg,
@@ -1303,30 +1473,7 @@ class _AdminScreenState extends State<AdminScreen>
     ),
   );
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
-
-  Widget _emptyCenter(String label, IconData icon) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: kAdminSurface2,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kAdminBorder),
-          ),
-          child: Icon(icon, color: kAdminTextDim, size: 26),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          label,
-          style: const TextStyle(color: kAdminTextMuted, fontSize: 14),
-        ),
-      ],
-    ),
-  );
+  // ── Dialogs ────────────────────────────────────────────────────────────────────
 
   void _snack(String message, Color color) {
     if (!mounted) return;
@@ -1449,11 +1596,16 @@ class _AdminScreenState extends State<AdminScreen>
     final confirmed = await _showAdminDialog(
       title: 'Filter Catalog',
       children: [
-        _DarkTextField(controller: _catalogCategoryCtrl, label: 'Category'),
+        _DarkDropdown(
+          controller: _catalogCategoryCtrl,
+          label: 'Category',
+          options: _kCategories,
+        ),
         const SizedBox(height: 10),
-        _DarkTextField(
+        _DarkDropdown(
           controller: _catalogSubcategoryCtrl,
           label: 'Subcategory',
+          options: _kSubcategories,
         ),
         const SizedBox(height: 10),
         _DarkTextField(controller: _catalogColorCtrl, label: 'Dominant color'),
@@ -1464,6 +1616,47 @@ class _AdminScreenState extends State<AdminScreen>
     );
     if (confirmed == true) await _refreshCatalogData();
   }
+
+  // ── Constants ─────────────────────────────────────────────────────────────────
+
+  static const _kCategories = [
+    'Topwear',
+    'Outerwear',
+    'Bottomwear',
+    'Footwear',
+    'Dress',
+    'Accessories',
+  ];
+
+  static const _kSubcategories = [
+    'T-Shirt',
+    'Shirt',
+    'Polo',
+    'Blouse',
+    'Tank Top',
+    'Sweater',
+    'Hoodie',
+    'Jacket',
+    'Cardigan',
+    'Vest',
+    'Jeans',
+    'Pants',
+    'Shorts',
+    'Skirt',
+    'Leggings',
+    'Dress',
+    'Sneakers',
+    'Formal Shoes',
+    'Boots',
+    'Sandals',
+    'Heels',
+    'Loafers',
+    'Slippers',
+    'Flip Flops',
+    'Sports Shoes',
+  ];
+
+  // ── Theme ─────────────────────────────────────────────────────────────────────
 
   ThemeData _buildAdminTheme() {
     final brightness = _isDarkTheme ? Brightness.dark : Brightness.light;
@@ -1512,6 +1705,8 @@ class _AdminScreenState extends State<AdminScreen>
       ),
     );
   }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────────
 
   Map<String, dynamic> _map(dynamic raw) {
     if (raw is Map<String, dynamic>) return raw;
@@ -1569,6 +1764,379 @@ class _AdminScreenState extends State<AdminScreen>
   }
 }
 
+// ── New helper widgets (drop these in admin_screen_components.dart) ──────────────
+
+/// Reusable icon button used in the top bar.
+class _IconBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final double size;
+
+  const _IconBtn({required this.icon, required this.onTap, this.size = 17});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: kAdminSurface2,
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(color: kAdminBorder),
+        ),
+        child: Icon(icon, size: size, color: kAdminTextMuted),
+      ),
+    );
+  }
+}
+
+/// Animated "Live" badge.
+class _LiveBadge extends StatelessWidget {
+  const _LiveBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: kAdminGreen.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kAdminGreen.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              color: kAdminGreen,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          const Text(
+            'Live',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: kAdminGreen,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Section header with an icon, label, optional subtitle, and optional count.
+class _SectionHeader extends StatelessWidget {
+  final String label;
+  final String? subtitle;
+  final IconData icon;
+  final int? count;
+
+  const _SectionHeader({
+    required this.label,
+    required this.icon,
+    this.subtitle,
+    this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: kAdminAccent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: kAdminAccent.withValues(alpha: 0.18)),
+          ),
+          child: Icon(icon, size: 13, color: kAdminAccent),
+        ),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: kAdminText,
+                letterSpacing: -0.2,
+              ),
+            ),
+            if (subtitle != null)
+              Text(
+                subtitle!,
+                style: const TextStyle(fontSize: 10, color: kAdminTextDim),
+              ),
+          ],
+        ),
+        if (count != null) ...[
+          const Spacer(),
+          _CountBadge(count: count!, label: '', color: kAdminTextMuted),
+        ],
+      ],
+    );
+  }
+}
+
+/// Hero KPI card — large, prominent, used for top-level numbers.
+class _HeroKpiCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final String? delta;
+  final String? subValue;
+  final IconData icon;
+  final Color color;
+
+  const _HeroKpiCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    this.delta,
+    this.subValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kAdminSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kAdminBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 13, color: color),
+              ),
+              const Spacer(),
+              if (delta != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: kAdminGreen.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    delta!,
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: kAdminGreen,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              color: kAdminText,
+              letterSpacing: -1,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: kAdminTextMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          if (subValue != null)
+            Text(
+              subValue!,
+              style: const TextStyle(fontSize: 10, color: kAdminTextDim),
+            )
+          else
+            const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+}
+
+/// Mini KPI card — compact, for secondary stats.
+class _MiniKpiCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final String? delta;
+  final IconData icon;
+  final Color color;
+
+  const _MiniKpiCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    this.delta,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: kAdminSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kAdminBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Icon(icon, size: 12, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: kAdminText,
+                    letterSpacing: -0.5,
+                    height: 1.1,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    color: kAdminTextMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (delta != null)
+                  Text(
+                    delta!,
+                    style: const TextStyle(fontSize: 9, color: kAdminGreen),
+                  )
+                else
+                  const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small count badge (e.g. "12 users").
+class _CountBadge extends StatelessWidget {
+  final int count;
+  final String label;
+  final Color color;
+
+  const _CountBadge({
+    required this.count,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = label.isEmpty
+        ? '$count'
+        : '$count $label${count == 1 ? '' : 's'}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+/// Unread feedback banner.
+class _UnreadBanner extends StatelessWidget {
+  final int count;
+
+  const _UnreadBanner({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: kAdminAccent.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kAdminAccent.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.mark_email_unread_rounded,
+            color: kAdminAccent,
+            size: 14,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$count unread message${count > 1 ? 's' : ''}',
+            style: const TextStyle(
+              color: kAdminAccent,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Avatar fallback (unchanged) ──────────────────────────────────────────────────
+
 class _AvatarFallback extends StatelessWidget {
   final String initial;
   const _AvatarFallback({required this.initial});
@@ -1577,7 +2145,7 @@ class _AvatarFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     if (initial.isEmpty) {
       return const Center(
-        child: Icon(Icons.person_rounded, size: 16, color: kAdminTextMuted),
+        child: Icon(Icons.person_rounded, size: 14, color: kAdminTextMuted),
       );
     }
     return Center(
