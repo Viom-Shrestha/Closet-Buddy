@@ -110,6 +110,11 @@ class AdminService {
     return res.statusCode == 204;
   }
 
+  Future<bool> deleteOutfit(int outfitId) async {
+    final res = await _client.delete('/admin/outfits/$outfitId/');
+    return res.statusCode == 204;
+  }
+
   Future<int> bulkReclassify(List<int> ids, String category, String subcategory) async {
     final res = await _client.post('/admin/clothing/reclassify/', {
       'ids': ids,

@@ -1,4 +1,4 @@
-﻿part of '../../features/admin/screens/admin_screen.dart';
+part of '../../features/admin/screens/admin_screen.dart';
 
 class _AdminTabMeta {
   final IconData icon;
@@ -8,112 +8,6 @@ class _AdminTabMeta {
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Section label
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _AdminSectionLabel extends StatelessWidget {
-  final String text;
-  const _AdminSectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Container(
-        width: 3,
-        height: 12,
-        margin: const EdgeInsets.only(right: 8),
-        decoration: BoxDecoration(
-          color: kAdminAccent,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-      Text(
-        text.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: kAdminTextMuted,
-          letterSpacing: 1.8,
-        ),
-      ),
-    ],
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  KPI ticker card (horizontal scroll row)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _KpiCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final String? delta;
-  final Color color;
-
-  const _KpiCard({
-    required this.label,
-    required this.value,
-    this.delta,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 110,
-    margin: const EdgeInsets.only(right: 10),
-    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-    decoration: BoxDecoration(
-      color: kAdminSurface,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: color.withValues(alpha: 0.25)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w800,
-            color: color.withValues(alpha: 0.8),
-            letterSpacing: 1.2,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w900,
-            color: color,
-            letterSpacing: -1.0,
-            height: 1,
-          ),
-        ),
-        if (delta != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: kAdminGreen.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              delta!,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: kAdminGreen,
-              ),
-            ),
-          )
-        else
-          const SizedBox(height: 16),
-      ],
-    ),
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Engagement gauge (arc progress)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _EngagementGauge extends StatelessWidget {
@@ -132,41 +26,67 @@ class _EngagementGauge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pct = (value / max).clamp(0.0, 1.0);
+    final pctStr = '${(pct * 100).toStringAsFixed(0)}%';
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: kAdminSurface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: kAdminBorder),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 56,
-            height: 56,
-            child: CustomPaint(
-              painter: _ArcPainter(progress: pct, color: color),
-              child: Center(
-                child: Text(
-                  value.toInt().toString(),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: color,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
           Text(
             label,
             style: const TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
               color: kAdminTextMuted,
-              letterSpacing: 0.3,
+              letterSpacing: 0.5,
             ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              SizedBox(
+                width: 52,
+                height: 52,
+                child: CustomPaint(
+                  painter: _ArcPainter(progress: pct, color: color),
+                  child: Center(
+                    child: Text(
+                      value.toInt().toString(),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    pctStr,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: color,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const Text(
+                    'of active',
+                    style: TextStyle(fontSize: 9, color: kAdminTextDim),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -236,33 +156,48 @@ class _StatPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+    padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
       color: kAdminSurface,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       border: Border.all(color: kAdminBorder),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    child: Row(
       children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            color: color,
-            letterSpacing: -0.5,
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
           ),
+          child: Icon(icon, size: 17, color: color),
         ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: kAdminTextMuted,
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: kAdminText,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: kAdminTextMuted,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -271,12 +206,12 @@ class _StatPill extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Slot ring chart (donut using CustomPaint)
+//  Slot coverage chart (individual gauges — each value is % of users)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SlotDatum {
   final String label;
-  final double value;
+  final double value; // 0–100 percentage of users who have this slot filled
   final Color color;
   const _SlotDatum(this.label, this.value, this.color);
 }
@@ -287,9 +222,6 @@ class _SlotRingChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = data.fold<double>(0, (s, d) => s + d.value);
-    final avg = data.isEmpty ? 0.0 : total / data.length;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -298,6 +230,7 @@ class _SlotRingChart extends StatelessWidget {
         border: Border.all(color: kAdminBorder),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'SLOT COVERAGE',
@@ -308,68 +241,56 @@ class _SlotRingChart extends StatelessWidget {
               letterSpacing: 1.5,
             ),
           ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 110,
-            child: CustomPaint(
-              painter: _DonutPainter(data: data, total: total),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'AVG',
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: kAdminTextDim,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      avg == 0 ? '—' : '${avg.toStringAsFixed(0)}%',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: kAdminText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          const SizedBox(height: 2),
+          const Text(
+            '% of users with items in each slot',
+            style: TextStyle(fontSize: 9, color: kAdminTextDim),
           ),
           const SizedBox(height: 14),
-          // Legend
           ...data.map(
             (d) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: d.color,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: d.color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        d.label,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: kAdminText,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${d.value.toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: d.color,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 7),
-                  Text(
-                    d.label,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: kAdminTextMuted,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${d.value.toInt()}%',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: d.color,
+                  const SizedBox(height: 5),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: (d.value / 100).clamp(0.0, 1.0),
+                      minHeight: 6,
+                      backgroundColor: kAdminSurface2,
+                      valueColor: AlwaysStoppedAnimation(d.color),
                     ),
                   ),
                 ],
@@ -382,53 +303,11 @@ class _SlotRingChart extends StatelessWidget {
   }
 }
 
-class _DonutPainter extends CustomPainter {
-  final List<_SlotDatum> data;
-  final double total;
-  const _DonutPainter({required this.data, required this.total});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.shortestSide / 2 - 6;
-    var start = -3.14159 / 2;
-
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 16
-      ..strokeCap = StrokeCap.round;
-
-    // Background ring
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      0,
-      2 * 3.14159,
-      false,
-      paint..color = kAdminSurface2,
-    );
-
-    for (final d in data) {
-      final sweep = total == 0 ? 0.0 : (d.value / total) * 2 * 3.14159;
-      if (sweep <= 0) continue;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        start,
-        sweep - 0.06,
-        false,
-        paint..color = d.color,
-      );
-      start += sweep;
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DonutPainter old) => false;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-//  Rating meter (horizontal fill bar)
+//  _RatingMeter (unused — kept for potential future use)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ignore: unused_element
 class _RatingMeter extends StatelessWidget {
   final double rating;
   final double max;
@@ -503,9 +382,10 @@ class _RatingMeter extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Stat block 2 (icon + value)
+//  _StatBlock2 (unused — kept for potential future use)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ignore: unused_element
 class _StatBlock2 extends StatelessWidget {
   final String label;
   final String value;
@@ -708,7 +588,7 @@ class _HBarRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Color swatch chart
+//  Color pie chart
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ColorSwatchChart extends StatelessWidget {
@@ -735,6 +615,14 @@ class _ColorSwatchChart extends StatelessWidget {
     'cream': Color(0xFFD4C5A9),
     'khaki': Color(0xFFC2B280),
     'indigo': Color(0xFF6366F1),
+    'burgundy': Color(0xFF9B1C1C),
+    'olive': Color(0xFF84894A),
+    'turquoise': Color(0xFF06B6D4),
+    'lavender': Color(0xFFA78BFA),
+    'mustard': Color(0xFFEAB308),
+    'blush': Color(0xFFFCA5A5),
+    'coral': Color(0xFFF97316),
+    'sage': Color(0xFF86EFAC),
   };
 
   Color _resolve(String name) {
@@ -749,12 +637,16 @@ class _ColorSwatchChart extends StatelessWidget {
   Widget build(BuildContext context) {
     if (rows.isEmpty) return const SizedBox.shrink();
 
+    final labels = rows
+        .map((r) => (r['dominant_color'] ?? '—').toString())
+        .toList();
     final nums = rows.map((r) {
       final v = r['total'] ?? r['count'];
       if (v is num) return v.toDouble();
       return double.tryParse(v?.toString() ?? '') ?? 0.0;
     }).toList();
-    final maxVal = nums.isEmpty ? 1.0 : nums.reduce((a, b) => a > b ? a : b);
+    final total = nums.fold(0.0, (a, b) => a + b);
+    final colors = labels.map(_resolve).toList();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -765,106 +657,423 @@ class _ColorSwatchChart extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (int i = 0; i < rows.length; i++) ...[
-            _ColorBarRow(
-              label: rows[i]['dominant_color']?.toString() ?? '—',
-              value: nums[i],
-              maxValue: maxVal,
-              swatch: _resolve(rows[i]['dominant_color']?.toString() ?? ''),
+          // Pie chart
+          SizedBox(
+            width: 160,
+            height: 160,
+            child: CustomPaint(
+              painter: _PiePainter(values: nums, colors: colors, total: total),
             ),
-            if (i < rows.length - 1) const SizedBox(height: 10),
-          ],
+          ),
+          const SizedBox(height: 16),
+          // Legend
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: List.generate(labels.length, (i) {
+              final pct = total == 0 ? 0.0 : nums[i] / total * 100;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: colors[i],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '${labels[i]} ${pct.toStringAsFixed(0)}%',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: kAdminTextMuted,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
         ],
       ),
     );
   }
 }
 
-class _ColorBarRow extends StatelessWidget {
-  final String label;
-  final double value;
-  final double maxValue;
-  final Color swatch;
-
-  const _ColorBarRow({
-    required this.label,
-    required this.value,
-    required this.maxValue,
-    required this.swatch,
+class _PiePainter extends CustomPainter {
+  final List<double> values;
+  final List<Color> colors;
+  final double total;
+  const _PiePainter({
+    required this.values,
+    required this.colors,
+    required this.total,
   });
 
   @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide / 2;
+    var startAngle = -3.14159 / 2;
+    const gap = 0.03;
+
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    for (int i = 0; i < values.length; i++) {
+      if (total == 0 || values[i] == 0) continue;
+      final sweep = (values[i] / total) * 2 * 3.14159 - gap;
+      paint.color = colors[i];
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        sweep,
+        true,
+        paint,
+      );
+      startAngle += sweep + gap;
+    }
+
+    // Centre hole
+    canvas.drawCircle(center, radius * 0.42, Paint()..color = kAdminSurface);
+  }
+
+  @override
+  bool shouldRepaint(_PiePainter old) =>
+      old.values != values || old.total != total;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Outfits-per-day line chart (7 days)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _OutfitsPerDayChart extends StatelessWidget {
+  final List<Map<String, dynamic>> rows; // [{date, count}]
+  const _OutfitsPerDayChart({required this.rows});
+
+  @override
   Widget build(BuildContext context) {
-    final pct = maxValue == 0 ? 0.0 : (value / maxValue).clamp(0.0, 1.0);
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: swatch,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: swatch.withValues(alpha: 0.5),
-                blurRadius: 6,
-                offset: const Offset(0, 1),
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    final counts = rows.map((r) {
+      final v = r['count'];
+      return (v is num)
+          ? v.toDouble()
+          : double.tryParse(v?.toString() ?? '') ?? 0.0;
+    }).toList();
+
+    final labels = rows.map((r) {
+      final raw = r['date']?.toString() ?? '';
+      final dt = DateTime.tryParse(raw);
+      if (dt == null) return raw;
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return days[dt.weekday - 1];
+    }).toList();
+
+    final total = counts.fold(0.0, (a, b) => a + b).toInt();
+    final peak = counts.fold(0.0, (a, b) => a > b ? a : b).toInt();
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        color: kAdminSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kAdminBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'OUTFITS CREATED',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: kAdminTextMuted,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Last 7 days',
+                      style: TextStyle(fontSize: 10, color: kAdminTextDim),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '$total',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: kAdminText,
+                      letterSpacing: -0.5,
+                      height: 1,
+                    ),
+                  ),
+                  Text(
+                    'peak $peak/day',
+                    style: const TextStyle(fontSize: 9, color: kAdminTextDim),
+                  ),
+                ],
               ),
             ],
           ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 60,
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: kAdminText,
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 100,
+            child: CustomPaint(
+              size: Size.infinite,
+              painter: _LineChartPainter(
+                values: counts,
+                lineColor: kAdminAccent,
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Stack(
-            children: [
-              Container(
-                height: 8,
-                decoration: BoxDecoration(
-                  color: kAdminSurface2,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              FractionallySizedBox(
-                widthFactor: pct,
-                child: Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: swatch.withValues(alpha: 0.85),
-                    borderRadius: BorderRadius.circular(4),
+          const SizedBox(height: 8),
+          // Day labels
+          Row(
+            children: List.generate(labels.length, (i) {
+              final isToday = i == labels.length - 1;
+              return Expanded(
+                child: Text(
+                  labels[i],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
+                    color: isToday ? kAdminAccent : kAdminTextDim,
                   ),
                 ),
-              ),
-            ],
+              );
+            }),
           ),
-        ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 28,
-          child: Text(
-            value.toInt().toString(),
-            textAlign: TextAlign.right,
+        ],
+      ),
+    );
+  }
+}
+
+class _LineChartPainter extends CustomPainter {
+  final List<double> values;
+  final Color lineColor;
+  const _LineChartPainter({required this.values, required this.lineColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.length < 2) return;
+
+    final maxVal = values.fold(0.0, (a, b) => a > b ? a : b);
+    final effectiveMax = maxVal == 0 ? 1.0 : maxVal;
+
+    // ── grid lines ──────────────────────────────────────────────────────────
+    final gridPaint = Paint()
+      ..color = lineColor.withValues(alpha: 0.08)
+      ..strokeWidth = 1;
+    for (int g = 0; g <= 3; g++) {
+      final y = size.height * (1 - g / 3);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    // ── compute points ───────────────────────────────────────────────────────
+    final n = values.length;
+    final points = List.generate(n, (i) {
+      final x = i / (n - 1) * size.width;
+      final y = size.height * (1 - (values[i] / effectiveMax).clamp(0, 1));
+      return Offset(x, y);
+    });
+
+    // ── filled area ──────────────────────────────────────────────────────────
+    final fillPath = Path()..moveTo(0, size.height);
+    for (final pt in points) {
+      fillPath.lineTo(pt.dx, pt.dy);
+    }
+    fillPath.lineTo(size.width, size.height);
+    fillPath.close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          lineColor.withValues(alpha: 0.18),
+          lineColor.withValues(alpha: 0.0),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawPath(fillPath, fillPaint);
+
+    // ── line ─────────────────────────────────────────────────────────────────
+    final linePath = Path()..moveTo(points[0].dx, points[0].dy);
+    for (int i = 1; i < points.length; i++) {
+      // cubic bezier for smooth curve
+      final prev = points[i - 1];
+      final curr = points[i];
+      final cpX = (prev.dx + curr.dx) / 2;
+      linePath.cubicTo(cpX, prev.dy, cpX, curr.dy, curr.dx, curr.dy);
+    }
+    canvas.drawPath(
+      linePath,
+      Paint()
+        ..color = lineColor
+        ..strokeWidth = 2.2
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    // ── dots ─────────────────────────────────────────────────────────────────
+    for (int i = 0; i < points.length; i++) {
+      final isToday = i == points.length - 1;
+      // white fill
+      canvas.drawCircle(
+        points[i],
+        isToday ? 5.0 : 3.5,
+        Paint()..color = const Color(0xFF1A1A2E),
+      );
+      // colored ring
+      canvas.drawCircle(
+        points[i],
+        isToday ? 5.0 : 3.5,
+        Paint()
+          ..color = lineColor.withValues(alpha: isToday ? 1.0 : 0.7)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = isToday ? 2.5 : 1.8,
+      );
+      if (isToday) {
+        canvas.drawCircle(points[i], 2.0, Paint()..color = lineColor);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LineChartPainter old) => old.values != values;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Storage types breakdown
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _StorageTypesChart extends StatelessWidget {
+  final List<Map<String, dynamic>> rows; // [{type, total}]
+  const _StorageTypesChart({required this.rows});
+
+  static const _iconMap = <String, IconData>{
+    'closet': Icons.door_sliding_outlined,
+    'wardrobe': Icons.door_back_door_outlined,
+    'cupboard': Icons.shelves,
+    'shelf': Icons.shelves,
+    'drawer': Icons.table_rows_outlined,
+    'box': Icons.inbox_outlined,
+    'other': Icons.inventory_2_outlined,
+  };
+
+  static const _colorList = [
+    kAdminBlue,
+    kAdminAccent,
+    kAdminGreen,
+    kAdminYellow,
+    kAdminRed,
+    kAdminTextMuted,
+    kAdminTextDim,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    final nums = rows.map((r) {
+      final v = r['total'];
+      return (v is num)
+          ? v.toDouble()
+          : double.tryParse(v?.toString() ?? '') ?? 0.0;
+    }).toList();
+    final maxVal = nums.fold(0.0, (a, b) => a > b ? a : b);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kAdminSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kAdminBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'STORAGE TYPES',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w800,
-              color: swatch,
+              color: kAdminTextMuted,
+              letterSpacing: 1.5,
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 14),
+          ...List.generate(rows.length, (i) {
+            final label = (rows[i]['type'] ?? '—').toString();
+            final normalizedLabel = label.trim();
+            final titleLabel = normalizedLabel.isEmpty
+                ? '—'
+                : normalizedLabel[0].toUpperCase() +
+                      normalizedLabel.substring(1);
+            final icon =
+                _iconMap[normalizedLabel.toLowerCase()] ??
+                Icons.inventory_2_outlined;
+            final color = _colorList[i % _colorList.length];
+            final frac = maxVal == 0 ? 0.0 : (nums[i] / maxVal).clamp(0.0, 1.0);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Icon(icon, size: 14, color: color),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 62,
+                    child: Text(
+                      titleLabel,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: kAdminText,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: frac,
+                        minHeight: 6,
+                        backgroundColor: kAdminSurface2,
+                        valueColor: AlwaysStoppedAnimation(color),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    nums[i].toInt().toString(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 }
@@ -882,63 +1091,13 @@ class _RecentUserRow extends StatelessWidget {
     return s.isEmpty ? '?' : s[0].toUpperCase();
   }
 
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 8),
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(
-      color: kAdminSurface,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: kAdminBorder),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: kAdminAccent.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              _initial(user['username']?.toString()),
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: kAdminAccent,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                user['username']?.toString() ?? '—',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: kAdminText,
-                ),
-              ),
-              Text(
-                user['email']?.toString() ?? '',
-                style: const TextStyle(fontSize: 11, color: kAdminTextMuted),
-              ),
-            ],
-          ),
-        ),
-        if (user['date_joined'] != null)
-          Text(
-            _fmt(user['date_joined'].toString()),
-            style: const TextStyle(fontSize: 10, color: kAdminTextDim),
-          ),
-      ],
-    ),
-  );
+  String _avatarUrl(dynamic raw) {
+    final s = (raw ?? '').toString().trim();
+    if (s.isEmpty) return '';
+    if (s.startsWith('http://') || s.startsWith('https://')) return s;
+    if (s.startsWith('/')) return '${ApiClient.host}$s';
+    return '${ApiClient.host}/$s';
+  }
 
   String _fmt(String raw) {
     final dt = DateTime.tryParse(raw)?.toLocal();
@@ -958,6 +1117,169 @@ class _RecentUserRow extends StatelessWidget {
       'Dec',
     ];
     return '${mo[dt.month - 1]} ${dt.day}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = user['is_active'] == true;
+    final clothing = user['clothing_count'] ?? 0;
+    final outfits = user['outfit_count'] ?? 0;
+    final avatarInitial = _initial(user['username']?.toString());
+    final avatarUrl = _avatarUrl(user['avatar']);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: kAdminSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kAdminBorder),
+      ),
+      child: Row(
+        children: [
+          // Avatar
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: kAdminAccent.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: ClipOval(
+              child: avatarUrl.isNotEmpty
+                  ? Image.network(
+                      avatarUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Center(
+                        child: Text(
+                          avatarInitial,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: kAdminAccent,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Center(
+                      child: Text(
+                        avatarInitial,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: kAdminAccent,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Name + email
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        user['username']?.toString() ?? '—',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kAdminText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? kAdminGreen.withValues(alpha: 0.12)
+                            : kAdminTextDim.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isActive ? 'Active' : 'Inactive',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: isActive ? kAdminGreen : kAdminTextDim,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Text(
+                      user['email']?.toString() ?? '',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: kAdminTextMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Counts + date
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (user['date_joined'] != null)
+                Text(
+                  _fmt(user['date_joined'].toString()),
+                  style: const TextStyle(fontSize: 10, color: kAdminTextDim),
+                ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.checkroom_outlined,
+                    size: 10,
+                    color: kAdminTextDim,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    '$clothing',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: kAdminTextMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.style_outlined,
+                    size: 10,
+                    color: kAdminTextDim,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    '$outfits',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: kAdminTextMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1062,10 +1384,20 @@ class _UserCard extends StatelessWidget {
     return s.isEmpty ? '?' : s[0].toUpperCase();
   }
 
+  String _avatarUrl(dynamic raw) {
+    final s = (raw ?? '').toString().trim();
+    if (s.isEmpty) return '';
+    if (s.startsWith('http://') || s.startsWith('https://')) return s;
+    if (s.startsWith('/')) return '${ApiClient.host}$s';
+    return '${ApiClient.host}/$s';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isActive = user['is_active'] == true;
     final isStaff = user['is_staff'] == true;
+    final avatarInitial = _initial(user['username']?.toString());
+    final avatarUrl = _avatarUrl(user['avatar']);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1095,15 +1427,34 @@ class _UserCard extends StatelessWidget {
                           : kAdminBorder,
                     ),
                   ),
-                  child: Center(
-                    child: Text(
-                      _initial(user['username']?.toString()),
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: isActive ? kAdminAccent : kAdminTextDim,
-                      ),
-                    ),
+                  child: ClipOval(
+                    child: avatarUrl.isNotEmpty
+                        ? Image.network(
+                            avatarUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Center(
+                              child: Text(
+                                avatarInitial,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: isActive
+                                      ? kAdminAccent
+                                      : kAdminTextDim,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              avatarInitial,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: isActive ? kAdminAccent : kAdminTextDim,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1203,7 +1554,7 @@ class _UserCard extends StatelessWidget {
                   onTap: () => onStaff(user),
                 ),
                 _UserAction(
-                  label: 'Reset pwd',
+                  label: 'Reset password',
                   icon: Icons.lock_reset_rounded,
                   onTap: () => onReset(user),
                 ),
@@ -1299,10 +1650,14 @@ class _CatalogItemCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? kAdminAccent.withValues(alpha: 0.08) : kAdminSurface,
+          color: selected
+              ? kAdminAccent.withValues(alpha: 0.08)
+              : kAdminSurface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? kAdminAccent.withValues(alpha: 0.4) : kAdminBorder,
+            color: selected
+                ? kAdminAccent.withValues(alpha: 0.4)
+                : kAdminBorder,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -1402,7 +1757,8 @@ class _CatalogItemCard extends StatelessWidget {
 
 class _OutfitGridCard extends StatelessWidget {
   final Map<String, dynamic> outfit;
-  const _OutfitGridCard({required this.outfit});
+  final VoidCallback? onDelete;
+  const _OutfitGridCard({required this.outfit, this.onDelete});
 
   String _img(dynamic raw) {
     final s = (raw ?? '').toString().trim();
@@ -1412,19 +1768,11 @@ class _OutfitGridCard extends StatelessWidget {
     return '${ApiClient.host}/$s';
   }
 
-  String _itemLabel(Map<String, dynamic>? item) {
-    if (item == null) return '—';
-    final sub = (item['subcategory'] ?? '').toString();
-    final cat = (item['category'] ?? '').toString();
-    final label = sub.isNotEmpty ? sub : cat;
-    return label.isEmpty ? '—' : label;
-  }
-
   @override
   Widget build(BuildContext context) {
     final name = (outfit['name'] ?? 'Outfit').toString();
     final rating = outfit['rating']?.toString() ?? '—';
-    final wears = (outfit['wear_count'] ?? 0).toString();
+    final wears = (outfit['wear_count'] ?? 0);
     final occasion = (outfit['occasion'] ?? '').toString();
     final isFav = outfit['is_favourite'] == true;
     final userMap = outfit['user'] is Map
@@ -1445,39 +1793,8 @@ class _OutfitGridCard extends StatelessWidget {
         ? Map<String, dynamic>.from(outfit['shoes_item'] as Map)
         : null;
 
-    final slotPreview = [
-      _SlotPreviewRow(
-        icon: Icons.layers_outlined,
-        label: 'Outer',
-        value: _itemLabel(outerwear),
-        color: kAdminYellow,
-        imageUrl: _img(outerwear?['image']),
-      ),
-      _SlotPreviewRow(
-        icon: Icons.checkroom_outlined,
-        label: 'Top',
-        value: _itemLabel(topwear),
-        color: kAdminAccent,
-        imageUrl: _img(topwear?['image']),
-      ),
-      _SlotPreviewRow(
-        icon: Icons.straighten_rounded,
-        label: 'Bottom',
-        value: _itemLabel(bottomwear),
-        color: kAdminBlue,
-        imageUrl: _img(bottomwear?['image']),
-      ),
-      _SlotPreviewRow(
-        icon: Icons.directions_walk_outlined,
-        label: 'Shoes',
-        value: _itemLabel(shoes),
-        color: kAdminGreen,
-        imageUrl: _img(shoes?['image']),
-      ),
-    ];
-
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: kAdminSurface,
         borderRadius: BorderRadius.circular(14),
@@ -1486,6 +1803,69 @@ class _OutfitGridCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Slot images — 2×2 grid fills most of the card
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _SlotThumb(
+                            item: outerwear,
+                            icon: Icons.layers_outlined,
+                            color: kAdminYellow,
+                            label: 'Outer',
+                            imgFn: _img,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: _SlotThumb(
+                            item: topwear,
+                            icon: Icons.checkroom_outlined,
+                            color: kAdminAccent,
+                            label: 'Top',
+                            imgFn: _img,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _SlotThumb(
+                            item: bottomwear,
+                            icon: Icons.straighten_rounded,
+                            color: kAdminBlue,
+                            label: 'Bottom',
+                            imgFn: _img,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: _SlotThumb(
+                            item: shoes,
+                            icon: Icons.directions_walk_outlined,
+                            color: kAdminGreen,
+                            label: 'Shoes',
+                            imgFn: _img,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Name + fav + delete
           Row(
             children: [
               Expanded(
@@ -1494,67 +1874,121 @@ class _OutfitGridCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: kAdminText,
                   ),
                 ),
               ),
-              if (isFav)
-                const Icon(Icons.favorite_rounded, color: kAdminRed, size: 14),
+              if (isFav) ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.favorite_rounded, color: kAdminRed, size: 12),
+              ],
+              if (onDelete != null) ...[
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: onDelete,
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: kAdminRedDim,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      size: 12,
+                      color: kAdminRed,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
+          // User + occasion + rating
           Row(
             children: [
               Text(
                 '@$username',
-                style: const TextStyle(fontSize: 10, color: kAdminTextMuted),
+                style: const TextStyle(fontSize: 9, color: kAdminTextMuted),
               ),
               const Spacer(),
-              const Icon(Icons.star_rounded, size: 11, color: kAdminYellow),
+              if (occasion.isNotEmpty) ...[
+                _SmallBadge(occasion, bg: kAdminAccentDim, fg: kAdminAccent),
+                const SizedBox(width: 4),
+              ],
+              _SmallBadge('${wears}x', bg: kAdminSurface2, fg: kAdminTextDim),
+              const SizedBox(width: 4),
+              const Icon(Icons.star_rounded, size: 10, color: kAdminYellow),
               const SizedBox(width: 2),
               Text(
                 rating,
                 style: const TextStyle(
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: kAdminYellow,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              if (occasion.isNotEmpty)
-                _SmallBadge(occasion, bg: kAdminAccentDim, fg: kAdminAccent),
-              if (occasion.isNotEmpty) const SizedBox(width: 6),
-              _SmallBadge(
-                '$wears wears',
-                bg: kAdminSurface2,
-                fg: kAdminTextDim,
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: slotPreview[0]),
-              const SizedBox(width: 8),
-              Expanded(child: slotPreview[1]),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: slotPreview[2]),
-              const SizedBox(width: 8),
-              Expanded(child: slotPreview[3]),
-            ],
-          ),
         ],
       ),
+    );
+  }
+}
+
+class _SlotThumb extends StatelessWidget {
+  final Map<String, dynamic>? item;
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String Function(dynamic) imgFn;
+
+  const _SlotThumb({
+    required this.item,
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.imgFn,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imgUrl = imgFn(item?['image']);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(
+          color: color.withValues(alpha: 0.08),
+          child: imgUrl.isNotEmpty
+              ? Image.network(
+                  imgUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) =>
+                      Center(child: Icon(icon, size: 18, color: color)),
+                )
+              : Center(child: Icon(icon, size: 18, color: color)),
+        ),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            color: Colors.black45,
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 7,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1582,78 +2016,6 @@ class _SmallBadge extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(fontSize: 10, color: fg, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-}
-
-class _SlotPreviewRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-  final String imageUrl;
-
-  const _SlotPreviewRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.imageUrl,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              color: kAdminWhite.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: color.withValues(alpha: 0.25)),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: imageUrl.isNotEmpty
-                ? Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        Icon(icon, size: 14, color: color),
-                  )
-                : Icon(icon, size: 14, color: color),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: kAdminText,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1847,10 +2209,14 @@ class _DarkChipButton extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: highlight ? kAdminAccent.withValues(alpha: 0.15) : kAdminSurface2,
+        color: highlight
+            ? kAdminAccent.withValues(alpha: 0.15)
+            : kAdminSurface2,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: highlight ? kAdminAccent.withValues(alpha: 0.35) : kAdminBorder,
+          color: highlight
+              ? kAdminAccent.withValues(alpha: 0.35)
+              : kAdminBorder,
         ),
       ),
       child: Row(
@@ -1880,10 +2246,7 @@ class _DarkTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
 
-  const _DarkTextField({
-    required this.controller,
-    required this.label,
-  });
+  const _DarkTextField({required this.controller, required this.label});
 
   @override
   Widget build(BuildContext context) => TextField(
@@ -1897,3 +2260,80 @@ class _DarkTextField extends StatelessWidget {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Dropdown with predefined options (category / subcategory)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DarkDropdown extends StatefulWidget {
+  final TextEditingController controller;
+  final String label;
+  final List<String> options;
+
+  const _DarkDropdown({
+    required this.controller,
+    required this.label,
+    required this.options,
+  });
+
+  @override
+  State<_DarkDropdown> createState() => _DarkDropdownState();
+}
+
+class _DarkDropdownState extends State<_DarkDropdown> {
+  String? _selected;
+
+  static const _kAny = 'Any';
+
+  @override
+  void initState() {
+    super.initState();
+    final v = widget.controller.text.trim();
+    _selected = v.isEmpty ? null : v;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String?>(
+      initialValue: _selected,
+      isExpanded: true,
+      style: const TextStyle(fontSize: 14, color: kAdminText),
+      dropdownColor: kAdminSurface,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        labelStyle: const TextStyle(fontSize: 13, color: kAdminTextMuted),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: kAdminBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: kAdminAccent),
+        ),
+      ),
+      items: [
+        const DropdownMenuItem<String?>(
+          value: null,
+          child: Text(
+            _kAny,
+            style: TextStyle(fontSize: 13, color: kAdminTextDim),
+          ),
+        ),
+        ...widget.options.map(
+          (opt) => DropdownMenuItem<String?>(
+            value: opt,
+            child: Text(opt, style: const TextStyle(fontSize: 13)),
+          ),
+        ),
+      ],
+      onChanged: (v) {
+        setState(() => _selected = v);
+        widget.controller.text = v ?? '';
+      },
+    );
+  }
+}

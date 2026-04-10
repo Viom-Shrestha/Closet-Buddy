@@ -44,13 +44,30 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
     'dry',
   ];
   static const String _shoeCategory = 'Shoes';
-  static const List<String> _shoeOccasionValues = [
+
+  static const List<String> _kCategoryValues = [
+    'Topwear',
+    'Outerwear',
+    'Bottomwear',
+    'Footwear',
+    'Dress',
+    'Accessories',
+  ];
+
+  static const List<String> _kOccasionValues = [
     'Casual',
-    'Sports',
     'Formal',
-    'Outdoor',
+    'Office',
     'Party',
+    'Date',
+    'Traditional',
+    'Sport',
     'Home',
+    'Travel',
+    'Beach',
+    'Street',
+    'Outdoor',
+    'Workout',
   ];
 
   late AnimationController _enterCtrl;
@@ -102,24 +119,13 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
       category: _safe(data?['category']),
       subcategory: _safe(data?['subcategory']),
     );
-    final shoeOccasions = allItems
-        .where(
-          (entry) => _looksLikeShoeMetadata(
-            category: _safe(entry['category']),
-            subcategory: _safe(entry['subcategory']),
-          ),
-        )
-        .map((entry) => _safe(entry['occasion']))
-        .where((entry) => entry.isNotEmpty)
-        .toList();
     if (mounted) {
       setState(() {
         item = data;
         if (isShoeItem) {
           _categoryOptions = const [_shoeCategory];
           _occasionOptions = _normalizeOptions([
-            ..._shoeOccasionValues,
-            ...shoeOccasions,
+            ..._kOccasionValues,
             _safe(data?['occasion']),
           ]);
           if (_safe(item?['category']).isEmpty ||
@@ -127,16 +133,14 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
             item?['category'] = _shoeCategory;
           }
         } else {
-          _categoryOptions = _collectOptions(
-            allItems,
-            'category',
-            extras: [_safe(data?['category'])],
-          );
-          _occasionOptions = _collectOptions(
-            allItems,
-            'occasion',
-            extras: [_safe(data?['occasion'])],
-          );
+          _categoryOptions = _normalizeOptions([
+            ..._kCategoryValues,
+            _safe(data?['category']),
+          ]);
+          _occasionOptions = _normalizeOptions([
+            ..._kOccasionValues,
+            _safe(data?['occasion']),
+          ]);
         }
         _temperatureOptions = _collectOptions(
           allItems,

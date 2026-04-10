@@ -29,13 +29,30 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
   final ImagePicker picker = ImagePicker();
   static const String _shoeCategory = 'Shoes';
   static const String _defaultShoeOccasion = 'Casual';
-  static const List<String> _shoeOccasionValues = [
+
+  static const List<String> _kCategoryValues = [
+    'Topwear',
+    'Outerwear',
+    'Bottomwear',
+    'Footwear',
+    'Dress',
+    'Accessories',
+  ];
+
+  static const List<String> _kOccasionValues = [
     'Casual',
-    'Sports',
     'Formal',
-    'Outdoor',
+    'Office',
     'Party',
+    'Date',
+    'Traditional',
+    'Sport',
     'Home',
+    'Travel',
+    'Beach',
+    'Street',
+    'Outdoor',
+    'Workout',
   ];
 
   UploadStep currentStep = UploadStep.selectImage;
@@ -1508,26 +1525,6 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     return (value ?? '').toString().trim();
   }
 
-  bool _looksLikeShoeMetadata({
-    required String category,
-    required String subcategory,
-  }) {
-    final blob = '$category $subcategory'.toLowerCase();
-    const keys = [
-      'shoe',
-      'shoes',
-      'sneaker',
-      'boot',
-      'heel',
-      'footwear',
-      'slipper',
-      'sandal',
-      'loafer',
-      'flip flop',
-    ];
-    return keys.any(blob.contains);
-  }
-
   List<String> _mergeDropdownOptions(
     List<String> values, {
     String currentValue = '',
@@ -1566,16 +1563,6 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
       if (!mounted) return;
       setState(() {
         if (widget.isShoe) {
-          final shoeOccasions = items
-              .where(
-                (entry) => _looksLikeShoeMetadata(
-                  category: _safeText(entry['category']),
-                  subcategory: _safeText(entry['subcategory']),
-                ),
-              )
-              .map((entry) => _safeText(entry['occasion']))
-              .where((entry) => entry.isNotEmpty)
-              .toList();
           category = _shoeCategory;
           categoryController.text = _shoeCategory;
           if (occasionController.text.trim().isEmpty) {
@@ -1584,22 +1571,17 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
           }
           _categoryOptions = const [_shoeCategory];
           _occasionOptions = _mergeDropdownOptions(
-            [
-              ..._shoeOccasionValues,
-              ...shoeOccasions,
-            ],
+            _kOccasionValues,
             currentValue: occasionController.text,
           );
         } else {
-          _categoryOptions = _collectOptions(
-            items,
-            'category',
-            extras: [categoryController.text],
+          _categoryOptions = _mergeDropdownOptions(
+            _kCategoryValues,
+            currentValue: categoryController.text,
           );
-          _occasionOptions = _collectOptions(
-            items,
-            'occasion',
-            extras: [occasionController.text],
+          _occasionOptions = _mergeDropdownOptions(
+            _kOccasionValues,
+            currentValue: occasionController.text,
           );
         }
         _temperatureOptions = _collectOptions(
@@ -1631,13 +1613,16 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
             occasionController.text = occasion;
           }
           _categoryOptions = const [_shoeCategory];
-          _occasionOptions = _mergeDropdownOptions([
-            ..._shoeOccasionValues,
-            occasionController.text,
-          ]);
+          _occasionOptions = _mergeDropdownOptions(_kOccasionValues);
         } else {
-          _categoryOptions = _mergeDropdownOptions([categoryController.text]);
-          _occasionOptions = _mergeDropdownOptions([occasionController.text]);
+          _categoryOptions = _mergeDropdownOptions(
+            _kCategoryValues,
+            currentValue: categoryController.text,
+          );
+          _occasionOptions = _mergeDropdownOptions(
+            _kOccasionValues,
+            currentValue: occasionController.text,
+          );
         }
         _temperatureOptions = _mergeDropdownOptions([
           detectedTempController.text,
