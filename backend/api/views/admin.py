@@ -49,6 +49,7 @@ def _serialize_user_row(user):
         "id": user.id,
         "username": user.username,
         "email": user.email,
+        "avatar": _avatar_url(user),
         "first_name": user.first_name,
         "last_name": user.last_name,
         "is_staff": user.is_staff,
@@ -60,6 +61,14 @@ def _serialize_user_row(user):
         "storage_count": getattr(user, "storage_count", 0),
         "accessory_count": getattr(user, "accessory_count", 0),
     }
+
+
+def _avatar_url(user):
+    try:
+        profile = user.profile
+    except UserProfile.DoesNotExist:
+        return None
+    return profile.avatar.url if profile.avatar else None
 
 
 def _parse_limit_offset(request, default_limit=50, max_limit=200):
@@ -171,7 +180,7 @@ def admin_dashboard(request):
     )
 
     recent_users_qs = (
-        User.objects.order_by("-date_joined")
+        User.objects.select_related("profile").order_by("-date_joined")
         .annotate(
             clothing_count=Count("clothing_items", distinct=True),
             outfit_count=Count("outfits", distinct=True),
@@ -202,13 +211,6 @@ def admin_dashboard(request):
     avg_rating = Outfit.objects.filter(rating__isnull=False).aggregate(avg=Avg("rating"))["avg"]
     favourite_rate = round((favourite_outfits / total_outfits) * 100, 2) if total_outfits else 0.0
     avg_wardrobe = round(total_clothing / total_users, 2) if total_users else 0.0
-
-    top_outfit_items = list(
-        ClothingItem.objects.filter(outfits__isnull=False)
-        .values("id", "category", "subcategory")
-        .annotate(total=Count("outfits"))
-        .order_by("-total")[:6]
-    )
 
     def slot_user_count(keys):
         query = Q()
@@ -269,7 +271,6 @@ def admin_dashboard(request):
                 "average_rating": round(avg_rating, 2) if avg_rating is not None else None,
                 "favourite_rate": favourite_rate,
                 "outfits_per_day": outfits_per_day,
-                "most_used_items": top_outfit_items,
             },
             "slot_coverage": {
                 "topwear_percent": percent(topwear_users),
@@ -298,7 +299,7 @@ def admin_users(request):
     except ValueError:
         limit = 100
 
-    users = User.objects.all()
+    users = User.objects.select_related("profile").all()
     if query:
         users = users.filter(
             Q(username__icontains=query)
@@ -370,7 +371,7 @@ def admin_user_summary(request, user_id):
         return denied
 
     try:
-        user = User.objects.get(id=user_id)
+        user = User.objects.select_related("profile").get(id=user_id)
     except User.DoesNotExist:
         return Response({"detail": "User not found."}, status=404)
 
@@ -390,6 +391,7 @@ def admin_user_summary(request, user_id):
                 "id": user.id,
                 "username": user.username,
                 "email": user.email,
+                "avatar": _avatar_url(user),
                 "first_name": user.first_name,
                 "last_name": user.last_name,
                 "date_joined": user.date_joined.isoformat(),
@@ -616,6 +618,10 @@ def admin_outfit_detail(request, outfit_id):
     except Outfit.DoesNotExist:
         return Response({"detail": "Outfit not found."}, status=404)
 
+    if request.method == "DELETE":
+        outfit.delete()
+        return Response(status=204)
+
     payload = OutfitReadSerializer(outfit, context={"request": request}).data
     payload["user"] = {
         "id": outfit.user_id,
@@ -758,6 +764,9 @@ class AdminViewSet(viewsets.ViewSet):
     def outfit_detail(self, request, outfit_id=None):
         return admin_outfit_detail(request, outfit_id)
 
+    def outfit_delete(self, request, outfit_id=None):
+        return admin_outfit_detail(request, outfit_id)
+
     def non_clothing_list(self, request):
         return admin_non_clothing_list(request)
 
@@ -766,4 +775,3 @@ class AdminViewSet(viewsets.ViewSet):
 
     def feedback_mark_read(self, request, feedback_id=None):
         return admin_feedback_mark_read(request, feedback_id)
-
