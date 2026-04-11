@@ -38,11 +38,19 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
   bool _selectionMode = false;
   final Set<int> _selectedClothingIds = <int>{};
   List<Map<String, dynamic>> _breadcrumbChain = const [];
+  final TextEditingController _storageSearchController =
+      TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _storageSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -1044,105 +1052,237 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: StorageTokens.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: StorageTokens.transparent,
       builder: (_) => StatefulBuilder(
         builder: (context, setModalState) {
-          Widget dd(
+          Widget filterChip(
             String label,
             String value,
             List<String> options,
-            ValueChanged<String?> onChanged,
+            ValueChanged<String> onChanged,
           ) {
-            return DropdownButtonFormField<String>(
-              initialValue: options.contains(value) ? value : 'All',
-              decoration: InputDecoration(
-                labelText: label,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: StorageTokens.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: options.map((option) {
+                      final isSelected = value == option;
+                      return GestureDetector(
+                        onTap: () =>
+                            setModalState(() => onChanged(option)),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? StorageTokens.inkStrong
+                                : StorageTokens.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected
+                                  ? StorageTokens.inkStrong
+                                  : StorageTokens.line,
+                            ),
+                          ),
+                          child: Text(
+                            option,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: isSelected
+                                  ? StorageTokens.surface
+                                  : StorageTokens.inkStrong,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ),
-              items: options
-                  .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-                  .toList(),
-              onChanged: onChanged,
             );
           }
 
-          return SafeArea(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                MediaQuery.of(context).viewInsets.bottom + 16,
-              ),
-              child: SingleChildScrollView(
+          return Container(
+            decoration: const BoxDecoration(
+              color: StorageTokens.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  20,
+                  24,
+                  MediaQuery.of(context).viewInsets.bottom + 24,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Search Filters',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                    Row(
+                      children: [
+                        const Text(
+                          'Filters & Sort',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                          style: IconButton.styleFrom(
+                            backgroundColor: StorageTokens.surfaceSoft,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.55,
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            filterChip(
+                              'Subcategory',
+                              subcategory,
+                              _storageOptionsFor(clothes, 'subcategory'),
+                              (v) => subcategory = v,
+                            ),
+                            filterChip(
+                              'Occasion',
+                              occasion,
+                              _storageOptionsFor(clothes, 'occasion'),
+                              (v) => occasion = v,
+                            ),
+                            filterChip(
+                              'Color',
+                              color,
+                              _storageOptionsFor(clothes, 'dominant_color'),
+                              (v) => color = v,
+                            ),
+                            filterChip(
+                              'Tag',
+                              tag,
+                              _storageTagOptions(clothes),
+                              (v) => tag = v,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Sort By',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: StorageTokens.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                'Category (A-Z)',
+                                'Subcategory (A-Z)',
+                                'Favorites first',
+                              ].map((option) {
+                                final isSelected = sortBy == option;
+                                return GestureDetector(
+                                  onTap: () =>
+                                      setModalState(() => sortBy = option),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? StorageTokens.inkStrong
+                                          : StorageTokens.surface,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? StorageTokens.inkStrong
+                                            : StorageTokens.line,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      option,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: isSelected
+                                            ? StorageTokens.surface
+                                            : StorageTokens.inkStrong,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: StorageTokens.danger.withValues(
+                                  alpha: 0.07,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: StorageTokens.danger.withValues(
+                                    alpha: 0.25,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.favorite,
+                                    color: StorageTokens.danger,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Text(
+                                      'Show favorites only',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: favoritesOnly,
+                                    onChanged: (v) =>
+                                        setModalState(() => favoritesOnly = v),
+                                    activeThumbColor: StorageTokens.danger,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    dd(
-                      'Subcategory',
-                      subcategory,
-                      _storageOptionsFor(clothes, 'subcategory'),
-                      (v) {
-                        setModalState(() => subcategory = v ?? 'All');
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    dd(
-                      'Occasion',
-                      occasion,
-                      _storageOptionsFor(clothes, 'occasion'),
-                      (v) {
-                        setModalState(() => occasion = v ?? 'All');
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    dd(
-                      'Color',
-                      color,
-                      _storageOptionsFor(clothes, 'dominant_color'),
-                      (v) {
-                        setModalState(() => color = v ?? 'All');
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    dd('Tag', tag, _storageTagOptions(clothes), (v) {
-                      setModalState(() => tag = v ?? 'All');
-                    }),
-                    const SizedBox(height: 10),
-                    dd(
-                      'Sort',
-                      sortBy,
-                      const [
-                        'Category (A-Z)',
-                        'Subcategory (A-Z)',
-                        'Favorites first',
-                      ],
-                      (v) {
-                        setModalState(() => sortBy = v ?? 'Category (A-Z)');
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      title: const Text('Favorites only'),
-                      value: favoritesOnly,
-                      contentPadding: EdgeInsets.zero,
-                      onChanged: (v) => setModalState(() => favoritesOnly = v),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 20),
                     Row(
                       children: [
                         Expanded(
@@ -1157,11 +1297,18 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                                 sortBy = 'Category (A-Z)';
                               });
                             },
-                            child: const Text('Reset'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text('Reset All'),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Expanded(
+                          flex: 2,
                           child: FilledButton(
                             onPressed: () {
                               setState(() {
@@ -1562,65 +1709,99 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: TextField(
-                                onChanged: (v) =>
-                                    setState(() => _searchQuery = v),
-                                decoration: InputDecoration(
-                                  hintText:
-                                      'Smart search: "black casual shirt", "winter jacket"',
-                                  prefixIcon: const Icon(Icons.search),
-                                  filled: true,
-                                  fillColor: HomeTokens.parchment,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: StorageTokens.surfaceAlt,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: StorageTokens.line,
                                   ),
-                                  isDense: true,
+                                ),
+                                child: TextField(
+                                  controller: _storageSearchController,
+                                  onChanged: (v) =>
+                                      setState(() => _searchQuery = v),
+                                  decoration: InputDecoration(
+                                    hintText: 'Search clothes...',
+                                    hintStyle: const TextStyle(
+                                      color: StorageTokens.mutedSoft,
+                                    ),
+                                    prefixIcon: const Icon(
+                                      Icons.search,
+                                      color: StorageTokens.muted,
+                                    ),
+                                    suffixIcon: _searchQuery.isEmpty
+                                        ? null
+                                        : IconButton(
+                                            onPressed: () => setState(() {
+                                              _storageSearchController.clear();
+                                              _searchQuery = '';
+                                            }),
+                                            icon: const Icon(
+                                              Icons.clear,
+                                              color: StorageTokens.muted,
+                                            ),
+                                          ),
+                                    border: InputBorder.none,
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 8),
-                            InkWell(
+                            GestureDetector(
                               onTap: () => _openStorageFilterSheet(clothes),
-                              borderRadius: BorderRadius.circular(10),
                               child: Container(
-                                height: 46,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                ),
+                                padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
-                                  color: HomeTokens.parchment,
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: _storageActiveFilterCount() > 0
+                                      ? StorageTokens.inkStrong
+                                      : StorageTokens.surface,
+                                  borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: HomeTokens.rule,
+                                    color: _storageActiveFilterCount() > 0
+                                        ? StorageTokens.inkStrong
+                                        : StorageTokens.line,
                                   ),
                                 ),
-                                child: Row(
+                                child: Stack(
+                                  clipBehavior: Clip.none,
                                   children: [
-                                    const Icon(Icons.tune, size: 20),
-                                    if (_storageActiveFilterCount() > 0) ...[
-                                      const SizedBox(width: 5),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: HomeTokens.accent,
-                                          borderRadius: BorderRadius.circular(
-                                            999,
+                                    Icon(
+                                      Icons.tune,
+                                      color: _storageActiveFilterCount() > 0
+                                          ? StorageTokens.surface
+                                          : StorageTokens.inkStrong,
+                                    ),
+                                    if (_storageActiveFilterCount() > 0)
+                                      Positioned(
+                                        right: -6,
+                                        top: -6,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: StorageTokens.danger,
+                                            shape: BoxShape.circle,
                                           ),
-                                        ),
-                                        child: Text(
-                                          '${_storageActiveFilterCount()}',
-                                          style: const TextStyle(
-                                            color: HomeTokens.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
+                                          constraints: const BoxConstraints(
+                                            minWidth: 18,
+                                            minHeight: 18,
+                                          ),
+                                          child: Text(
+                                            '${_storageActiveFilterCount()}',
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              color: StorageTokens.surface,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ],
                                   ],
                                 ),
                               ),
