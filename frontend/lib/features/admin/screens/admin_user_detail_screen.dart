@@ -187,9 +187,10 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
     final initials =
         '${fn.isNotEmpty ? fn[0] : ''}${ln.isNotEmpty ? ln[0] : ''}'
             .toUpperCase();
-    final avatarLabel = initials.isNotEmpty
-        ? initials
-        : widget.username[0].toUpperCase();
+    final usernameInitial = widget.username.trim().isNotEmpty
+        ? widget.username.trim()[0].toUpperCase()
+        : '?';
+    final avatarLabel = initials.isNotEmpty ? initials : usernameInitial;
     final avatarUrl = _absUrl(user['avatar']);
     final isActive = user['is_active'] == true;
     final isStaff = user['is_staff'] == true;

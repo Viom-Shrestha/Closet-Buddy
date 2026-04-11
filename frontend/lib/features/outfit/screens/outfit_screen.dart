@@ -38,6 +38,43 @@ class _OutfitsPageState extends State<OutfitsPage> {
   bool _loading = true;
   bool _selectMode = false;
   final Set<int> _selectedIds = {};
+  String _sortBy = 'Newest first';
+
+  static const List<String> _sortOptions = [
+    'Newest first',
+    'Oldest first',
+    'Rating (high to low)',
+    'Favourites first',
+  ];
+
+  List<Map<String, dynamic>> get _displayOutfits {
+    final list = List<Map<String, dynamic>>.from(_outfits);
+    switch (_sortBy) {
+      case 'Oldest first':
+        list.sort(
+          (a, b) =>
+              (a['created_at'] ?? '').compareTo(b['created_at'] ?? ''),
+        );
+      case 'Rating (high to low)':
+        list.sort((a, b) {
+          final ra = int.tryParse(a['rating']?.toString() ?? '') ?? 0;
+          final rb = int.tryParse(b['rating']?.toString() ?? '') ?? 0;
+          return rb.compareTo(ra);
+        });
+      case 'Favourites first':
+        list.sort((a, b) {
+          final fa = (a['is_favourite'] == true) ? 0 : 1;
+          final fb = (b['is_favourite'] == true) ? 0 : 1;
+          return fa.compareTo(fb);
+        });
+      default:
+        list.sort(
+          (a, b) =>
+              (b['created_at'] ?? '').compareTo(a['created_at'] ?? ''),
+        );
+    }
+    return list;
+  }
 
   @override
   void initState() {
@@ -199,11 +236,13 @@ class _OutfitsPageState extends State<OutfitsPage> {
                     child: _emptyState(),
                   ),
                 )
-              else
+              else ...[
+                SliverToBoxAdapter(child: _sortBar()),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
                   sliver: SliverLayoutBuilder(
                     builder: (context, constraints) {
+                      final displayed = _displayOutfits;
                       final width = constraints.crossAxisExtent;
                       final crossAxisCount = width > 900
                           ? 4
@@ -212,7 +251,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
                           : 2;
                       return SliverGrid(
                         delegate: SliverChildBuilderDelegate((context, index) {
-                          final outfit = _outfits[index];
+                          final outfit = displayed[index];
                           final id = outfit['id'] is int
                               ? outfit['id'] as int
                               : int.tryParse('${outfit['id']}');
@@ -236,7 +275,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
                             selectionMode: _selectMode,
                             selected: selected,
                           );
-                        }, childCount: _outfits.length),
+                        }, childCount: displayed.length),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
                           childAspectRatio: 0.46,
@@ -247,6 +286,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
                     },
                   ),
                 ),
+              ],
             ],
           ),
         ),
@@ -312,6 +352,71 @@ class _OutfitsPageState extends State<OutfitsPage> {
         foregroundColor: OutfitTokens.ink,
       ),
       body: page,
+    );
+  }
+
+  Widget _sortBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          const Icon(Icons.sort, size: 18, color: OutfitTokens.muted),
+          const SizedBox(width: 8),
+          const Text(
+            'Sort:',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: OutfitTokens.muted,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _sortOptions.map((option) {
+                  final active = _sortBy == option;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _sortBy = option),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: active
+                              ? OutfitTokens.inkStrong
+                              : OutfitTokens.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: active
+                                ? OutfitTokens.inkStrong
+                                : OutfitTokens.border,
+                          ),
+                        ),
+                        child: Text(
+                          option,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: active
+                                ? OutfitTokens.white
+                                : OutfitTokens.ink,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

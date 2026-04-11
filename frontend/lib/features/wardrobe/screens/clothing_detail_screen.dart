@@ -50,7 +50,6 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
     'Outerwear',
     'Bottomwear',
     'Footwear',
-    'Dress',
     'Accessories',
   ];
 
@@ -445,7 +444,7 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
                       ),
 
                     // ── Details Card ───────────────────────────────────────
-                    SliverToBoxAdapter(child: _buildDetailsCard(temp, weather)),
+                    SliverToBoxAdapter(child: _buildDetailsCard()),
 
                     // ── Attributes ─────────────────────────────────────────
                     SliverToBoxAdapter(child: _buildAttributes(attrs)),
@@ -685,11 +684,9 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
     );
   }
 
-  Widget _buildDetailsCard(String temp, String weather) {
+  Widget _buildDetailsCard() {
     final dom = _tc(item!['dominant_color']);
     final sec = _tc(item!['secondary_color']);
-    final storageRaw = item!['storage_unit'];
-    final storageName = storageRaw is Map ? _tc(storageRaw['name']) : '';
     final added = _date(item!['created_at']);
     final rows = <Map<String, String>>[
       {'label': 'Category', 'value': _tc(item!['category'])},
@@ -697,9 +694,6 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
       {'label': 'Occasion', 'value': _tc(item!['occasion'])},
       {'label': 'Primary Color', 'value': dom},
       {'label': 'Secondary Color', 'value': sec},
-      {'label': 'Temperature', 'value': temp},
-      {'label': 'Weather', 'value': weather},
-      {'label': 'Storage', 'value': storageName},
       {'label': 'Added', 'value': added},
     ];
 
@@ -1638,11 +1632,22 @@ class _EditSheet extends StatelessWidget {
 
   Widget _buildDropdownInput(String key) {
     final controller = ctrls[key]!;
+    final hasAny = key == 'occasion' ||
+        key == 'detected_temp' ||
+        key == 'detected_weather';
     final options = _dropdownValues(key);
     final current = _safe(controller.text);
-    final selected = options.contains(current)
-        ? current
-        : (options.isNotEmpty ? options.first : null);
+
+    final String? selected;
+    if (hasAny && current.isEmpty) {
+      selected = '';
+    } else {
+      selected = options.contains(current)
+          ? current
+          : (options.isNotEmpty ? options.first : null);
+    }
+
+    final allOptions = hasAny ? ['', ...options] : options;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1656,12 +1661,12 @@ class _EditSheet extends StatelessWidget {
           fontWeight: FontWeight.w500,
         ),
         decoration: _inputDecoration(key),
-        items: options
+        items: allOptions
             .map(
               (option) => DropdownMenuItem<String>(
                 value: option,
                 child: Text(
-                  _humanize(option),
+                  option.isEmpty ? 'Any' : _humanize(option),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
