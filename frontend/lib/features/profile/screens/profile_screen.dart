@@ -718,30 +718,33 @@ class _ProfileScreenState extends State<ProfileScreen>
                 final titleSize = chartSize < 210 ? 10.0 : 12.0;
 
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    SizedBox.square(
-                      dimension: chartSize,
-                      child: PieChart(
-                        PieChartData(
-                          sectionsSpace: 2,
-                          centerSpaceRadius: centerRadius,
-                          startDegreeOffset: -90,
-                          sections: [
-                            for (int i = 0; i < categories.length; i++)
-                              PieChartSectionData(
-                                value: categories[i].value.toDouble(),
-                                title: total == 0
-                                    ? '0%'
-                                    : '${((categories[i].value * 100) / total).round()}%',
-                                color: _chartColors[i % _chartColors.length],
-                                radius: radius,
-                                titleStyle: TextStyle(
-                                  fontSize: titleSize,
-                                  fontWeight: FontWeight.w800,
-                                  color: ProfileTokens.white,
+                    Center(
+                      child: SizedBox.square(
+                        dimension: chartSize,
+                        child: PieChart(
+                          PieChartData(
+                            sectionsSpace: 2,
+                            centerSpaceRadius: centerRadius,
+                            startDegreeOffset: -90,
+                            sections: [
+                              for (int i = 0; i < categories.length; i++)
+                                PieChartSectionData(
+                                  value: categories[i].value.toDouble(),
+                                  title: total == 0
+                                      ? '0%'
+                                      : '${((categories[i].value * 100) / total).round()}%',
+                                  color: _chartColors[i % _chartColors.length],
+                                  radius: radius,
+                                  titleStyle: TextStyle(
+                                    fontSize: titleSize,
+                                    fontWeight: FontWeight.w800,
+                                    color: ProfileTokens.white,
+                                  ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),

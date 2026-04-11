@@ -33,6 +33,7 @@ class _AdminScreenState extends State<AdminScreen>
   final _catalogSubcategoryCtrl = TextEditingController();
   final _catalogColorCtrl = TextEditingController();
   final _catalogUserCtrl = TextEditingController();
+  final _catalogOccasionCtrl = TextEditingController();
 
   // Access
   bool _checkingAccess = true;
@@ -55,6 +56,46 @@ class _AdminScreenState extends State<AdminScreen>
   List<Map<String, dynamic>> _adminOutfits = [];
   List<Map<String, dynamic>> _feedback = [];
   Map<String, dynamic>? _profile;
+
+  // Outfit sort
+  String _outfitSortBy = 'Newest first';
+
+  List<Map<String, dynamic>> get _sortedOutfits {
+    final list = List<Map<String, dynamic>>.from(_adminOutfits);
+    switch (_outfitSortBy) {
+      case 'Oldest first':
+        list.sort(
+          (a, b) => (a['created_at'] ?? '').compareTo(b['created_at'] ?? ''),
+        );
+      case 'Rating (high to low)':
+        list.sort((a, b) {
+          final ra = int.tryParse(a['rating']?.toString() ?? '') ?? 0;
+          final rb = int.tryParse(b['rating']?.toString() ?? '') ?? 0;
+          return rb.compareTo(ra);
+        });
+      case 'Favourites first':
+        list.sort((a, b) {
+          final fa = (a['is_favourite'] == true) ? 0 : 1;
+          final fb = (b['is_favourite'] == true) ? 0 : 1;
+          return fa.compareTo(fb);
+        });
+      default:
+        list.sort(
+          (a, b) => (b['created_at'] ?? '').compareTo(a['created_at'] ?? ''),
+        );
+    }
+    return list;
+  }
+
+  // Catalog occasion filter (client-side)
+  List<Map<String, dynamic>> get _filteredCatalogItems {
+    final occ = _catalogOccasionCtrl.text.trim().toLowerCase();
+    if (occ.isEmpty) return _catalogItems;
+    return _catalogItems.where((item) {
+      final itemOcc = (item['occasion'] ?? '').toString().toLowerCase();
+      return itemOcc == occ;
+    }).toList();
+  }
 
   // Tab navigation
   late final TabController _tabCtrl;
@@ -97,6 +138,7 @@ class _AdminScreenState extends State<AdminScreen>
     _catalogSubcategoryCtrl.dispose();
     _catalogColorCtrl.dispose();
     _catalogUserCtrl.dispose();
+    _catalogOccasionCtrl.dispose();
     super.dispose();
   }
 
@@ -286,11 +328,6 @@ class _AdminScreenState extends State<AdminScreen>
           options: _kCategories,
         ),
         const SizedBox(height: 10),
-        _DarkDropdown(
-          controller: subCtrl,
-          label: 'Subcategory (optional)',
-          options: _kSubcategories,
-        ),
       ],
       confirmLabel: 'Apply',
     );
@@ -1069,14 +1106,14 @@ class _AdminScreenState extends State<AdminScreen>
             backgroundColor: kAdminSurface,
             child: _loadingCatalog && _catalogItems.isEmpty
                 ? _loadingCenter()
-                : _catalogItems.isEmpty
+                : _filteredCatalogItems.isEmpty
                 ? _emptyCenter('No items found', Icons.checkroom_rounded)
                 : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                    itemCount: _catalogItems.length,
+                    itemCount: _filteredCatalogItems.length,
                     itemBuilder: (_, i) {
-                      final item = _catalogItems[i];
+                      final item = _filteredCatalogItems[i];
                       final id = _asInt(item['id']);
                       final selected =
                           id != null && _selectedCatalogIds.contains(id);
@@ -1282,15 +1319,83 @@ class _AdminScreenState extends State<AdminScreen>
   // ── Outfits tab ───────────────────────────────────────────────────────────────
 
   Widget _buildOutfitsTab() {
-    return RefreshIndicator(
-      onRefresh: _loadOutfits,
-      color: kAdminAccent,
-      backgroundColor: kAdminSurface,
-      child: _loadingOutfits && _adminOutfits.isEmpty
-          ? _loadingCenter()
-          : _adminOutfits.isEmpty
-          ? _emptyCenter('No outfits saved yet', Icons.style_rounded)
-          : LayoutBuilder(
+    if (_loadingOutfits && _adminOutfits.isEmpty) return _loadingCenter();
+    if (_adminOutfits.isEmpty) {
+      return _emptyCenter('No outfits saved yet', Icons.style_rounded);
+    }
+    final sorted = _sortedOutfits;
+    return Column(
+      children: [
+        // Sort bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            children: [
+              const Icon(Icons.sort, size: 16, color: kAdminTextMuted),
+              const SizedBox(width: 6),
+              const Text(
+                'Sort:',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: kAdminTextMuted,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children:
+                        [
+                          'Newest first',
+                          'Oldest first',
+                          'Rating (high to low)',
+                          'Favourites first',
+                        ].map((option) {
+                          final active = _outfitSortBy == option;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _outfitSortBy = option),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: active ? kAdminAccent : kAdminSurface2,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: active ? kAdminAccent : kAdminBorder,
+                                  ),
+                                ),
+                                child: Text(
+                                  option,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: active ? kAdminBg : kAdminTextMuted,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadOutfits,
+            color: kAdminAccent,
+            backgroundColor: kAdminSurface,
+            child: LayoutBuilder(
               builder: (context, constraints) {
                 final width = constraints.maxWidth;
                 final crossAxisCount = width >= 1200
@@ -1302,8 +1407,8 @@ class _AdminScreenState extends State<AdminScreen>
                     : 1;
                 return GridView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-                  itemCount: _adminOutfits.length,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  itemCount: sorted.length,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
                     mainAxisSpacing: 10,
@@ -1311,7 +1416,7 @@ class _AdminScreenState extends State<AdminScreen>
                     childAspectRatio: 0.9,
                   ),
                   itemBuilder: (_, i) {
-                    final outfit = _adminOutfits[i];
+                    final outfit = sorted[i];
                     final id = _asInt(outfit['id']);
                     return _OutfitGridCard(
                       outfit: outfit,
@@ -1321,6 +1426,9 @@ class _AdminScreenState extends State<AdminScreen>
                 );
               },
             ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1608,25 +1716,27 @@ class _AdminScreenState extends State<AdminScreen>
           options: _kSubcategories,
         ),
         const SizedBox(height: 10),
+        _DarkDropdown(
+          controller: _catalogOccasionCtrl,
+          label: 'Occasion',
+          options: _kOccasions,
+        ),
+        const SizedBox(height: 10),
         _DarkTextField(controller: _catalogColorCtrl, label: 'Dominant color'),
         const SizedBox(height: 10),
         _DarkTextField(controller: _catalogUserCtrl, label: 'User ID'),
       ],
       confirmLabel: 'Apply',
     );
-    if (confirmed == true) await _refreshCatalogData();
+    if (confirmed == true) {
+      setState(() {});
+      await _refreshCatalogData();
+    }
   }
 
   // ── Constants ─────────────────────────────────────────────────────────────────
 
-  static const _kCategories = [
-    'Topwear',
-    'Outerwear',
-    'Bottomwear',
-    'Footwear',
-    'Dress',
-    'Accessories',
-  ];
+  static const _kCategories = ['Topwear', 'Outerwear', 'Bottomwear', 'Shoes'];
 
   static const _kSubcategories = [
     'T-Shirt',
@@ -1654,6 +1764,22 @@ class _AdminScreenState extends State<AdminScreen>
     'Slippers',
     'Flip Flops',
     'Sports Shoes',
+  ];
+
+  static const _kOccasions = [
+    'Casual',
+    'Formal',
+    'Office',
+    'Party',
+    'Date',
+    'Traditional',
+    'Sport',
+    'Home',
+    'Travel',
+    'Beach',
+    'Street',
+    'Outdoor',
+    'Workout',
   ];
 
   // ── Theme ─────────────────────────────────────────────────────────────────────

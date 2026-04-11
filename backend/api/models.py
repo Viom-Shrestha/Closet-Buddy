@@ -48,7 +48,6 @@ class StorageUnit(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE,related_name="storage_units")
     name = models.CharField(max_length=100)
-    description = models.TextField(null=True, blank=True)
     type = models.CharField(
         max_length=30,
         choices=STORAGE_TYPE_CHOICES
