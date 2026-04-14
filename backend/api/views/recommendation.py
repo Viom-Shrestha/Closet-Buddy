@@ -30,6 +30,7 @@ class RecommendationRequestSerializer(serializers.Serializer):
     weather = RecommendationWeatherSerializer()
     occasion = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     prompt = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    debug = serializers.BooleanField(required=False, default=False)
 
 
 class RecommendationOutfitSerializer(serializers.Serializer):
@@ -51,6 +52,7 @@ class RecommendationResponseSerializer(serializers.Serializer):
     occasion_fallback_used = serializers.BooleanField()
     metadata = RecommendationMetadataSerializer()
     warning = serializers.CharField(required=False)
+    debug = serializers.JSONField(required=False)
 
 
 class RecommendationErrorSerializer(serializers.Serializer):
@@ -67,6 +69,14 @@ def _coerce_optional_text(value, field_name: str):
         text = value.strip()
         return text or None
     return Response({"error": f"{field_name} must be a string."}, status=400)
+
+
+def _as_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
 
 
 def recommend_outfits_view(request):
@@ -95,6 +105,7 @@ def recommend_outfits_view(request):
     prompt = _coerce_optional_text(payload.get("prompt"), "prompt")
     if isinstance(prompt, Response):
         return prompt
+    debug_enabled = _as_bool(payload.get("debug", False)) or _as_bool(request.query_params.get("debug", False))
 
     data = recommend_outfits(
         user=request.user,
@@ -102,6 +113,7 @@ def recommend_outfits_view(request):
         occasion=occasion,
         prompt=prompt,
         limit=RECOMMENDATION_LIMIT,
+        debug=debug_enabled,
     )
 
     if data.get("insufficient_wardrobe"):
@@ -135,6 +147,8 @@ def recommend_outfits_view(request):
         )
     if warnings:
         response_body["warning"] = " ".join(warnings)
+    if debug_enabled and "debug" in data:
+        response_body["debug"] = data["debug"]
 
     return Response(response_body, status=200)
 

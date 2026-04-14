@@ -13,7 +13,6 @@ STORAGE_TYPE_CHOICES = StorageUnit.STORAGE_TYPE_CHOICES
 class StorageUnitCreateRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     type = serializers.ChoiceField(choices=STORAGE_TYPE_CHOICES)
-    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     parent_storage = serializers.IntegerField(required=False, allow_null=True)
     is_put_away = serializers.BooleanField(required=False, default=False)
 
@@ -21,7 +20,6 @@ class StorageUnitCreateRequestSerializer(serializers.Serializer):
 class StorageUnitUpdateRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     type = serializers.ChoiceField(choices=STORAGE_TYPE_CHOICES, required=False)
-    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     parent_storage = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -92,7 +90,6 @@ class StorageUnitViewSet(viewsets.ViewSet):
             user=request.user,
             name=(request.data.get("name", "") or "").strip(),
             type=request.data.get("type", ""),
-            description=request.data.get("description"),
             parent_storage=parent,
             is_put_away=_as_bool(request.data.get("is_put_away", False)),
         )
@@ -135,8 +132,6 @@ class StorageUnitViewSet(viewsets.ViewSet):
             storage.name = (request.data.get("name", "") or "").strip()
         if "type" in request.data:
             storage.type = request.data.get("type", "")
-        if "description" in request.data:
-            storage.description = request.data.get("description")
         if "is_put_away" in request.data:
             storage.is_put_away = _as_bool(request.data.get("is_put_away"))
 

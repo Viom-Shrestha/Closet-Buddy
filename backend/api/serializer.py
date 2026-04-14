@@ -127,7 +127,6 @@ class StorageUnitSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
-            "description",
             "type",
             "parent_storage",
             "is_put_away",

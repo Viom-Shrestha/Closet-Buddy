@@ -566,6 +566,13 @@ def admin_clothing_reclassify(request):
     return Response({"updated": updated})
 
 
+def admin_clothing_bulk_update(request):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    return admin_clothing_reclassify(request)
+
+
 def admin_outfits_list(request):
     denied = _require_admin(request)
     if denied:
@@ -746,15 +753,15 @@ class AdminViewSet(viewsets.ViewSet):
     def clothing_list(self, request):
         return admin_clothing_list(request)
 
+    def clothing_bulk_update(self, request):
+        return admin_clothing_bulk_update(request)
+
     @extend_schema(operation_id="admin_clothing_detail")
     def clothing_detail(self, request, item_id=None):
         return admin_clothing_detail(request, item_id)
 
     def clothing_delete(self, request, item_id=None):
         return admin_clothing_detail(request, item_id)
-
-    def clothing_reclassify(self, request):
-        return admin_clothing_reclassify(request)
 
     @extend_schema(operation_id="admin_outfits_list")
     def outfits_list(self, request):
