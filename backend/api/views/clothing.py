@@ -74,6 +74,19 @@ def _as_bool(value):
     return bool(value)
 
 
+def _query_bool(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
 def _title_label(raw):
     if not raw:
         return ""
@@ -546,7 +559,11 @@ def recent_clothes(request):
 
 
 def all_clothes(request):
-    items = ClothingItem.objects.filter(user=request.user).order_by("-created_at")
+    exclude_put_away = _query_bool(request.query_params.get("exclude_put_away"), default=False)
+    items = ClothingItem.objects.filter(user=request.user)
+    if exclude_put_away:
+        items = items.filter(storage_unit__is_put_away=False)
+    items = items.order_by("-created_at")
     serializer = ClothingItemSerializer(items, many=True, context={"request": request})
     return Response(serializer.data, status=200)
 
