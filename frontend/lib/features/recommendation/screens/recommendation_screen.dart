@@ -165,7 +165,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   }
 
   Future<void> _loadClothing() async {
-    final items = await _clothingService.getAllClothes();
+    final items = await _clothingService.getAllClothes(excludePutAway: true);
     final map = <int, Map<String, dynamic>>{};
     for (final item in items) {
       final id = _asInt(item['id']);

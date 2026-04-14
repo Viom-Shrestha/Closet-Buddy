@@ -62,8 +62,11 @@ class ClothingService {
         : [];
   }
 
-  Future<List<Map<String, dynamic>>> getAllClothes() async {
-    final res = await client.get('/clothing/all/');
+  Future<List<Map<String, dynamic>>> getAllClothes({
+    bool excludePutAway = false,
+  }) async {
+    final query = excludePutAway ? '?exclude_put_away=true' : '';
+    final res = await client.get('/clothing/all/$query');
     return res.statusCode == 200
         ? List<Map<String, dynamic>>.from(jsonDecode(res.body))
         : [];
