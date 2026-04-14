@@ -116,7 +116,7 @@ class AdminService {
   }
 
   Future<int> bulkReclassify(List<int> ids, String category, String subcategory) async {
-    final res = await _client.post('/admin/clothing/reclassify/', {
+    final res = await _client.post('/admin/clothing/', {
       'ids': ids,
       'category': category,
       'subcategory': subcategory,

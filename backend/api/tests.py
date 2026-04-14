@@ -1,14 +1,21 @@
 import base64
+import shutil
+import tempfile
+from types import SimpleNamespace
+from uuid import UUID
 from pathlib import Path
 from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import SimpleTestCase, override_settings
+from PIL import Image
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from api.recommend import scoring
+from api.recommend import engine as recommendation_engine
 from api.views import clothing as clothing_view
 
 from .models import AccessoryItem, BetaFeedback, ClothingItem, NonClothingItem, Outfit, StorageUnit
@@ -19,6 +26,254 @@ def _png_upload(name: str = "item.png") -> SimpleUploadedFile:
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAoMBgQH0mN0AAAAASUVORK5CYII="
     )
     return SimpleUploadedFile(name, pixel_png, content_type="image/png")
+
+
+class ModelPredictionUnitTests(SimpleTestCase):
+    def _temp_png_path(self, name: str = "tmp.png") -> Path:
+        temp_dir = Path(tempfile.mkdtemp(prefix="model-predict-tests-"))
+        self.addCleanup(lambda: shutil.rmtree(temp_dir, ignore_errors=True))
+        image_path = temp_dir / name
+        image_path.write_bytes(_png_upload(name).read())
+        return image_path
+
+    def test_auth_model_rejects_non_clothing_with_confidence(self):
+        image_path = self._temp_png_path("non-clothing.png")
+
+        with image_path.open("rb") as image_file, patch(
+            "api.views.clothing.is_clothing",
+            return_value={"is_clothing": False, "confidence": 0.06},
+        ):
+            result = clothing_view._authenticate_item(image_file, is_shoe=False)
+
+        self.assertEqual(result["error"], "Not a clothing item")
+        self.assertAlmostEqual(float(result["confidence"]), 0.06, places=3)
+
+    def test_segmentation_model_returns_saved_image_path(self):
+        source_image = self._temp_png_path("seg-input.png")
+        fake_segmented = Image.new("RGBA", (2, 2), (255, 0, 0, 255))
+        fixed_uuid = UUID("11111111-1111-1111-1111-111111111111")
+
+        with tempfile.TemporaryDirectory(prefix="seg-media-") as media_root, override_settings(
+            MEDIA_ROOT=media_root,
+            MEDIA_URL="/media/",
+        ):
+            Path(media_root, "clothing").mkdir(parents=True, exist_ok=True)
+            with source_image.open("rb") as image_file, patch(
+                "ai_models.segmentation.segmentation_utill.remove",
+                return_value=fake_segmented,
+            ), patch(
+                "ai_models.segmentation.segmentation_utill.uuid.uuid4",
+                return_value=fixed_uuid,
+            ):
+                segmented_path = clothing_view.segment_image(image_file)
+
+            self.assertEqual(
+                segmented_path,
+                "/media/clothing/11111111-1111-1111-1111-111111111111.png",
+            )
+            self.assertTrue(
+                Path(media_root, "clothing", "11111111-1111-1111-1111-111111111111.png").exists()
+            )
+
+    def test_classification_model_outputs_subcategory_and_attributes(self):
+        image_path = self._temp_png_path("classify.png")
+
+        with patch(
+            "api.views.clothing.classify_subcategory",
+            return_value=("Shirt", 0.97),
+        ), patch(
+            "api.views.clothing.extract_attributes",
+            return_value=["cotton", "striped"],
+        ):
+            category, subcategory, attributes = clothing_view._classify_clothing_safe(image_path)
+
+        self.assertEqual(category, "Topwear")
+        self.assertEqual(subcategory, "Shirt")
+        self.assertEqual(attributes, ["cotton", "striped"])
+
+    def test_occasion_model_returns_occasion_with_confidence(self):
+        image_path = self._temp_png_path("occasion.png")
+
+        with patch(
+            "api.views.clothing.predict_occasion_details",
+            return_value={"occasion": "Office", "confidence": 0.88},
+        ):
+            occasion, confidence = clothing_view._predict_occasion_safe(image_path)
+
+        self.assertEqual(occasion, "Office")
+        self.assertAlmostEqual(confidence, 0.88, places=3)
+
+    def test_weather_model_confidence_threshold_filters_weak_labels(self):
+        image_path = self._temp_png_path("weather.png")
+
+        with patch(
+            "api.views.clothing.classify_clothing_weather",
+            return_value={
+                "temperature": "warm",
+                "weather": "rainy",
+                "temperature_confidence": 0.22,
+                "temperature_margin": 0.001,
+                "weather_confidence": 0.23,
+                "weather_margin": 0.001,
+                "is_precipitation_specific": False,
+            },
+        ):
+            detected_temp, detected_weather = clothing_view._classify_weather_safe(
+                image_path,
+                category="Topwear",
+                subcategory="Shirt",
+            )
+
+        self.assertIsNone(detected_temp)
+        self.assertIsNone(detected_weather)
+
+
+class RecommendationEngineUnitTests(SimpleTestCase):
+    @staticmethod
+    def _item(
+        item_id: int,
+        category: str,
+        subcategory: str,
+        *,
+        occasion: str = "",
+        attributes=None,
+        dominant_color: str = "Black",
+        detected_temp: str = "",
+        detected_weather: str = "",
+    ):
+        return SimpleNamespace(
+            id=item_id,
+            category=category,
+            subcategory=subcategory,
+            occasion=occasion,
+            attributes=list(attributes or []),
+            dominant_color=dominant_color,
+            detected_temp=detected_temp,
+            detected_weather=detected_weather,
+        )
+
+    def test_recommend_outfits_filters_items_by_weather_before_generation(self):
+        user = object()
+        top_cold = self._item(1, "Topwear", "Sweater", detected_temp="cold")
+        top_hot = self._item(2, "Topwear", "T-Shirt", detected_temp="hot")
+        bottom = self._item(3, "Bottomwear", "Jeans", detected_temp="warm")
+        shoes = self._item(4, "Footwear", "Sneakers", detected_temp="warm")
+        wardrobe = [top_cold, top_hot, bottom, shoes]
+
+        captured = {}
+
+        def _fake_generate(topwear, bottomwear, footwear, outerwear, temperature, combo_limit=50):
+            captured["topwear_ids"] = [item.id for item in topwear]
+            captured["bottomwear_ids"] = [item.id for item in bottomwear]
+            captured["footwear_ids"] = [item.id for item in footwear]
+            return [
+                {
+                    "topwear": topwear[0],
+                    "bottomwear": bottomwear[0],
+                    "shoes": footwear[0],
+                    "outerwear": None,
+                }
+            ]
+
+        with (
+            patch("api.recommend.engine.ClothingItem.objects.filter", return_value=wardrobe),
+            patch("api.recommend.engine.random.uniform", return_value=0.0),
+            patch("api.recommend.engine.generator.generate_outfits", side_effect=_fake_generate),
+            patch("api.recommend.engine.scoring.build_prompt", return_value="prompt"),
+            patch("api.recommend.engine.scoring.final_score", return_value=0.9),
+        ):
+            result = recommendation_engine.recommend_outfits(
+                user=user,
+                weather={"temperature": "hot", "weather": "dry"},
+                occasion="",
+                prompt=None,
+                limit=1,
+            )
+
+        self.assertEqual(captured["topwear_ids"], [2])
+        self.assertEqual(captured["bottomwear_ids"], [3])
+        self.assertEqual(captured["footwear_ids"], [4])
+        self.assertEqual(result["fallback_used"], False)
+        self.assertEqual(len(result["results"]), 1)
+        self.assertEqual(result["results"][0]["topwear_id"], 2)
+
+    def test_recommend_outfits_passes_expected_inputs_into_scoring(self):
+        user = object()
+        top = self._item(10, "Topwear", "Shirt", occasion="Office")
+        bottom = self._item(20, "Bottomwear", "Trousers", occasion="Office")
+        shoes = self._item(30, "Footwear", "Loafers", occasion="Office")
+        outfit = {"topwear": top, "bottomwear": bottom, "shoes": shoes, "outerwear": None}
+
+        with (
+            patch("api.recommend.engine.ClothingItem.objects.filter", return_value=[top, bottom, shoes]),
+            patch("api.recommend.engine.random.uniform", return_value=0.0),
+            patch("api.recommend.engine.generator.generate_outfits", return_value=[outfit]),
+            patch("api.recommend.engine.scoring.build_prompt", return_value="built prompt") as prompt_mock,
+            patch("api.recommend.engine.scoring.final_score", return_value=0.77) as score_mock,
+        ):
+            result = recommendation_engine.recommend_outfits(
+                user=user,
+                weather={"temperature": "Cool", "weather": "DRY"},
+                occasion="office",
+                prompt="smart look",
+                limit=1,
+            )
+
+        prompt_mock.assert_called_once_with(
+            "smart look",
+            "office",
+            {"temperature": "cool", "weather": "dry"},
+        )
+        score_mock.assert_called_once_with(
+            outfit,
+            {"temperature": "cool", "weather": "dry"},
+            "office",
+            "built prompt",
+        )
+        self.assertEqual(result["occasion_applied"], "office")
+        self.assertEqual(result["results"][0]["topwear_id"], 10)
+
+    def test_recommend_outfits_ranks_higher_scored_outfits_first(self):
+        user = object()
+        top_a = self._item(101, "Topwear", "Shirt")
+        top_b = self._item(102, "Topwear", "Shirt")
+        bottom_a = self._item(201, "Bottomwear", "Jeans")
+        bottom_b = self._item(202, "Bottomwear", "Jeans")
+        shoes_a = self._item(301, "Footwear", "Sneakers")
+        shoes_b = self._item(302, "Footwear", "Sneakers")
+
+        wardrobe = [top_a, top_b, bottom_a, bottom_b, shoes_a, shoes_b]
+
+        outfit_high = {"topwear": top_a, "bottomwear": bottom_a, "shoes": shoes_a, "outerwear": None}
+        outfit_mid = {"topwear": top_b, "bottomwear": bottom_a, "shoes": shoes_b, "outerwear": None}
+        outfit_low = {"topwear": top_b, "bottomwear": bottom_b, "shoes": shoes_a, "outerwear": None}
+
+        score_map = {
+            top_a.id: 0.95,
+            top_b.id: 0.70,
+        }
+
+        def _score(outfit, weather, occasion, text_prompt):
+            return score_map[outfit["topwear"].id] if outfit["bottomwear"].id == 201 else 0.55
+
+        with (
+            patch("api.recommend.engine.ClothingItem.objects.filter", return_value=wardrobe),
+            patch("api.recommend.engine.random.uniform", return_value=0.0),
+            patch("api.recommend.engine.generator.generate_outfits", return_value=[outfit_low, outfit_mid, outfit_high]),
+            patch("api.recommend.engine.scoring.build_prompt", return_value="prompt"),
+            patch("api.recommend.engine.scoring.final_score", side_effect=_score),
+        ):
+            result = recommendation_engine.recommend_outfits(
+                user=user,
+                weather={"temperature": "warm", "weather": "dry"},
+                occasion="",
+                prompt=None,
+                limit=3,
+            )
+
+        ranked_topwear_ids = [row["topwear_id"] for row in result["results"]]
+        self.assertEqual(ranked_topwear_ids[0], 101)
+        self.assertIn(102, ranked_topwear_ids[1:])
 
 
 class OutfitAiRateTests(APITestCase):
@@ -233,6 +488,18 @@ class RecommendationApiTests(APITestCase):
         self.assertEqual(len(res.data["outfits"]), 3)
         self.assertEqual(res.data["metadata"]["temperature"], "any")
         self.assertEqual(res.data["metadata"]["weather"], "any")
+
+    @patch("api.recommend.scoring.clip_score", return_value=0.78)
+    def test_recommendations_debug_mode_returns_logic_trace(self, _mock_clip):
+        payload = {"weather": {"temperature": "cool", "weather": "dry"}, "debug": True}
+        res = self.client.post("/api/recommendations/", payload, format="json")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("debug", res.data)
+        self.assertIn("normalized_weather", res.data["debug"])
+        self.assertIn("phase1_context_ranking", res.data["debug"])
+        self.assertIn("phase2_scoring", res.data["debug"])
+        self.assertIn("phase3_diversity_rerank", res.data["debug"])
 
     def test_recommendations_rejects_invalid_payload_shape(self):
         res = self.client.post("/api/recommendations/", [], format="json")

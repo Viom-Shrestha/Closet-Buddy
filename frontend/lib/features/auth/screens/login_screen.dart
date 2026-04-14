@@ -341,56 +341,34 @@ class _LoginScreenState extends State<LoginScreen>
 
                           SizedBox(height: 16),
 
-                          // Remember me and forgot password
+                          // Remember me
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: Checkbox(
-                                      value: _rememberMe,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          _rememberMe = value ?? false;
-                                        });
-                                      },
-                                      fillColor:
-                                          const WidgetStatePropertyAll<Color>(
-                                            AuthTokens.ink,
-                                          ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(4),
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: Checkbox(
+                                  value: _rememberMe,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _rememberMe = value ?? false;
+                                    });
+                                  },
+                                  fillColor:
+                                      const WidgetStatePropertyAll<Color>(
+                                        AuthTokens.ink,
                                       ),
-                                    ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Remember me',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: AuthTokens.muted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              TextButton(
-                                onPressed: () {},
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: Size(0, 0),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
                                 ),
-                                child: Text(
-                                  'Forgot password?',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AuthTokens.ink,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Remember me',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AuthTokens.muted,
                                 ),
                               ),
                             ],
