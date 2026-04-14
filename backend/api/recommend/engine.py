@@ -126,7 +126,12 @@ def recommend_outfits(
     limit: int = 3,
     debug: bool = False,
 ) -> Dict:
-    items = list(ClothingItem.objects.filter(user=user))
+    items = list(
+        ClothingItem.objects.filter(
+            user=user,
+            storage_unit__is_put_away=False,
+        )
+    )
     fallback_used = False
     occasion_fallback_used = False
     debug_trace: Dict = {"debug_enabled": bool(debug)} if debug else {}

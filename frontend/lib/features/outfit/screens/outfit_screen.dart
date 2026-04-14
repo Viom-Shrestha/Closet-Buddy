@@ -1045,7 +1045,7 @@ class _OutfitItemSelectionPageState extends State<OutfitItemSelectionPage> {
   Future<void> _loadClothes() async {
     setState(() => _loading = true);
     final results = await Future.wait([
-      _clothingService.getAllClothes(),
+      _clothingService.getAllClothes(excludePutAway: true),
       _accessoryService.getAll(),
     ]);
     final items = results[0];
@@ -1652,7 +1652,7 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
 
   Future<void> _loadClothes() async {
     final results = await Future.wait([
-      _clothingService.getAllClothes(),
+      _clothingService.getAllClothes(excludePutAway: true),
       _accessoryService.getAll(),
     ]);
     final items = results[0];

@@ -35,7 +35,6 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
     'Outerwear',
     'Bottomwear',
     'Footwear',
-    'Dress',
     'Accessories',
   ];
 
@@ -289,7 +288,9 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                   : 'Segmentation failed. You can continue without segmentation.')
             : null;
 
-        category = widget.isShoe ? _shoeCategory : _safeText(result['category']);
+        category = widget.isShoe
+            ? _shoeCategory
+            : _safeText(result['category']);
         subcategory = _safeText(result['subcategory']);
         dominantColor = _safeText(result['dominant_color']);
         secondaryColor = _safeText(result['secondary_color']);
@@ -1044,7 +1045,8 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
                     ? _buildReadOnlyField(
                         label: 'Category',
                         value: _shoeCategory,
-                        helperText: 'Shoes category is locked for shoe uploads.',
+                        helperText:
+                            'Shoes category is locked for shoe uploads.',
                       )
                     : _buildDropdownField(
                         label: 'Category',
@@ -1587,18 +1589,12 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         _temperatureOptions = _collectOptions(
           items,
           'detected_temp',
-          extras: [
-            detectedTempController.text,
-            ..._defaultTemperatureValues,
-          ],
+          extras: [detectedTempController.text, ..._defaultTemperatureValues],
         );
         _weatherOptions = _collectOptions(
           items,
           'detected_weather',
-          extras: [
-            detectedWeatherController.text,
-            ..._defaultWeatherValues,
-          ],
+          extras: [detectedWeatherController.text, ..._defaultWeatherValues],
         );
         _metadataOptionsLoaded = true;
       });
