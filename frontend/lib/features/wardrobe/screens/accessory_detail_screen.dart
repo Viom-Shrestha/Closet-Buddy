@@ -24,11 +24,14 @@ class _AccessoryDetailScreenState extends State<AccessoryDetailScreen> {
   Map<String, dynamic>? _item;
   bool _loading = true;
   bool _hasChanges = false;
+  bool _updatingFavourite = false;
 
   @override
   void initState() {
     super.initState();
-    _item = widget.initialData;
+    _item = widget.initialData == null
+        ? null
+        : Map<String, dynamic>.from(widget.initialData!);
     _load();
   }
 
@@ -36,7 +39,7 @@ class _AccessoryDetailScreenState extends State<AccessoryDetailScreen> {
     final latest = await _service.getById(widget.accessoryId);
     if (!mounted) return;
     setState(() {
-      _item = latest ?? _item;
+      _item = latest != null ? Map<String, dynamic>.from(latest) : _item;
       _loading = false;
     });
   }
@@ -83,18 +86,44 @@ class _AccessoryDetailScreenState extends State<AccessoryDetailScreen> {
   }
 
   Future<void> _toggleFavourite() async {
+    if (_updatingFavourite) return;
     final item = _item;
     if (item == null) return;
     final current = item['is_favourite'] == true;
-    setState(() => item['is_favourite'] = !current);
-    final ok = await _service.toggleFavourite(widget.accessoryId);
-    if (!mounted) return;
-    if (!ok) {
-      setState(() => item['is_favourite'] = current);
+    setState(() {
+      _updatingFavourite = true;
+      _item = {
+        ...item,
+        'is_favourite': !current,
+      };
+    });
+    try {
+      final ok = await _service.toggleFavourite(widget.accessoryId);
+      if (!mounted) return;
+      if (!ok) {
+        setState(() {
+          _updatingFavourite = false;
+          _item = {
+            ...item,
+            'is_favourite': current,
+          };
+        });
+        _toast('Failed to update favourite', err: true);
+        return;
+      }
+      setState(() => _updatingFavourite = false);
+      _hasChanges = true;
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _updatingFavourite = false;
+        _item = {
+          ...item,
+          'is_favourite': current,
+        };
+      });
       _toast('Failed to update favourite', err: true);
-      return;
     }
-    _hasChanges = true;
   }
 
   Future<void> _deleteAccessory() async {
@@ -147,53 +176,58 @@ class _AccessoryDetailScreenState extends State<AccessoryDetailScreen> {
     final save = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: WardrobeTokens.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Name'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: descriptionCtrl,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Description'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: dominantCtrl,
-                decoration: const InputDecoration(labelText: 'Dominant color'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: secondaryCtrl,
-                decoration: const InputDecoration(labelText: 'Secondary color'),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: WardrobeTokens.inkStrong,
-                  ),
-                  child: const Text('Save Changes'),
+      builder: (ctx) => AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: 'Name'),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                TextField(
+                  controller: descriptionCtrl,
+                  maxLines: 2,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: dominantCtrl,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: 'Dominant color'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: secondaryCtrl,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(labelText: 'Secondary color'),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: WardrobeTokens.inkStrong,
+                    ),
+                    child: const Text('Save Changes'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -262,7 +296,7 @@ class _AccessoryDetailScreenState extends State<AccessoryDetailScreen> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) Navigator.pop(context, _hasChanges);
+        if (!didPop && mounted) Navigator.of(context).pop(_hasChanges);
       },
       child: Scaffold(
         backgroundColor: WardrobeTokens.pageWarm,
@@ -272,13 +306,19 @@ class _AccessoryDetailScreenState extends State<AccessoryDetailScreen> {
           title: const Text('Accessory Detail'),
           actions: [
             IconButton(
-              onPressed: _toggleFavourite,
-              icon: Icon(
-                isFav ? Icons.favorite : Icons.favorite_border,
-                color: isFav
-                    ? WardrobeTokens.dangerStrong
-                    : WardrobeTokens.inkStrong,
-              ),
+              onPressed: _updatingFavourite ? null : _toggleFavourite,
+              icon: _updatingFavourite
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      isFav ? Icons.favorite : Icons.favorite_border,
+                      color: isFav
+                          ? WardrobeTokens.dangerStrong
+                          : WardrobeTokens.inkStrong,
+                    ),
             ),
           ],
         ),
