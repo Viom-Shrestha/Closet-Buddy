@@ -436,18 +436,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return _asInt(outfit['wear_count']) ?? 0;
   }
 
-  Map<String, dynamic>? _resolveTodayOutfit() {
-    final currentId = _asInt(_todayOutfit?['id']);
-    if (currentId != null) {
-      final latest = outfits
-          .where((o) => _asInt(o['id']) == currentId)
-          .cast<Map<String, dynamic>?>()
-          .firstWhere((o) => o != null, orElse: () => null);
-      return latest ?? _todayOutfit;
-    }
-    return _todayOutfit ?? (outfits.isNotEmpty ? outfits.first : null);
-  }
-
   String _activeTabLabel() {
     switch (_selectedIndex) {
       case 1:
@@ -900,7 +888,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ── TODAY'S OUTFIT — the star of the show ─────────────────────────────────
 
   Widget _buildTodayOutfitCard() {
-    final Map<String, dynamic>? todayOutfit = _resolveTodayOutfit();
+    final Map<String, dynamic>? todayOutfit = _todayOutfit;
 
     final String outfitName =
         (todayOutfit?['name'] ?? todayOutfit?['title'] ?? "Today's Look")
@@ -2166,4 +2154,3 @@ class _QuickActionTile extends StatelessWidget {
     ),
   );
 }
-
