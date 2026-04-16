@@ -4,8 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/core.dart';
 
 class ApiClient {
-  static const host = AppConfig.apiHost;
-  static const baseUrl = AppConfig.apiBaseUrl;
+  static String get host => AppConfig.apiHost;
+  static String get baseUrl => AppConfig.apiBaseUrl;
 
   Future<String?> _accessToken() async {
     final prefs = await SharedPreferences.getInstance();

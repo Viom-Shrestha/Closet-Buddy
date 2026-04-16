@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:frontend/core/core.dart';
 import 'package:frontend/services/auth_service.dart';
@@ -59,18 +62,37 @@ class _LoginScreenState extends State<LoginScreen>
     if (!_formKey.currentState!.validate()) {
       return; // Stop if form validation fails
     }
+
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
 
-    // Attempt login and get the token (or false on failure)
-    final success = await authService.login(
-      _username.text,
-      _password.text,
-      rememberMe: _rememberMe,
-    );
+    var success = false;
+    var errorMessage = 'Login failed. Please check credentials.';
+
+    try {
+      // Attempt login and get the token (or false on failure)
+      success = await authService.login(
+        _username.text.trim(),
+        _password.text,
+        rememberMe: _rememberMe,
+      );
+      if (!success) {
+        errorMessage = 'Login failed. Please check credentials.';
+      }
+    } on SocketException {
+      errorMessage = 'Cannot reach server. Check backend and API host.';
+    } on TimeoutException {
+      errorMessage = 'Server timeout. Please try again.';
+    } catch (e) {
+      errorMessage = 'Login failed. Please try again.';
+      debugPrint('Login error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false); // Stop loading regardless of outcome
+      }
+    }
 
     if (!mounted) return;
-
-    setState(() => _isLoading = false); // Stop loading regardless of outcome
 
     if (success) {
       // pushReplacement removes the current screen (LoginScreen) from the stack.
@@ -84,8 +106,8 @@ class _LoginScreenState extends State<LoginScreen>
     } else {
       // Failure Message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login failed. Please check credentials.'),
+        SnackBar(
+          content: Text(errorMessage),
           backgroundColor: AuthTokens.dangerStrong,
         ),
       );
@@ -378,7 +400,7 @@ class _LoginScreenState extends State<LoginScreen>
 
                           // Login button
                           SizedBox(
-                            height: 52,
+                            height: 55,
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : login,
                               style: ElevatedButton.styleFrom(

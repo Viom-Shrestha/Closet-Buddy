@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api_client.dart';
@@ -94,7 +95,7 @@ class AuthService {
         'password': password,
         'remember_me': rememberMe,
       }),
-    );
+    ).timeout(const Duration(seconds: 15));
 
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body);

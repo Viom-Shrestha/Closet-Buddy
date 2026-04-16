@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:frontend/core/core.dart';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:frontend/services/accessory_service.dart';
@@ -45,12 +44,7 @@ class _UploadAccessoryScreenState extends State<UploadAccessoryScreen> {
   Future<void> _pickImage(ImageSource source) async {
     final picked = await _picker.pickImage(source: source);
     if (picked == null) return;
-    final original = File(picked.path);
-    final shouldCrop = await _askCropChoice();
-    if (shouldCrop == null) return;
-
-    final selected = shouldCrop ? await _cropImage(original) : original;
-    if (selected == null) return;
+    final selected = File(picked.path);
 
     setState(() {
       _selectedImage = selected;
@@ -75,104 +69,6 @@ class _UploadAccessoryScreenState extends State<UploadAccessoryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Accessory segmentation failed')),
       );
-    }
-  }
-
-  Future<bool?> _askCropChoice() {
-    return showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: UploadTokens.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Prepare Image',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Do you want to crop the image before segmentation?',
-                style: TextStyle(fontSize: 13, color: UploadTokens.muted),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Use Original'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: UploadTokens.ink,
-                      ),
-                      child: const Text('Crop Image'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<File?> _cropImage(File source) async {
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Cropping is not supported on this platform yet. Using original image.',
-            ),
-          ),
-        );
-      }
-      return source;
-    }
-
-    try {
-      final cropped = await ImageCropper().cropImage(
-        sourcePath: source.path,
-        compressFormat: ImageCompressFormat.jpg,
-        compressQuality: 95,
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'Crop Accessory',
-            toolbarColor: UploadTokens.surface,
-            toolbarWidgetColor: UploadTokens.ink,
-            statusBarColor: UploadTokens.surface,
-            backgroundColor: UploadTokens.pageBg,
-            activeControlsWidgetColor: UploadTokens.ink,
-            initAspectRatio: CropAspectRatioPreset.original,
-            lockAspectRatio: false,
-          ),
-          IOSUiSettings(title: 'Crop Accessory', aspectRatioLockEnabled: false),
-        ],
-      );
-      if (cropped == null) return null;
-      return File(cropped.path);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cropping failed. Using original image instead.'),
-          ),
-        );
-      }
-      return source;
     }
   }
 

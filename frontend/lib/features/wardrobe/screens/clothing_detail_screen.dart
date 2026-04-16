@@ -144,18 +144,12 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
         _temperatureOptions = _collectOptions(
           allItems,
           'detected_temp',
-          extras: [
-            _safe(data?['detected_temp']),
-            ..._defaultTemperatureValues,
-          ],
+          extras: [_safe(data?['detected_temp']), ..._defaultTemperatureValues],
         );
         _weatherOptions = _collectOptions(
           allItems,
           'detected_weather',
-          extras: [
-            _safe(data?['detected_weather']),
-            ..._defaultWeatherValues,
-          ],
+          extras: [_safe(data?['detected_weather']), ..._defaultWeatherValues],
         );
         loading = false;
       });
@@ -295,7 +289,9 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
       'secondary_color': TextEditingController(text: item!['secondary_color']),
       'occasion': TextEditingController(text: item!['occasion']),
       'detected_temp': TextEditingController(text: item!['detected_temp']),
-      'detected_weather': TextEditingController(text: item!['detected_weather']),
+      'detected_weather': TextEditingController(
+        text: item!['detected_weather'],
+      ),
       'attributes': TextEditingController(text: _attrs().join(', ')),
     };
 
@@ -793,7 +789,10 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
       {'label': 'Temperature', 'value': tmp},
       {'label': 'Weather', 'value': wth},
       {'label': 'Stored in', 'value': storageName},
-      {'label': 'Tags', 'value': atrs.isEmpty ? 'No tags yet' : atrs.join(', ')},
+      {
+        'label': 'Tags',
+        'value': atrs.isEmpty ? 'No tags yet' : atrs.join(', '),
+      },
     ].where((row) => (row['value'] ?? '').isNotEmpty).toList();
 
     return Padding(
@@ -889,6 +888,7 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
       ),
     );
   }
+
   Widget _buildActions() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
@@ -1216,28 +1216,32 @@ class _ConditionChip extends StatelessWidget {
           child: Icon(icon, size: 19, color: color),
         ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: color.withValues(alpha: 0.7),
-                letterSpacing: 0.4,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w600,
+                  color: color.withValues(alpha: 0.7),
+                  letterSpacing: 0.4,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: ClothingDetailTokens.text,
+              const SizedBox(height: 2),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: ClothingDetailTokens.text,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     ),
@@ -1364,7 +1368,9 @@ class _ActionButton extends StatelessWidget {
             ],
           );
 
-    final fg = primary ? ClothingDetailTokens.white : ClothingDetailTokens.danger;
+    final fg = primary
+        ? ClothingDetailTokens.white
+        : ClothingDetailTokens.danger;
 
     return GestureDetector(
       onTap: onTap,
@@ -1632,7 +1638,8 @@ class _EditSheet extends StatelessWidget {
 
   Widget _buildDropdownInput(String key) {
     final controller = ctrls[key]!;
-    final hasAny = key == 'occasion' ||
+    final hasAny =
+        key == 'occasion' ||
         key == 'detected_temp' ||
         key == 'detected_weather';
     final options = _dropdownValues(key);
@@ -1693,9 +1700,9 @@ class _EditSheet extends StatelessWidget {
           color: ClothingDetailTokens.text,
           fontWeight: FontWeight.w600,
         ),
-        decoration: _inputDecoration('category').copyWith(
-          helperText: 'Shoes category is locked for shoe items.',
-        ),
+        decoration: _inputDecoration(
+          'category',
+        ).copyWith(helperText: 'Shoes category is locked for shoe items.'),
       ),
     );
   }
@@ -1748,7 +1755,9 @@ class _EditSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          isShoe ? _buildLockedCategoryInput() : _buildDropdownInput('category'),
+          isShoe
+              ? _buildLockedCategoryInput()
+              : _buildDropdownInput('category'),
           _buildTextInput('subcategory'),
           _buildTextInput('dominant_color'),
           _buildTextInput('secondary_color'),
@@ -1797,4 +1806,3 @@ class _EditSheet extends StatelessWidget {
     ),
   );
 }
-
