@@ -52,8 +52,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
     switch (_sortBy) {
       case 'Oldest first':
         list.sort(
-          (a, b) =>
-              (a['created_at'] ?? '').compareTo(b['created_at'] ?? ''),
+          (a, b) => (a['created_at'] ?? '').compareTo(b['created_at'] ?? ''),
         );
       case 'Rating (high to low)':
         list.sort((a, b) {
@@ -69,8 +68,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
         });
       default:
         list.sort(
-          (a, b) =>
-              (b['created_at'] ?? '').compareTo(a['created_at'] ?? ''),
+          (a, b) => (b['created_at'] ?? '').compareTo(a['created_at'] ?? ''),
         );
     }
     return list;
@@ -278,7 +276,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
                         }, childCount: displayed.length),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
-                          childAspectRatio: 0.46,
+                          childAspectRatio: 0.40,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),
@@ -577,6 +575,11 @@ class _HeaderSection extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     backgroundColor: OutfitTokens.onHero,
                     foregroundColor: OutfitTokens.ink,
+                    minimumSize: const Size.fromHeight(46),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                   ),
                   label: const Text('Create Outfit'),
                 ),
@@ -589,6 +592,11 @@ class _HeaderSection extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: OutfitTokens.onHero,
                     side: const BorderSide(color: OutfitTokens.onHeroMuted),
+                    minimumSize: const Size.fromHeight(46),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                   ),
                   label: const Text('Generate'),
                 ),
@@ -3071,8 +3079,8 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
     final aiRatingBreakdown = rawBreakdown is Map<String, dynamic>
         ? rawBreakdown
         : rawBreakdown is Map
-            ? Map<String, dynamic>.from(rawBreakdown)
-            : const <String, dynamic>{};
+        ? Map<String, dynamic>.from(rawBreakdown)
+        : const <String, dynamic>{};
     final aiRatedAtText = _formatDate(outfit?['ai_rated_at']?.toString());
     final wearCount = _asInt(outfit?['wear_count']) ?? 0;
     final lastWornAt = _formatDate(outfit?['last_worn_at']?.toString());
@@ -3290,7 +3298,10 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
                           ),
                       ],
                       const SizedBox(height: 8),
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
                         children: [
                           const Text(
                             'Rating: ',
@@ -3303,8 +3314,7 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
                             rating: ratingValue,
                             onSelected: _setRating,
                           ),
-                          if (_savingRating) ...[
-                            const SizedBox(width: 8),
+                          if (_savingRating)
                             const Text(
                               'Saving...',
                               style: TextStyle(
@@ -3312,7 +3322,6 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
                                 color: OutfitTokens.muted,
                               ),
                             ),
-                          ],
                         ],
                       ),
                     ],
@@ -3403,9 +3412,7 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
     );
   }
 
-  List<_StorageLocationRow> _clothingStorageRows(
-    Map<String, dynamic>? outfit,
-  ) {
+  List<_StorageLocationRow> _clothingStorageRows(Map<String, dynamic>? outfit) {
     if (outfit == null) return [];
 
     final rows = <_StorageLocationRow>[];
@@ -3687,18 +3694,18 @@ class _AiRatingCard extends StatelessWidget {
     final cohesionLine = clip == null
         ? 'Style cohesion is moderate with room to refine.'
         : clip >= 0.80
-            ? 'Strong style cohesion — the pieces read as one intentional look.'
-            : clip >= 0.65
-                ? 'Style cohesion is decent; one swap could tighten it further.'
-                : 'Style cohesion is weak — align silhouettes and vibe more closely.';
+        ? 'Strong style cohesion — the pieces read as one intentional look.'
+        : clip >= 0.65
+        ? 'Style cohesion is decent; one swap could tighten it further.'
+        : 'Style cohesion is weak — align silhouettes and vibe more closely.';
 
     final colorLine = color == null
         ? 'Color balance is fairly consistent.'
         : color >= 0.80
-            ? 'Color harmony is a clear strength of this outfit.'
-            : color >= 0.65
-                ? 'Color balance works, though the palette could be simplified.'
-                : 'Color pairing feels crowded — simplify to one accent tone.';
+        ? 'Color harmony is a clear strength of this outfit.'
+        : color >= 0.65
+        ? 'Color balance works, though the palette could be simplified.'
+        : 'Color pairing feels crowded — simplify to one accent tone.';
 
     String improvementLine;
     if (clip != null && color != null && dressLevel != null) {
@@ -3905,11 +3912,7 @@ class _StorageInfoRow extends StatelessWidget {
   final String value;
   final VoidCallback? onTap;
 
-  const _StorageInfoRow({
-    required this.label,
-    required this.value,
-    this.onTap,
-  });
+  const _StorageInfoRow({required this.label, required this.value, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -3933,17 +3936,9 @@ class _StorageInfoRow extends StatelessWidget {
             children: [
               Text(
                 '$label: ',
-                style: const TextStyle(
-                  color: OutfitTokens.muted,
-                  fontSize: 13,
-                ),
+                style: const TextStyle(color: OutfitTokens.muted, fontSize: 13),
               ),
-              Expanded(
-                child: Text(
-                  value,
-                  style: valueStyle,
-                ),
-              ),
+              Expanded(child: Text(value, style: valueStyle)),
               if (onTap != null) ...[
                 const SizedBox(width: 4),
                 const Icon(
@@ -3997,6 +3992,7 @@ class _StarRatingBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (index) {
         final value = index + 1;
         final isActive = value <= rating;
@@ -4006,9 +4002,9 @@ class _StarRatingBar extends StatelessWidget {
             isActive ? Icons.star_rounded : Icons.star_border_rounded,
             color: isActive ? OutfitTokens.warning : OutfitTokens.mutedSoft,
           ),
-          iconSize: 22,
+          iconSize: 20,
           padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           tooltip: '$value stars',
         );
       }),

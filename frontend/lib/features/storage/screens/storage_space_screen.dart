@@ -306,6 +306,7 @@ class _StorageListScreenState extends State<StorageListScreen> {
                 child: Column(
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
                           padding: const EdgeInsets.all(10),
@@ -328,6 +329,8 @@ class _StorageListScreenState extends State<StorageListScreen> {
                             children: [
                               Text(
                                 storage.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
@@ -338,30 +341,17 @@ class _StorageListScreenState extends State<StorageListScreen> {
                               const SizedBox(height: 4),
                               Row(
                                 children: [
-                                  Text(
-                                    storage.type.name.toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: StorageTokens.mutedSoft,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    width: 3,
-                                    height: 3,
-                                    decoration: const BoxDecoration(
-                                      color: StorageTokens.line,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '${storage.itemCount} items',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: StorageTokens.mutedSoft,
+                                  Expanded(
+                                    child: Text(
+                                      '${storage.type.name.toUpperCase()} - ${storage.itemCount} items',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: StorageTokens.mutedSoft,
+                                        letterSpacing: 0.2,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -369,74 +359,6 @@ class _StorageListScreenState extends State<StorageListScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: statusColor.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: Text(
-                                statusLabel,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: statusColor,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Switch(
-                              value: storage.isPutAway,
-                              activeThumbColor: StorageTokens.success,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                              onChanged: (val) async {
-                                final oldValue = storage.isPutAway;
-
-                                // optimistic update
-                                setState(() => storage.isPutAway = val);
-
-                                try {
-                                  await storageService.togglePutAway(
-                                    int.parse(storage.id),
-                                    val,
-                                  );
-                                } catch (_) {
-                                  if (!mounted) return;
-                                  // rollback if failed
-                                  setState(() => storage.isPutAway = oldValue);
-
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text("Failed to update"),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                        if (hasSubStorages)
-                          IconButton(
-                            icon: Icon(
-                              isExpanded
-                                  ? Icons.keyboard_arrow_up
-                                  : Icons.keyboard_arrow_down,
-                              color: StorageTokens.muted,
-                            ),
-                            onPressed: () => _toggleExpanded(storage.id),
-                          ),
                         PopupMenuButton<String>(
                           icon: const Icon(
                             Icons.more_vert,
@@ -488,6 +410,77 @@ class _StorageListScreenState extends State<StorageListScreen> {
                               ),
                             ),
                           ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: statusColor.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (hasSubStorages)
+                          IconButton(
+                            icon: Icon(
+                              isExpanded
+                                  ? Icons.keyboard_arrow_up
+                                  : Icons.keyboard_arrow_down,
+                              color: StorageTokens.muted,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _toggleExpanded(storage.id),
+                          ),
+                        Switch(
+                          value: storage.isPutAway,
+                          activeThumbColor: StorageTokens.success,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          onChanged: (val) async {
+                            final oldValue = storage.isPutAway;
+
+                            // optimistic update
+                            setState(() => storage.isPutAway = val);
+
+                            try {
+                              await storageService.togglePutAway(
+                                int.parse(storage.id),
+                                val,
+                              );
+                            } catch (_) {
+                              if (!mounted) return;
+                              // rollback if failed
+                              setState(() => storage.isPutAway = oldValue);
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Failed to update"),
+                                ),
+                              );
+                            }
+                          },
                         ),
                       ],
                     ),
