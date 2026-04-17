@@ -1162,14 +1162,10 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Text(
-                'Recommended Outfits',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const Spacer(),
-              _Pressable(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 520;
+              final editButton = _Pressable(
                 onTap: _enterInputMode,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -1188,9 +1184,8 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _Pressable(
+              );
+              final regenerateButton = _Pressable(
                 onTap: _loading ? null : _generate,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -1202,6 +1197,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_loading)
                         const SizedBox(
@@ -1231,8 +1227,41 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                     ],
                   ),
                 ),
-              ),
-            ],
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Recommended Outfits',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [editButton, regenerateButton],
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Recommended Outfits',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  editButton,
+                  const SizedBox(width: 8),
+                  regenerateButton,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 10),
           Wrap(spacing: 8, runSpacing: 8, children: _summaryChips()),

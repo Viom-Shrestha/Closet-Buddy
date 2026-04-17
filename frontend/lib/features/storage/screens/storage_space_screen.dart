@@ -788,150 +788,155 @@ class _AddStorageSheetState extends State<AddStorageSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
       decoration: const BoxDecoration(
         color: StorageTokens.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.parentId != null
-                          ? 'Add Sub-Storage'
-                          : 'Add Storage Space',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: StorageTokens.ink,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    if (widget.parentName != null) ...[
-                      const SizedBox(height: 4),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            24,
+            24,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Inside ${widget.parentName}',
+                        widget.parentId != null
+                            ? 'Add Sub-Storage'
+                            : 'Add Storage Space',
                         style: const TextStyle(
-                          fontSize: 13,
-                          color: StorageTokens.mutedSoft,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: StorageTokens.ink,
+                          letterSpacing: -0.5,
                         ),
                       ),
+                      if (widget.parentName != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Inside ${widget.parentName}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: StorageTokens.mutedSoft,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: StorageTokens.muted),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Storage Name',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: StorageTokens.muted,
-                letterSpacing: 0.3,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _nameController,
-              autofocus: true,
-              style: const TextStyle(fontSize: 15, color: StorageTokens.ink),
-              decoration: InputDecoration(
-                hintText: 'e.g., Master Bedroom Closet',
-                hintStyle: const TextStyle(color: StorageTokens.mutedSoft),
-                filled: true,
-                fillColor: StorageTokens.pageBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: StorageTokens.line),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: StorageTokens.line),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: StorageTokens.ink,
-                    width: 2,
                   ),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
+                  IconButton(
+                    icon: const Icon(Icons.close, color: StorageTokens.muted),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Storage Name',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: StorageTokens.muted,
+                  letterSpacing: 0.3,
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Storage Type',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: StorageTokens.muted,
-                letterSpacing: 0.3,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: StorageType.values.map((type) {
-                final isSelected = _selectedType == type;
-                return ChoiceChip(
-                  label: Text(
-                    type.name[0].toUpperCase() + type.name.substring(1),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: isSelected
-                          ? StorageTokens.surface
-                          : StorageTokens.ink,
+              const SizedBox(height: 8),
+              TextField(
+                controller: _nameController,
+                autofocus: true,
+                style: const TextStyle(fontSize: 15, color: StorageTokens.ink),
+                decoration: InputDecoration(
+                  hintText: 'e.g., Master Bedroom Closet',
+                  hintStyle: const TextStyle(color: StorageTokens.mutedSoft),
+                  filled: true,
+                  fillColor: StorageTokens.pageBg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: StorageTokens.line),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: StorageTokens.line),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: StorageTokens.ink,
+                      width: 2,
                     ),
                   ),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() => _selectedType = type);
-                  },
-                  backgroundColor: StorageTokens.pageBg,
-                  selectedColor: StorageTokens.ink,
-                  side: BorderSide(
-                    color: isSelected ? StorageTokens.ink : StorageTokens.line,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: PrimaryButton(
-                text: 'Create Storage',
-                onPressed: () {
-                  if (_nameController.text.trim().isNotEmpty) {
-                    widget.onSave(_nameController.text.trim(), _selectedType);
-                  }
-                },
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              const Text(
+                'Storage Type',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: StorageTokens.muted,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: StorageType.values.map((type) {
+                  final isSelected = _selectedType == type;
+                  return ChoiceChip(
+                    label: Text(
+                      type.name[0].toUpperCase() + type.name.substring(1),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: isSelected
+                            ? StorageTokens.surface
+                            : StorageTokens.ink,
+                      ),
+                    ),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() => _selectedType = type);
+                    },
+                    backgroundColor: StorageTokens.pageBg,
+                    selectedColor: StorageTokens.ink,
+                    side: BorderSide(
+                      color: isSelected ? StorageTokens.ink : StorageTokens.line,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: PrimaryButton(
+                  text: 'Create Storage',
+                  onPressed: () {
+                    if (_nameController.text.trim().isNotEmpty) {
+                      widget.onSave(_nameController.text.trim(), _selectedType);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
