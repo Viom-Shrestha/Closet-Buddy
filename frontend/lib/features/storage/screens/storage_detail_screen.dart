@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:frontend/core/core.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:frontend/services/storage_service.dart';
+import 'package:frontend/services/accessory_service.dart';
 import 'package:frontend/services/clothing_service.dart';
 import 'package:frontend/services/misc_service.dart';
 import 'package:frontend/services/clothing_query_service.dart';
 import 'package:frontend/services/api_client.dart';
+import 'package:frontend/features/wardrobe/screens/accessory_detail_screen.dart';
 import 'package:frontend/features/wardrobe/screens/clothing_detail_screen.dart';
 import 'package:frontend/features/upload/screens/upload_clothing_screen.dart';
 import 'package:frontend/theme/app_theme.dart';
@@ -21,6 +23,7 @@ class StorageDetailScreen extends StatefulWidget {
 
 class _StorageDetailScreenState extends State<StorageDetailScreen> {
   final StorageService storageService = ServiceRegistry.instance.storageService;
+  final AccessoryService accessoryService = ServiceRegistry.instance.accessoryService;
   final ClothingService clothingService = ServiceRegistry.instance.clothingService;
   final MiscService miscService = ServiceRegistry.instance.miscService;
 
@@ -55,8 +58,21 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
 
   Future<void> _load() async {
     try {
-      final res = await storageService.getDetail(widget.storageId);
-      final allStorages = await storageService.getAll();
+      final detailFuture = storageService.getDetail(widget.storageId);
+      final allStoragesFuture = storageService.getAll();
+      final accessoriesFuture = accessoryService.getAll();
+      final res = await detailFuture;
+      final allStorages = await allStoragesFuture;
+      final allAccessories = await accessoriesFuture;
+      final filteredAccessories = allAccessories.where((a) {
+        final storageRaw = a['storage_unit'];
+        final storage = storageRaw is Map<String, dynamic>
+            ? storageRaw
+            : storageRaw is Map
+            ? Map<String, dynamic>.from(storageRaw)
+            : null;
+        return storage != null && _asInt(storage['id']) == widget.storageId;
+      }).toList();
       final chain = _buildBreadcrumbChain(
         res['storage'] as Map<String, dynamic>,
         allStorages,
@@ -64,7 +80,7 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
 
       if (!mounted) return;
       setState(() {
-        data = res;
+        data = <String, dynamic>{...res, 'accessories': filteredAccessories};
         _breadcrumbChain = chain;
         loading = false;
       });
@@ -336,6 +352,127 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
       hasChanges = true;
       _load();
     }
+  }
+
+  Future<void> _openAccessoryDetail(Map<String, dynamic> accessory) async {
+    final accessoryId = _asInt(accessory['id']);
+    if (accessoryId <= 0) return;
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AccessoryDetailScreen(
+          accessoryId: accessoryId,
+          initialData: accessory,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      hasChanges = true;
+      _load();
+    }
+  }
+
+  Future<void> _toggleAccessoryFavourite(Map<String, dynamic> accessory) async {
+    final oldValue = accessory['is_favourite'] == true;
+    setState(() => accessory['is_favourite'] = !oldValue);
+
+    final ok = await accessoryService.toggleFavourite(_asInt(accessory['id']));
+    if (!mounted) return;
+
+    if (!ok) {
+      setState(() => accessory['is_favourite'] = oldValue);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update favourite')),
+      );
+      return;
+    }
+
+    hasChanges = true;
+  }
+
+  Future<void> _moveAccessory(Map<String, dynamic> accessory) async {
+    final all = await storageService.getAll();
+    if (!mounted) return;
+
+    final storages = List<Map<String, dynamic>>.from(all)
+      ..sort(
+        (a, b) => (a['name'] ?? '').toString().compareTo(
+          (b['name'] ?? '').toString(),
+        ),
+      );
+
+    if (storages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No storage spaces available')),
+      );
+      return;
+    }
+
+    final currentId = _asInt(accessory['storage_unit']?['id']);
+    final target = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'Move Accessory',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text('Choose destination storage'),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: storages.length,
+                itemBuilder: (context, i) {
+                  final s = storages[i];
+                  final id = _asInt(s['id']);
+                  final isCurrent = id == currentId;
+
+                  return ListTile(
+                    enabled: !isCurrent,
+                    leading: Icon(_storageTypeIcon(s['type']?.toString())),
+                    title: Text((s['name'] ?? 'Storage').toString()),
+                    subtitle: Text((s['type'] ?? 'other').toString()),
+                    trailing: isCurrent
+                        ? const Text('Current')
+                        : const Icon(Icons.chevron_right),
+                    onTap: isCurrent ? null : () => Navigator.pop(context, s),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (target == null) return;
+
+    setState(() => _movingItem = true);
+    final ok = await accessoryService.moveToStorage(
+      _asInt(accessory['id']),
+      _asInt(target['id']),
+    );
+
+    if (!mounted) return;
+    setState(() => _movingItem = false);
+
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to move accessory')),
+      );
+      return;
+    }
+
+    hasChanges = true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Moved to ${(target['name'] ?? 'storage')}')),
+    );
+    _load();
   }
 
   Future<void> _moveClothing(Map<String, dynamic> item) async {
@@ -1399,6 +1536,9 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
     final storage = data!['storage'] as Map<String, dynamic>;
     final clothes = data!['clothes'] as List;
     final nonClothes = data!['non_clothing_items'] as List;
+    final accessories = data!['accessories'] is List
+        ? data!['accessories'] as List
+        : const [];
     final subStorages = storage['sub_storages'] as List;
     final counts = data!['counts'] as Map<String, dynamic>;
     final query = _searchQuery.trim().toLowerCase();
@@ -1415,7 +1555,11 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
 
     final colorStat = _mostCommonColor(clothes);
     final categoryDist = _categoryDistribution(clothes);
-    final itemDist = _itemDistribution(clothes, nonClothes);
+    final itemDist = _itemDistribution(clothes, [...nonClothes, ...accessories]);
+    final clothingCount = _asInt(counts['clothing']);
+    final nonClothingCount = _asInt(counts['non_clothing']);
+    final accessoryCount = accessories.length;
+    final totalCount = clothingCount + nonClothingCount + accessoryCount;
 
     return PopScope(
       canPop: false,
@@ -1514,9 +1658,10 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            _count('Clothes', _asInt(counts['clothing'])),
-                            _count('Other', _asInt(counts['non_clothing'])),
-                            _count('Total', _asInt(counts['total'])),
+                            _count('Clothes', clothingCount),
+                            _count('Accessories', accessoryCount),
+                            _count('Other', nonClothingCount),
+                            _count('Total', totalCount),
                           ],
                         ),
                         const Divider(height: 24),
@@ -1547,6 +1692,102 @@ class _StorageDetailScreenState extends State<StorageDetailScreen> {
                         ),
                         const SizedBox(height: 16),
                         _buildDistributionChart(itemDist),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _sectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Accessories',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: HomeTokens.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (accessories.isEmpty)
+                          const Center(
+                            child: Text('No accessories here yet'),
+                          )
+                        else
+                          ...accessories.map(
+                            (a) => ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: (a['image'] == null ||
+                                      (a['image'] ?? '').toString().trim().isEmpty)
+                                  ? const Icon(Icons.watch_outlined)
+                                  : ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        _img(a['image']),
+                                        width: 40,
+                                        height: 40,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                const Icon(
+                                          Icons.watch_outlined,
+                                        ),
+                                      ),
+                                    ),
+                              title: Text((a['name'] ?? 'Accessory').toString()),
+                              subtitle: Text(
+                                (a['dominant_color'] ?? '').toString().trim().isEmpty
+                                    ? 'Accessory'
+                                    : 'Color: ${(a['dominant_color'] ?? '').toString()}',
+                              ),
+                              onTap: () => _openAccessoryDetail(
+                                Map<String, dynamic>.from(a as Map),
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  final item = Map<String, dynamic>.from(a as Map);
+                                  if (value == 'move') _moveAccessory(item);
+                                  if (value == 'favorite') {
+                                    _toggleAccessoryFavourite(item);
+                                  }
+                                },
+                                itemBuilder: (_) => [
+                                  const PopupMenuItem(
+                                    value: 'move',
+                                    child: ListTile(
+                                      leading: Icon(
+                                        Icons.drive_file_move_outline,
+                                        size: 20,
+                                      ),
+                                      title: Text('Move'),
+                                      contentPadding: EdgeInsets.zero,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'favorite',
+                                    child: ListTile(
+                                      leading: Icon(
+                                        (a['is_favourite'] == true)
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        size: 20,
+                                        color: (a['is_favourite'] == true)
+                                            ? StorageTokens.dangerStrong
+                                            : HomeTokens.inkSub,
+                                      ),
+                                      title: Text(
+                                        (a['is_favourite'] == true)
+                                            ? 'Unfavorite'
+                                            : 'Favorite',
+                                      ),
+                                      contentPadding: EdgeInsets.zero,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
