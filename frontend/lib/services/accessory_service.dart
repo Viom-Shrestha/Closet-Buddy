@@ -62,4 +62,11 @@ class AccessoryService {
     final res = await client.post('/accessories/$id/toggle-favourite/', {});
     return res.statusCode == 200;
   }
+
+  Future<bool> moveToStorage(int id, int storageId) async {
+    final res = await client.patch('/accessories/$id/', {
+      'storage_unit': storageId,
+    });
+    return res.statusCode == 200;
+  }
 }

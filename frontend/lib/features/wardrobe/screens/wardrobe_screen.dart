@@ -268,6 +268,32 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
     return _itemKind(item) == 'accessory' ? -id : id;
   }
 
+  Map<String, dynamic>? _asMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
+  }
+
+  String _storageLabel(Map<String, dynamic> item) {
+    final storage = _asMap(item['storage_unit']);
+    if (storage == null) return 'Storage: Unassigned';
+
+    final parts = <String>[];
+    final seen = <int>{};
+    Map<String, dynamic>? cursor = storage;
+    while (cursor != null) {
+      final id = _itemId(cursor);
+      if (id != null && !seen.add(id)) break;
+      final name = (cursor['name'] ?? '').toString().trim();
+      if (name.isNotEmpty) {
+        parts.add(name);
+      }
+      cursor = _asMap(cursor['parent_storage']);
+    }
+    if (parts.isEmpty) return 'Storage: Unassigned';
+    return 'Storage: ${parts.reversed.join(' > ')}';
+  }
+
   List<String> _optionsFor(String field) {
     return ClothingQueryService.optionsForField(_allItems, field);
   }
@@ -1385,6 +1411,16 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _storageLabel(item),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: WardrobeTokens.mutedSoft,
+                    ),
                   ),
                 ],
               ),
