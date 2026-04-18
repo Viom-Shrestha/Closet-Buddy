@@ -372,8 +372,6 @@ class OutfitAiRateTests(APITestCase):
             shoes=self.shoes,
             outerwear=self.outerwear,
         )
-        outfit.clothing_items.set([self.top, self.bottom, self.shoes, self.outerwear])
-
         payload = {
             "outfit_id": outfit.id,
             "topwear_id": self.top.id,
@@ -406,8 +404,6 @@ class OutfitAiRateTests(APITestCase):
                 "overall_raw": 0.82,
             },
         )
-        outfit.clothing_items.set([self.top, self.bottom, self.shoes])
-
         res = self.client.patch(
             f"/api/outfits/{outfit.id}/",
             {"topwear_id": self.top_alt.id},
@@ -771,8 +767,6 @@ class OutfitRoutesParityTests(APITestCase):
             bottomwear=self.bottom,
             shoes=self.shoes,
         )
-        self.outfit.clothing_items.set([self.top, self.bottom, self.shoes])
-
     def test_outfit_list_invalid_favourite_filter_returns_400(self):
         res = self.client.get("/api/outfits/?is_favourite=not-a-bool")
 
