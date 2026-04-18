@@ -168,10 +168,6 @@ class Outfit(models.Model):
         related_name="outfits"
     )
     name = models.CharField(max_length=100)
-    clothing_items = models.ManyToManyField(
-        ClothingItem,
-        related_name="outfits"
-    )
     occasion = models.CharField(max_length=50, null=True, blank=True)
     rating = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
     ai_rating_score = models.FloatField(

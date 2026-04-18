@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(python -m uv run python backend/manage.py makemigrations api --name remove_outfit_clothing_items_m2m)",
+      "Bash(uv run *)"
     ]
   }
 }

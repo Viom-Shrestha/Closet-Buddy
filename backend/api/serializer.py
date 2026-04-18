@@ -443,7 +443,6 @@ class OutfitWriteSerializer(serializers.ModelSerializer):
         outfit = Outfit.objects.create(**validated_data)
         if accessories is not None:
             outfit.accessories.set(accessories)
-        self._sync_clothing_items(outfit)
         return outfit
 
     def update(self, instance, validated_data):
@@ -477,9 +476,4 @@ class OutfitWriteSerializer(serializers.ModelSerializer):
         instance.save(update_fields=list(validated_data.keys()) if validated_data else None)
         if accessories is not None:
             instance.accessories.set(accessories)
-        self._sync_clothing_items(instance)
         return instance
-
-    def _sync_clothing_items(self, outfit: Outfit):
-        selected = [item for item in [outfit.outerwear, outfit.topwear, outfit.bottomwear, outfit.shoes] if item]
-        outfit.clothing_items.set(selected)
