@@ -112,13 +112,11 @@ def _extract_pixels(img):
 
     if len(pixels) == 0:
         return None
-
     # Remove near-black noise
     pixels = pixels[np.any(pixels > 8, axis=1)]
 
     if len(pixels) == 0:
         return None
-
     # Sampling for speed
     if len(pixels) > MAX_SAMPLE_PIXELS:
         idx = np.random.choice(len(pixels), MAX_SAMPLE_PIXELS, replace=False)

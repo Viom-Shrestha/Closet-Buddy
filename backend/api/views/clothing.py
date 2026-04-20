@@ -343,18 +343,16 @@ def clothing_process(request):
 
     is_shoe = _as_bool(request.data.get("is_shoe", False))
 
-    # -------- CLIP --------
+    # CLIP Authentication 
     auth_error = _authenticate_item(image.file, is_shoe)
     if auth_error:
         return Response(auth_error, status=400)
-
-
     try:
         original_url, original_path = _persist_original_upload(image, request)
     except Exception:
         return Response({"error": "Failed to persist upload"}, status=500)
 
-    # -------- SEGMENT --------
+    # SEGMENT 
     segmented_url = None
     segmentation_failed = False
     segmentation_message = ""
@@ -384,10 +382,10 @@ def clothing_process(request):
     if not image_path.exists():
         return Response({"error": "Image missing"}, status=500)
 
-    # -------- COLORS --------
+    #  COLORS 
     colors = _extract_colors_safe(image_path)
     
-    # -------- CLASSIFICATION + ATTRIBUTES --------
+    #  CLASSIFICATION + ATTRIBUTES 
     occasion = None
     occasion_conf = DEFAULT_OCCASION_CONFIDENCE
     if is_shoe:
@@ -397,7 +395,7 @@ def clothing_process(request):
         occasion, occasion_conf = _predict_occasion_safe(image_path)
         category, subcategory, attributes = _classify_clothing_safe(image_path)
 
-    # -------- WEATHER LABELS --------
+    #  WEATHER LABELS 
     detected_temp, detected_weather = _classify_weather_safe(
         image_path,
         category=category,
@@ -445,7 +443,6 @@ def clothing_save(request):
 
     if use_segmentation and not segmented_url and original_url:
         use_segmentation = False
-
     source_url = segmented_url if use_segmentation else (original_url or segmented_url)
     if not source_url or not storage_id:
         return Response({"error": "image source and storage_unit required"}, status=400)

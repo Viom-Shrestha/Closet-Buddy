@@ -340,7 +340,7 @@ class OutfitAiRateTests(APITestCase):
         self.assertEqual(len(res.data["ai_rating_reasons"]), 3)
         self.assertIn("clip", res.data["ai_rating_breakdown"])
         self.assertIn("color_harmony", res.data["ai_rating_breakdown"])
-        self.assertIn("neutral_weather_fit", res.data["ai_rating_breakdown"])
+        self.assertIn("dress_level_consistency", res.data["ai_rating_breakdown"])
         self.assertIn("overall_raw", res.data["ai_rating_breakdown"])
 
     @patch("api.recommend.scoring.clip_score", return_value=0.7)
@@ -400,7 +400,7 @@ class OutfitAiRateTests(APITestCase):
             ai_rating_breakdown={
                 "clip": 0.81,
                 "color_harmony": 0.77,
-                "neutral_weather_fit": 0.7,
+                "dress_level_consistency": 0.7,
                 "overall_raw": 0.82,
             },
         )

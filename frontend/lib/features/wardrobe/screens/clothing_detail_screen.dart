@@ -421,34 +421,34 @@ class _ClothingDetailScreenState extends State<ClothingDetailScreen>
                 child: CustomScrollView(
                   physics: const BouncingScrollPhysics(),
                   slivers: [
-                    // ── Hero Image ─────────────────────────────────────────
+                    //  Hero Image
                     SliverToBoxAdapter(
                       child: _buildHero(isFav, domCol, glowCol),
                     ),
 
-                    // ── Title + Meta ───────────────────────────────────────
+                    //  Title + Meta
                     SliverToBoxAdapter(child: _buildTitleBlock()),
 
-                    // ── Colors ─────────────────────────────────────────────
+                    //  Colors
                     if (domCol.isNotEmpty || secCol.isNotEmpty)
                       SliverToBoxAdapter(child: _buildColors(domCol, secCol)),
 
-                    // ── Conditions ─────────────────────────────────────────
+                    //  Conditions
                     if (temp.isNotEmpty || weather.isNotEmpty)
                       SliverToBoxAdapter(
                         child: _buildConditions(temp, weather),
                       ),
 
-                    // ── Details Card ───────────────────────────────────────
+                    //  Details Card
                     SliverToBoxAdapter(child: _buildDetailsCard()),
 
-                    // ── Attributes ─────────────────────────────────────────
+                    //  Attributes
                     SliverToBoxAdapter(child: _buildAttributes(attrs)),
 
-                    // ── Description ────────────────────────────────────────
+                    //  Description
                     SliverToBoxAdapter(child: _buildDescription()),
 
-                    // ── Actions ────────────────────────────────────────────
+                    //  Actions
                     SliverToBoxAdapter(child: _buildActions()),
 
                     const SliverToBoxAdapter(child: SizedBox(height: 56)),

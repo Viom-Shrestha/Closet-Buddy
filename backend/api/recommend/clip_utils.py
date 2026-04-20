@@ -16,8 +16,6 @@ _MODEL: Optional[CLIPModel] = None
 _PROCESSOR: Optional[CLIPProcessor] = None
 LOGGER = logging.getLogger(__name__)
 
-# Fashion-CLIP cosine values typically occupy a narrow positive band.
-# Stretching this calibrated range improves score spread for ranking/rating.
 CLIP_SIM_LOW = 0.15
 CLIP_SIM_HIGH = 0.38
 

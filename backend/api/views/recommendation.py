@@ -98,7 +98,6 @@ def recommend_outfits_view(request):
         return Response({"error": "Invalid temperature label."}, status=400)
     if condition and condition not in ALLOWED_WEATHER:
         return Response({"error": "Invalid weather label."}, status=400)
-
     occasion = _coerce_optional_text(payload.get("occasion"), "occasion")
     if isinstance(occasion, Response):
         return occasion
@@ -106,7 +105,6 @@ def recommend_outfits_view(request):
     if isinstance(prompt, Response):
         return prompt
     debug_enabled = _as_bool(payload.get("debug", False)) or _as_bool(request.query_params.get("debug", False))
-
     data = recommend_outfits(
         user=request.user,
         weather={"temperature": temperature, "weather": condition},
@@ -115,7 +113,6 @@ def recommend_outfits_view(request):
         limit=RECOMMENDATION_LIMIT,
         debug=debug_enabled,
     )
-
     if data.get("insufficient_wardrobe"):
         missing = data.get("missing_slots", [])
         return Response(
@@ -125,7 +122,6 @@ def recommend_outfits_view(request):
             },
             status=422,
         )
-
     response_body = {
         "outfits": data["results"],
         "fallback_used": data["fallback_used"],

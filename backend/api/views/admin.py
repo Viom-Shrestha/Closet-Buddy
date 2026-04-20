@@ -62,7 +62,6 @@ def _serialize_user_row(user):
         "accessory_count": getattr(user, "accessory_count", 0),
     }
 
-
 def _avatar_url(user):
     try:
         profile = user.profile
@@ -94,7 +93,6 @@ def _is_shoe_label(category: str, subcategory: str) -> bool:
     keys = ["shoe", "sneaker", "boot", "heel", "footwear", "slipper", "sandal", "loafer"]
     return any(key in text for key in keys)
 
-
 def _is_bottom_label(category: str, subcategory: str) -> bool:
     text = _slot_text(category, subcategory)
     keys = ["pant", "trouser", "jean", "short", "skirt", "bottom", "jogger", "legging", "cargo"]
@@ -106,13 +104,11 @@ def _is_outerwear_label(category: str, subcategory: str) -> bool:
     keys = ["jacket", "coat", "blazer", "cardigan", "hoodie", "outerwear", "parka", "trench"]
     return any(key in text for key in keys)
 
-
 def _to_non_negative_int(value) -> int:
     try:
         return max(0, int(value))
     except (TypeError, ValueError):
         return 0
-
 
 def _engagement_from_profiles(today, week_start):
     today_key = today.isoformat()

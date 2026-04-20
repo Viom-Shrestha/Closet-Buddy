@@ -42,8 +42,6 @@ _TRANSFORM = transforms.Compose(
 
 
 def _load_checkpoint(path: Path):
-    # In newer torch versions, default is weights_only=True.
-    # We support both signatures for compatibility.
     try:
         return torch.load(path, map_location=DEVICE, weights_only=False)
     except TypeError:

@@ -198,7 +198,6 @@ class _UploadClothingScreenState extends State<UploadClothingScreen> {
         detectedWeather = _safeText(result['detected_weather']);
         attributes = _extractTags(result);
 
-        // ✅ update controllers AFTER values exist
         categoryController.text = category;
         subcategoryController.text = subcategory;
         dominantColorController.text = dominantColor;
