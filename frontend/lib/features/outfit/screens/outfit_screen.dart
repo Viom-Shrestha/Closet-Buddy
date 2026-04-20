@@ -2769,10 +2769,6 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Inline strip components for the builder panel
-// ─────────────────────────────────────────────────────────────────────────────
-
 class OutfitDetailPage extends StatefulWidget {
   final Map<String, dynamic> initialOutfit;
 
@@ -3684,11 +3680,7 @@ class _AiRatingCard extends StatelessWidget {
   List<String> _fallbackFromBreakdown() {
     final clip = _asDouble(breakdown['clip']);
     final color = _asDouble(breakdown['color_harmony']);
-    final dressLevel = _asDouble(
-      breakdown['dress_level_consistency'] ??
-          breakdown['formality_consistency'] ??
-          breakdown['neutral_weather_fit'],
-    );
+    final dressLevel = _asDouble(breakdown['dress_level_consistency']);
 
     // Thresholds match the backend _strength_reason / _improvement_reason logic.
     final cohesionLine = clip == null

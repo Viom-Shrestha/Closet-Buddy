@@ -30,7 +30,7 @@ def _clamp(value: float, min_value: float = 0.0, max_value: float = 1.0) -> floa
     return max(min(value, max_value), min_value)
 
 
-# ─── Shared prompt builders ───────────────────────────────────────────────────
+#  Shared prompt builders 
 
 def build_recommendation_prompt(
     user_prompt: Optional[str], occasion: Optional[str], weather: Dict
@@ -98,7 +98,7 @@ def build_rating_prompt(outfit: Dict) -> str:
     return " ".join(parts)
 
 
-# ─── Shared sub-scores ────────────────────────────────────────────────────────
+#  Shared sub-scores 
 
 def clip_score(outfit: Dict, text_prompt: str) -> float:
     try:
@@ -136,7 +136,7 @@ def clip_score(outfit: Dict, text_prompt: str) -> float:
         return 0.5
 
 
-# ─── Color family definitions ─────────────────────────────────────────────────
+#  Color family definitions 
 COLOR_FAMILIES: Dict[str, List[str]] = {
     # Neutrals
     "white":     ["white", "cream", "ivory", "off-white", "snow", "chalk",
@@ -221,7 +221,7 @@ COOL_FAMILIES = {
 # Families that sit between warm and cool — pair with either
 NEUTRAL_TEMP_FAMILIES = {"white", "black", "beige"}
 
-# ─── Known good pairings (family-level) ───────────────────────────────────────
+#  Known good pairings (family-level) 
 GOOD_PAIRINGS: set[frozenset[str]] = {
     # Classic neutrals
     frozenset(["black", "white"]),
@@ -327,7 +327,7 @@ GOOD_PAIRINGS: set[frozenset[str]] = {
     frozenset(["indigo", "mustard"]),
 }
 
-# ─── Known clashing pairings ──────────────────────────────────────────────────
+#  Known clashing pairings 
 BAD_PAIRINGS: set[frozenset[str]] = {
     frozenset(["red", "green"]),
     frozenset(["red", "orange"]),      # too close, fights itself
@@ -414,7 +414,7 @@ def color_harmony_score(outfit: Dict) -> float:
     non_neutral = [f for f in unique_families if f not in NEUTRAL_FAMILIES]
     neutral_fams = [f for f in unique_families if f in NEUTRAL_FAMILIES]
 
-    # ── Hard penalty for known clashing pairs ────────────────────────────────
+    #  Hard penalty for known clashing pairs 
     clash_penalty = 0.0
     for i in range(len(non_neutral)):
         for j in range(i + 1, len(non_neutral)):
@@ -428,7 +428,7 @@ def color_harmony_score(outfit: Dict) -> float:
             if pair in BAD_PAIRINGS:
                 clash_penalty += 0.15
 
-    # ── Base score by palette structure ──────────────────────────────────────
+    #  Base score by palette structure 
     if len(unique_families) == 1:
         # Monochromatic — always clean
         score = 0.82
@@ -970,17 +970,12 @@ def ai_rating_snapshot(outfit: Dict) -> Dict:
         "ai_rating_score": score,
         "ai_rating_reasons": reasons,
         "ai_rating_breakdown": {
-            # Keep legacy key name for client compatibility.
             "clip": round(clip, 4),
             "prompt_alignment": round(prompt_alignment, 4),
             "image_cohesion": round(image_cohesion, 4),
             "attribute_cohesion": round(attribute_cohesion, 4),
             "color_harmony": round(color, 4),
             "dress_level_consistency": round(dress_level, 4),
-            # Keep legacy key name for client compatibility.
-            "formality_consistency": round(dress_level, 4),
-            # Legacy fallback key for older clients/tests.
-            "neutral_weather_fit": round(dress_level, 4),
             "overall_raw": round(overall_raw, 4),
         },
     }
