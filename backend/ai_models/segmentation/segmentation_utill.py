@@ -4,6 +4,7 @@ import uuid
 from django.conf import settings
 from pathlib import Path
 
+# IMAGE SEGMENTATION FUNCTION
 def segment_image(uploaded_image):
     input_image = Image.open(uploaded_image)
 
