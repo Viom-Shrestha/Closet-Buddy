@@ -1,5 +1,3 @@
-# ai_models/classification/attribute_clip.py
-
 from transformers import CLIPProcessor, CLIPModel
 from PIL import Image
 import torch
@@ -11,12 +9,7 @@ MODEL_NAME = "patrickjohncyh/fashion-clip"
 clip_model = CLIPModel.from_pretrained(MODEL_NAME).to(device)
 clip_processor = CLIPProcessor.from_pretrained(MODEL_NAME, use_fast=True)
 
-
-# ===============================
-# ATTRIBUTE PROMPT GROUPS
-# ===============================
-
-# -------- GLOBAL GROUPS --------
+# GLOBAL GROUPS 
 
 PATTERN_PROMPTS = {
     "solid": "solid color clothing",
@@ -52,7 +45,7 @@ FIT_PROMPTS = {
     "oversized": "oversized clothing"
 }
 
-# -------- UPPER BODY --------
+#  UPPER BODY 
 
 SLEEVE_PROMPTS = {
     "long sleeve": "long sleeve top",
@@ -67,7 +60,7 @@ NECKLINE_PROMPTS = {
     "hooded": "hooded top"
 }
 
-# -------- LOWER BODY --------
+#  LOWER BODY 
 
 LOWER_LENGTH_PROMPTS = {
     "full length": "full length pants",
@@ -77,7 +70,7 @@ LOWER_LENGTH_PROMPTS = {
     "midi": "midi skirt"
 }
 
-# -------- FULL BODY --------
+#  FULL BODY 
 
 DRESS_LENGTH_PROMPTS = {
     "mini dress": "mini dress",
@@ -85,7 +78,7 @@ DRESS_LENGTH_PROMPTS = {
     "maxi dress": "long maxi dress"
 }
 
-# -------- SHOES --------
+#  SHOES 
 
 SHOE_TYPE_PROMPTS = {
     "sneakers": "sneakers athletic running shoes trainers",
@@ -119,10 +112,9 @@ SHOE_USAGE_PROMPTS = {
 }
 
 
-# ===============================
-# CORE CLIP SCORING FUNCTION
-# ===============================
 
+# Core scoring function
+# This function takes an image and a dictionary of prompts, and returns a dictionary of scores for each prompt based on how well the image matches the prompt.
 def _score_prompts(image, prompt_dict):
 
     labels = list(prompt_dict.keys())
@@ -157,9 +149,7 @@ def _pick_top_k(image, prompt_dict, k=1, threshold=0.30):
     return [item[0] for item in sorted_items[:k] if item[1] > threshold]
 
 
-# ===============================
-# MAIN ATTRIBUTE EXTRACTOR
-# ===============================
+# Main attribute extraction function for clothing items.
 
 UPPER_BODY = [
     "Shirt","Tee","Blouse","Jacket","Coat","Hoodie","Sweater"
@@ -180,7 +170,7 @@ def extract_attributes(image_path, subcategory):
 
     attributes = []
 
-    # ---- GLOBAL ----
+    #  GLOBAL 
     attributes.append(_pick_best(image, PATTERN_PROMPTS))
     attributes.append(_pick_best(image, STYLE_PROMPTS))
     attributes.append(_pick_best(image, FIT_PROMPTS))
@@ -188,7 +178,7 @@ def extract_attributes(image_path, subcategory):
     fabric = _pick_top_k(image, FABRIC_PROMPTS, k=1)
     attributes.extend(fabric)
 
-    # ---- CATEGORY SPECIFIC ----
+    #  CATEGORY SPECIFIC 
     if subcategory in UPPER_BODY:
         attributes.append(_pick_best(image, SLEEVE_PROMPTS))
         attributes.append(_pick_best(image, NECKLINE_PROMPTS))
@@ -206,9 +196,8 @@ def extract_attributes(image_path, subcategory):
     return attributes
 
 
-# ===============================
+
 # SHOE ATTRIBUTE EXTRACTOR
-# ===============================
 
 def extract_shoe_details(image_path):
 
