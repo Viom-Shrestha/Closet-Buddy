@@ -16,7 +16,7 @@ def _title_label(raw: object) -> str:
         return ""
     return " ".join(part.capitalize() for part in text.split())
 
-
+# Main function to classify shoe metadata from an image.
 def classify_shoe_metadata(image_path: Union[str, Path]) -> Tuple[str, str, str, List[str]]:
     """
     Return normalized shoe metadata tuple:

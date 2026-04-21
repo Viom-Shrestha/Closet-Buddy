@@ -6,7 +6,7 @@ from sklearn.cluster import KMeans
 UNKNOWN_RESULT = {"dominant_color": "Unknown", "secondary_color": "Unknown"}
 MAX_SAMPLE_PIXELS = 20000
 
-# Expanded, canonical color families aligned with recommendation scoring.
+# Color family definitions for mapping RGB values to color names. Each color has a list of representative RGB tuples that define the range of that color family.
 COLOR_FAMILIES = {
     "black": [(8, 8, 8), (25, 25, 25)],
     "white": [(245, 245, 245), (255, 255, 255)],
