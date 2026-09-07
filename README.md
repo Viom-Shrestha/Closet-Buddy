@@ -5,6 +5,10 @@ Final Year Project repository with:
 - `backend/` Django API + AI model integration
 - `frontend/` Flutter client
 
+## Demo
+
+[Watch the demo video](https://drive.google.com/file/d/15-n8NsiPU0z116eTlWdQtOhHeEBGoPL_/view?usp=sharing)
+
 ## Repository Layout
 
 - `backend/ai_models` model-related logic
@@ -15,6 +19,15 @@ Final Year Project repository with:
 - `frontend/lib/services` API/data services
 - `frontend/lib/widgets` reusable widgets
 - `frontend/lib/theme` design tokens and themes
+
+## Backend Quick Start
+
+```bash
+cd backend
+cp .env.example .env   # then fill in your local secret key / DB credentials
+uv run python manage.py migrate
+uv run python manage.py runserver
+```
 
 ## Frontend Quick Start
 
