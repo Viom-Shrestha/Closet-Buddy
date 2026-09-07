@@ -47,7 +47,8 @@ def build_recommendation_prompt(
         if condition:
             parts.append(condition)
         return " ".join([p for p in parts if p])
-    weather_phrase = temperature or condition or "mild"
+    weather_info = [temperature, condition]
+    weather_phrase = " and ".join([w for w in weather_info if w]) or "mild"
     if occasion:
         return f"a stylish {occasion.strip()} outfit for {weather_phrase} weather"
     return f"a stylish outfit for {weather_phrase} weather"

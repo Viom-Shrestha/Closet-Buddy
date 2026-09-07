@@ -78,7 +78,9 @@ class EditableOutfitCanvas extends StatefulWidget {
 class _EditableOutfitCanvasState extends State<EditableOutfitCanvas> {
   static const _minScale = 0.35;
   static const _maxScale = 2.6;
-  static const _safePaddingRatio = 0.03;
+  static const _safePaddingRatio = 0.04;
+  static const _widthClampTightening = 0.08;
+  static const _interactiveScaleHeadroom = 1.10;
   static const _previewMarginRatio = 0.05;
 
   final Map<String, EditableCanvasTransform> _transforms = {};
@@ -291,14 +293,21 @@ class _EditableOutfitCanvasState extends State<EditableOutfitCanvas> {
 
   double _maxScaleForItem(EditableCanvasItem item) {
     final visibleFactor = 1 - (_safePaddingRatio * 2);
-    final widthCap = visibleFactor / math.max(item.widthFactor, 0.0001);
+    final widthVisibleFactor = math.max(
+      0.1,
+      visibleFactor - _widthClampTightening,
+    );
+    final widthCap = widthVisibleFactor / math.max(item.widthFactor, 0.0001);
     final heightCap = visibleFactor / math.max(item.heightFactor, 0.0001);
     return math.min(widthCap, heightCap);
   }
 
   double _clampScaleForItem(EditableCanvasItem item, double scale) {
     final safeInput = scale.isFinite ? scale : 1.0;
-    final itemCap = _maxScaleForItem(item);
+    var itemCap = _maxScaleForItem(item);
+    if (widget.interactive) {
+      itemCap = math.min(_maxScale, itemCap * _interactiveScaleHeadroom);
+    }
     final upper = math.max(_minScale, math.min(_maxScale, itemCap));
     return safeInput.clamp(_minScale, upper).toDouble();
   }

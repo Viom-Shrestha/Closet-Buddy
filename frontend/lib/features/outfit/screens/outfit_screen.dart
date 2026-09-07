@@ -276,7 +276,8 @@ class _OutfitsPageState extends State<OutfitsPage> {
                         }, childCount: displayed.length),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
-                          childAspectRatio: 0.40,
+                          // Increased aspect ratio so cards are less tall
+                          childAspectRatio: 0.48,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),
@@ -908,9 +909,9 @@ class _GalleryCard extends StatelessWidget {
           id: 'bottom-${_asInt(bottom['id']) ?? 0}',
           label: 'Bottomwear',
           imageUrl: _imageOf(bottom),
-          widthFactor: 0.5,
-          heightFactor: 0.27,
-          defaultOffset: const Offset(0, 0.23),
+          widthFactor: 0.47,
+          heightFactor: 0.36,
+          defaultOffset: const Offset(0, 0.22),
         ),
       );
     }
@@ -920,8 +921,8 @@ class _GalleryCard extends StatelessWidget {
           id: 'top-${_asInt(top['id']) ?? 0}',
           label: 'Topwear',
           imageUrl: _imageOf(top),
-          widthFactor: 0.62,
-          heightFactor: 0.28,
+          widthFactor: 0.52,
+          heightFactor: 0.36,
           defaultOffset: const Offset(0, -0.03),
         ),
       );
@@ -932,9 +933,9 @@ class _GalleryCard extends StatelessWidget {
           id: 'outerwear-${_asInt(outerwear['id']) ?? 0}',
           label: 'Outerwear',
           imageUrl: _imageOf(outerwear),
-          widthFactor: 0.64,
-          heightFactor: 0.24,
-          defaultOffset: const Offset(0, -0.23),
+          widthFactor: 0.54,
+          heightFactor: 0.36,
+          defaultOffset: const Offset(0, -0.22),
         ),
       );
     }
@@ -944,9 +945,9 @@ class _GalleryCard extends StatelessWidget {
           id: 'shoes-${_asInt(shoes['id']) ?? 0}',
           label: 'Shoes',
           imageUrl: _imageOf(shoes),
-          widthFactor: 0.46,
-          heightFactor: 0.17,
-          defaultOffset: const Offset(0, 0.41),
+          widthFactor: 0.44,
+          heightFactor: 0.18,
+          defaultOffset: const Offset(0, 0.34),
         ),
       );
     }
@@ -1549,6 +1550,107 @@ class _ItemTile extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _resolveImage(dynamic rawUrl) {
+    final url = (rawUrl ?? '').toString().trim();
+    if (url.isEmpty) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('/')) return '${ApiClient.host}$url';
+    return '${ApiClient.host}/$url';
+  }
+}
+
+class _PickerItemTile extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final bool selected;
+  final VoidCallback onTap;
+  final bool multiSelect;
+
+  const _PickerItemTile({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+    this.multiSelect = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final image = _resolveImage(item['image']);
+    final label = ((item['subcategory'] ?? item['category'] ?? 'Item') as Object).toString();
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: BoxDecoration(
+          color: selected ? OutfitTokens.tagBg : OutfitTokens.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? OutfitTokens.ink : OutfitTokens.border,
+            width: selected ? 2.0 : 1.0,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+                    child: image.isEmpty
+                        ? const Center(
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 30,
+                              color: OutfitTokens.muted,
+                            ),
+                          )
+                        : Image.network(image, fit: BoxFit.contain),
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(6, 4, 6, 7),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: OutfitTokens.border),
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (selected)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: OutfitTokens.ink,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    size: 13,
+                    color: OutfitTokens.white,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -2276,9 +2378,9 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
           id: 'bottom-${_asInt(bottom['id']) ?? 0}',
           label: 'Bottomwear',
           imageUrl: _imageOf(bottom),
-          widthFactor: 0.5,
-          heightFactor: 0.27,
-          defaultOffset: const Offset(0, 0.23),
+          widthFactor: 0.47,
+          heightFactor: 0.36,
+          defaultOffset: const Offset(0, 0.22),
         ),
       );
     }
@@ -2288,8 +2390,8 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
           id: 'top-${_asInt(top['id']) ?? 0}',
           label: 'Topwear',
           imageUrl: _imageOf(top),
-          widthFactor: 0.62,
-          heightFactor: 0.28,
+          widthFactor: 0.52,
+          heightFactor: 0.36,
           defaultOffset: const Offset(0, -0.03),
         ),
       );
@@ -2300,9 +2402,9 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
           id: 'outerwear-${_asInt(outerwear['id']) ?? 0}',
           label: 'Outerwear',
           imageUrl: _imageOf(outerwear),
-          widthFactor: 0.64,
-          heightFactor: 0.24,
-          defaultOffset: const Offset(0, -0.23),
+          widthFactor: 0.54,
+          heightFactor: 0.36,
+          defaultOffset: const Offset(0, -0.22),
         ),
       );
     }
@@ -2312,9 +2414,9 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
           id: 'shoes-${_asInt(shoes['id']) ?? 0}',
           label: 'Shoes',
           imageUrl: _imageOf(shoes),
-          widthFactor: 0.46,
-          heightFactor: 0.17,
-          defaultOffset: const Offset(0, 0.41),
+          widthFactor: 0.44,
+          heightFactor: 0.18,
+          defaultOffset: const Offset(0, 0.34),
         ),
       );
     }
@@ -2468,29 +2570,53 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
       isScrollControlled: true,
       backgroundColor: OutfitTokens.bg,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        final pickerHeight = (MediaQuery.of(context).size.height * 0.55)
-            .clamp(260.0, 460.0)
+        final pickerHeight = (MediaQuery.of(context).size.height * 0.52)
+            .clamp(220.0, 440.0)
             .toDouble();
         return SafeArea(
           top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 6),
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: OutfitTokens.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 4, 10, 12),
+                child: Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${items.length} item${items.length == 1 ? '' : 's'} available',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: OutfitTokens.muted,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     TextButton.icon(
@@ -2501,89 +2627,106 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
                       style: TextButton.styleFrom(
                         foregroundColor: WidgetTokens.accent,
                       ),
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Add Item'),
+                      icon: const Icon(Icons.add, size: 15),
+                      label: const Text(
+                        'Add',
+                        style: TextStyle(fontSize: 13),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                if (items.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 20),
-                    child: Text(
-                      'No items found in this category yet.',
-                      style: TextStyle(color: OutfitTokens.muted),
-                    ),
-                  )
-                else
-                  SizedBox(
-                    height: pickerHeight,
-                    child: GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 4,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                            childAspectRatio: 0.74,
-                          ),
-                      itemCount: items.length + (optionalNone ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (optionalNone && index == 0) {
-                          final isSelected = selectedIndex == -1;
-                          return GestureDetector(
-                            onTap: () {
-                              onSelect(-1);
-                              Navigator.pop(context);
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? OutfitTokens.tagBg
-                                    : OutfitTokens.surface,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? OutfitTokens.ink
-                                      : OutfitTokens.border,
-                                  width: isSelected ? 1.5 : 1,
-                                ),
-                              ),
-                              child: const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.block,
-                                    size: 20,
-                                    color: OutfitTokens.muted,
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'None',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }
-                        final itemIndex = optionalNone ? index - 1 : index;
-                        return _ItemTile(
-                          item: items[itemIndex],
-                          selected: selectedIndex == itemIndex,
+              ),
+              const Divider(height: 1),
+              if (items.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.checkroom_outlined,
+                        size: 40,
+                        color: OutfitTokens.muted.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'No items in this category yet.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: OutfitTokens.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                SizedBox(
+                  height: pickerHeight,
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(14),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 0.78,
+                        ),
+                    itemCount: items.length + (optionalNone ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (optionalNone && index == 0) {
+                        final isSelected = selectedIndex == -1;
+                        return GestureDetector(
                           onTap: () {
-                            onSelect(itemIndex);
+                            onSelect(-1);
                             Navigator.pop(context);
                           },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? OutfitTokens.tagBg
+                                  : OutfitTokens.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSelected
+                                    ? OutfitTokens.ink
+                                    : OutfitTokens.border,
+                                width: isSelected ? 2.0 : 1,
+                              ),
+                            ),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.block_outlined,
+                                  size: 26,
+                                  color: OutfitTokens.muted,
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'None',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         );
-                      },
-                    ),
+                      }
+                      final itemIndex = optionalNone ? index - 1 : index;
+                      return _PickerItemTile(
+                        item: items[itemIndex],
+                        selected: selectedIndex == itemIndex,
+                        onTap: () {
+                          onSelect(itemIndex);
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         );
       },
@@ -2597,31 +2740,63 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
       isScrollControlled: true,
       backgroundColor: OutfitTokens.bg,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final pickerHeight = (MediaQuery.of(context).size.height * 0.55)
-                .clamp(260.0, 460.0)
+            final pickerHeight = (MediaQuery.of(context).size.height * 0.52)
+                .clamp(220.0, 440.0)
                 .toDouble();
+            final selectedCount = working.length;
             return SafeArea(
               top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 6),
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: OutfitTokens.border,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 4, 10, 12),
+                    child: Row(
                       children: [
-                        const Expanded(
-                          child: Text(
-                            'Select Accessories',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Accessories',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                selectedCount == 0
+                                    ? 'Tap items to select'
+                                    : '$selectedCount selected',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: selectedCount > 0
+                                      ? WidgetTokens.accent
+                                      : OutfitTokens.muted,
+                                  fontWeight: selectedCount > 0
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         TextButton.icon(
@@ -2632,51 +2807,71 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
                           style: TextButton.styleFrom(
                             foregroundColor: WidgetTokens.accent,
                           ),
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Add Item'),
+                          icon: const Icon(Icons.add, size: 15),
+                          label: const Text(
+                            'Add',
+                            style: TextStyle(fontSize: 13),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    if (_accessories.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 20),
-                        child: Text(
-                          'No accessories found yet.',
-                          style: TextStyle(color: OutfitTokens.muted),
-                        ),
-                      )
-                    else
-                      SizedBox(
-                        height: pickerHeight,
-                        child: GridView.builder(
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 4,
-                                crossAxisSpacing: 8,
-                                mainAxisSpacing: 8,
-                                childAspectRatio: 0.74,
-                              ),
-                          itemCount: _accessories.length,
-                          itemBuilder: (context, index) => _ItemTile(
-                            item: _accessories[index],
-                            selected: working.contains(index),
-                            multiSelect: true,
-                            onTap: () {
-                              setModalState(() {
-                                if (working.contains(index)) {
-                                  working.remove(index);
-                                } else {
-                                  working.add(index);
-                                }
-                              });
-                            },
+                  ),
+                  const Divider(height: 1),
+                  if (_accessories.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.watch_outlined,
+                            size: 40,
+                            color: OutfitTokens.muted.withValues(alpha: 0.5),
                           ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'No accessories yet.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: OutfitTokens.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: pickerHeight,
+                      child: GridView.builder(
+                        padding: const EdgeInsets.all(14),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                              childAspectRatio: 0.78,
+                            ),
+                        itemCount: _accessories.length,
+                        itemBuilder: (context, index) => _PickerItemTile(
+                          item: _accessories[index],
+                          selected: working.contains(index),
+                          multiSelect: true,
+                          onTap: () {
+                            setModalState(() {
+                              if (working.contains(index)) {
+                                working.remove(index);
+                              } else {
+                                working.add(index);
+                              }
+                            });
+                          },
                         ),
                       ),
-                    const SizedBox(height: 8),
-                    SizedBox(
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                    child: SizedBox(
                       width: double.infinity,
+                      height: 48,
                       child: FilledButton(
                         onPressed: () {
                           final previous = Set<int>.from(_accessoryIndices);
@@ -2697,12 +2892,19 @@ class _OutfitBuilderPageState extends State<OutfitBuilderPage> {
                         },
                         style: FilledButton.styleFrom(
                           backgroundColor: OutfitTokens.ink,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        child: const Text('Apply'),
+                        child: Text(
+                          selectedCount == 0
+                              ? 'Apply'
+                              : 'Apply ($selectedCount selected)',
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             );
           },
@@ -3518,9 +3720,9 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
           id: 'bottom-${_asInt(bottom['id']) ?? 0}',
           label: 'Bottomwear',
           imageUrl: _imageOf(bottom),
-          widthFactor: 0.5,
-          heightFactor: 0.27,
-          defaultOffset: const Offset(0, 0.23),
+          widthFactor: 0.47,
+          heightFactor: 0.36,
+          defaultOffset: const Offset(0, 0.22),
         ),
       );
     }
@@ -3530,8 +3732,8 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
           id: 'top-${_asInt(top['id']) ?? 0}',
           label: 'Topwear',
           imageUrl: _imageOf(top),
-          widthFactor: 0.62,
-          heightFactor: 0.28,
+          widthFactor: 0.52,
+          heightFactor: 0.36,
           defaultOffset: const Offset(0, -0.03),
         ),
       );
@@ -3542,9 +3744,9 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
           id: 'outerwear-${_asInt(outerwear['id']) ?? 0}',
           label: 'Outerwear',
           imageUrl: _imageOf(outerwear),
-          widthFactor: 0.64,
-          heightFactor: 0.24,
-          defaultOffset: const Offset(0, -0.23),
+          widthFactor: 0.54,
+          heightFactor: 0.36,
+          defaultOffset: const Offset(0, -0.22),
         ),
       );
     }
@@ -3554,9 +3756,9 @@ class _OutfitDetailPageState extends State<OutfitDetailPage> {
           id: 'shoes-${_asInt(shoes['id']) ?? 0}',
           label: 'Shoes',
           imageUrl: _imageOf(shoes),
-          widthFactor: 0.46,
-          heightFactor: 0.17,
-          defaultOffset: const Offset(0, 0.41),
+          widthFactor: 0.44,
+          heightFactor: 0.18,
+          defaultOffset: const Offset(0, 0.34),
         ),
       );
     }

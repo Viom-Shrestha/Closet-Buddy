@@ -3,7 +3,9 @@
     "allow": [
       "Bash(xargs ls:*)",
       "Bash(python -m uv run python backend/manage.py makemigrations api --name remove_outfit_clothing_items_m2m)",
-      "Bash(uv run *)"
+      "Bash(uv run *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\acer\\\\Desktop\\\\Personal\\\\closet_buddy\\\\frontend\\\\lib\" -Recurse -Name)",
+      "Bash(Select-Object -First 50)"
     ]
   }
 }

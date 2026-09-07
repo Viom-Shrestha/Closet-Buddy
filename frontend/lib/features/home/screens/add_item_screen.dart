@@ -52,7 +52,7 @@ class AddItemSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final options = [
       _AddItemOption(
-        title: 'Clothing Item',
+        title: 'Clothing',
         description: 'AI analysis for category, colors, and attributes',
         icon: Icons.checkroom_outlined,
         iconColor: AddItemTokens.info,
@@ -68,15 +68,15 @@ class AddItemSheet extends StatelessWidget {
       ),
       _AddItemOption(
         title: 'Accessory',
-        description: 'Upload accessory and run segmentation only',
+        description: 'Segmentation only — bags, watches, belts, etc.',
         icon: Icons.watch_outlined,
         iconColor: AddItemTokens.purple,
         onTap: () =>
             _openStorageSelector(context, isClothing: false, isAccessory: true),
       ),
       _AddItemOption(
-        title: 'Non-Clothing Item',
-        description: 'Add misc items without AI processing',
+        title: 'Other',
+        description: 'Misc items without AI processing',
         icon: Icons.shopping_bag_outlined,
         iconColor: AddItemTokens.success,
         onTap: () => _openStorageSelector(context, isClothing: false),
@@ -85,98 +85,138 @@ class AddItemSheet extends StatelessWidget {
 
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 2),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AddItemTokens.line,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 16, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Add Item',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Add to Wardrobe',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                              color: AddItemTokens.ink,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Choose what type of item to add.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AddItemTokens.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, size: 18),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AddItemTokens.surfaceSoft,
+                        padding: const EdgeInsets.all(8),
+                      ),
+                    ),
+                  ],
                 ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AddItemTokens.surfaceSoft,
-                  ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(child: _BigOptionCard(option: options[0])),
+                    const SizedBox(width: 10),
+                    Expanded(child: _BigOptionCard(option: options[1])),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _BigOptionCard(option: options[2])),
+                    const SizedBox(width: 10),
+                    Expanded(child: _BigOptionCard(option: options[3])),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            const Text(
-              'Pick a type to continue.',
-              style: TextStyle(color: AddItemTokens.muted),
-            ),
-            const SizedBox(height: 12),
-            for (final option in options) ...[
-              _MinimalOptionTile(option: option),
-              const SizedBox(height: 10),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _MinimalOptionTile extends StatelessWidget {
+class _BigOptionCard extends StatelessWidget {
   final _AddItemOption option;
 
-  const _MinimalOptionTile({required this.option});
+  const _BigOptionCard({required this.option});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
       onTap: option.onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AddItemTokens.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AddItemTokens.line),
+          color: option.iconColor.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: option.iconColor.withValues(alpha: 0.22),
+          ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: option.iconColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
+                color: option.iconColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(option.icon, color: option.iconColor, size: 22),
+              child: Icon(option.icon, color: option.iconColor, size: 23),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    option.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AddItemTokens.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    option.description,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AddItemTokens.muted,
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 12),
+            Text(
+              option.title,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AddItemTokens.ink,
               ),
             ),
-            const Icon(Icons.chevron_right, color: AddItemTokens.muted),
+            const SizedBox(height: 4),
+            Text(
+              option.description,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AddItemTokens.muted,
+                height: 1.35,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
