@@ -256,16 +256,7 @@ def _classify_clothing_safe(image_path: Path) -> Tuple[str, str, List[str]]:
         subcategory = _title_label(predicted_subcategory) or "Shirt"
         category = _infer_category(subcategory)
     except Exception:
-        # Backward-compatible fallback to prior classifier when local .pth inference fails.
-        try:
-            from ai_models.classification.subcategory import test_subcategory
-
-            with Image.open(image_path).convert("RGB") as segmented_image:
-                predicted_subcategory, _ = test_subcategory(segmented_image)
-            subcategory = _title_label(predicted_subcategory) or "Shirt"
-            category = _infer_category(subcategory)
-        except Exception:
-            pass
+        pass
 
     try:
         attributes = extract_attributes(image_path, subcategory)

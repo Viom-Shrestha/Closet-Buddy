@@ -1776,9 +1776,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           id: 'bottom-${_asInt(bottom['id']) ?? 0}',
           label: 'Bottomwear',
           imageUrl: _imageOf(bottom),
-          widthFactor: 0.5,
-          heightFactor: 0.27,
-          defaultOffset: const Offset(0, 0.23),
+          widthFactor: 0.47,
+          heightFactor: 0.36,
+          defaultOffset: const Offset(0, 0.22),
         ),
       );
     }
@@ -1788,8 +1788,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           id: 'top-${_asInt(top['id']) ?? 0}',
           label: 'Topwear',
           imageUrl: _imageOf(top),
-          widthFactor: 0.62,
-          heightFactor: 0.28,
+          widthFactor: 0.52,
+          heightFactor: 0.36,
           defaultOffset: const Offset(0, -0.03),
         ),
       );
@@ -1800,9 +1800,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           id: 'outerwear-${_asInt(outerwear['id']) ?? 0}',
           label: 'Outerwear',
           imageUrl: _imageOf(outerwear),
-          widthFactor: 0.64,
-          heightFactor: 0.24,
-          defaultOffset: const Offset(0, -0.23),
+          widthFactor: 0.54,
+          heightFactor: 0.36,
+          defaultOffset: const Offset(0, -0.22),
         ),
       );
     }
@@ -1812,9 +1812,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           id: 'shoes-${_asInt(shoes['id']) ?? 0}',
           label: 'Shoes',
           imageUrl: _imageOf(shoes),
-          widthFactor: 0.46,
-          heightFactor: 0.17,
-          defaultOffset: const Offset(0, 0.41),
+          widthFactor: 0.44,
+          heightFactor: 0.18,
+          defaultOffset: const Offset(0, 0.34),
         ),
       );
     }
