@@ -3,9 +3,9 @@ POST http://127.0.0.1:8000/api/auth/register/
 Content-Type: application/json
 
 {
-  "username": "test",
-  "email": "viom@test.com",
-  "password": "12345678"
+  "username": "testuser",
+  "email": "testuser@example.com",
+  "password": "changeme123"
 }
 
 ### Login User
@@ -13,6 +13,6 @@ POST http://127.0.0.1:8000/api/auth/login/
 Content-Type: application/json
 
 {
-  "username": "test",
-  "password": "111111"
+  "username": "testuser",
+  "password": "changeme123"
 }
