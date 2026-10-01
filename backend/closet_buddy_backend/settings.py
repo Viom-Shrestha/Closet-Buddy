@@ -37,8 +37,10 @@ _allowed_hosts_from_env = os.getenv('DJANGO_ALLOWED_HOSTS', '').strip()
 if _allowed_hosts_from_env:
     ALLOWED_HOSTS = [host.strip() for host in _allowed_hosts_from_env.split(',') if host.strip()]
 else:
-    # Local development defaults for emulator + LAN device testing.
-    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '10.0.2.2', '*']
+    # Local development defaults for emulator; wildcard (LAN device testing) only in DEBUG.
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '10.0.2.2']
+    if DEBUG:
+        ALLOWED_HOSTS.append('*')
 
 
 # Application definition
@@ -69,7 +71,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True  
+CORS_ALLOW_ALL_ORIGINS = DEBUG
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', '').split(',')
+    if origin.strip()
+]
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'

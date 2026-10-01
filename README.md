@@ -11,7 +11,7 @@ Final Year Project repository with:
 
 ## Repository Layout
 
-- `backend/ai_models` model-related logic
+- `backend/ai_models` model-related logic (the trained weights `backend/ai_models/classification/clothing_classification.pth` are not in git; place the file there manually)
 - `backend/api` backend API app
 - `frontend/lib/app` app bootstrap/composition
 - `frontend/lib/core` DI + config infrastructure

@@ -52,3 +52,7 @@ resources.json
 *.mp4
 *.mov
 *.mkv
+
+# --- Local tooling / model weights ---
+.claude/settings.local.json
+*.pth
